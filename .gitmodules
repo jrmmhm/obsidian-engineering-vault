@@ -1,0 +1,3 @@
+[submodule "50_Quellen"]
+	path = 50_Quellen
+	url = git@github.com:jrmmhm/00_sources.git
