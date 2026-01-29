@@ -10,8 +10,8 @@ Es wird stark empfohlen "Obsidian" als Software für die technische Dokumentatio
 
 1) Obsidian öffnen  
 2) "Ordner als Vault öffnen"  
-3) Ordner auswählen: `PMDE/00_Dokumentation/01_Projektvault`  
-4) Einstieg: `00_README` im Vault lesen
+3) Ordner auswählen: `PMDE/00_Dokumentation`  
+4) Einstieg: `README` unter `01_Projektvault` lesen
 
 
 ## Ordnerstruktur (Überblick)
@@ -27,7 +27,7 @@ Es wird stark empfohlen "Obsidian" als Software für die technische Dokumentatio
   **Wichtig:** Alle hier gespeicherten Dokumente sind projektintern. Externe Quellen liegen unter "50_Quellen".
 
 
-`01_Projektvault/` und `02_Dokumente/` teilen sich die gleiche Hauptordnerstruktur. Um diese Struktur zu verstehen, wird empfohlen 00_README in `01_Projektvault/` zu lesen.
+`01_Projektvault/` und `02_Dokumente/` teilen sich die gleiche Hauptordnerstruktur. Um diese Struktur zu verstehen, wird empfohlen README in `01_Projektvault/` zu lesen.
 
 ---
 
@@ -62,7 +62,7 @@ Enthält alle Hardware-Entwurfsdaten.
 - `14_Elektronik/` Schaltungen, Simulationen, Zusatzdaten (z.B. LTspice)
 
 ### 20_Software
-Software-Code nach projektspezifischer Struktur.
+Software-Code nach projektspezifischer Struktur. Wenn es im Projekt mehrere verschiedene Zuständigkeiten gibt, wird empfohlen pro Zuständigkeit ein Ordner anzulegen, sodass pro Ordner ein Repository angelegt werden kann.
 
 ### 30_Testdaten
 Messdaten und Auswertungen.
