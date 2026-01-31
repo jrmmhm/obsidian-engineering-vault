@@ -1,91 +1,128 @@
-# Projektübersicht
+# Project Overview
 
-Diese Ordner enthalten Hardware, Software, Testdaten, Beschaffung, Quellen sowie die vollständige Projektdokumentation.
-Die technische Dokumentation wird im Projektvault geführt (/00_Dokumentation/01_Projektvault) und ist der zentrale Einstiegspunkt.
+This is a **project structure template** for mechatronics engineering projects. It provides a complete documentation system with hardware, software, test data, procurement, and sources organization.
 
----
+The technical documentation is maintained in the project vault (/00_documentation/01_projectvault) and is the central entry point.
 
-## Schnellstart (Dokumentation lesen)
-Es wird stark empfohlen "Obsidian" als Software für die technische Dokumentation zu verwenden. 
+**Template Features:**
+- Obsidian-based documentation with traceability (requirements → architecture → implementation → verification)
+- Universal example module demonstrating best practices
+- Scalable folder structure for hardware, software, and documentation
+- English documentation for international collaboration
 
-1) Obsidian öffnen  
-2) "Ordner als Vault öffnen"  
-3) Ordner auswählen: `PMDE/00_Dokumentation`  
-4) Einstieg: `README` unter `01_Projektvault` lesen
-
-
-## Ordnerstruktur (Überblick)
-
-### 00_Dokumentation
-- `01_Projektvault/`  
-  Obsidian-Vault. Enthält die gesamte strukturierte Projektdokumentation.
-
-  **Wichtig:** Auschließlich Markdown-Dateien (.md).
-- `02_Dokumente/`
-  Exporte, PDFs, ergänzende Dokumente, die nicht als Markdown-Notizen gepflegt werden, aber eine der Aufgaben im Projektvault erfüllen.
-
-  **Wichtig:** Alle hier gespeicherten Dokumente sind projektintern. Externe Quellen liegen unter "50_Quellen".
-
-
-`01_Projektvault/` und `02_Dokumente/` teilen sich die gleiche Hauptordnerstruktur. Um diese Struktur zu verstehen, wird empfohlen README in `01_Projektvault/` zu lesen.
+**License:** MIT (see LICENSE file) - Free to use for any purpose, including commercial projects
 
 ---
 
-### Abgrenzung: 02_Dokumente vs. 50_Quellen
+## Quick Start (Reading Documentation)
+It is highly recommended to use "Obsidian" as software for the technical documentation.
 
-| Kriterium | 02_Dokumente (intern) | 50_Quellen (extern) |
+1) Open Obsidian
+2) "Open folder as vault"
+3) Select folder: `PMDE/00_documentation`
+4) Entry point: Read `README` under `01_projectvault`
+
+
+## Folder Structure (Overview)
+
+### 00_documentation
+- `01_projectvault/`
+  Obsidian vault. Contains all structured project documentation.
+
+  **Important:** Exclusively Markdown files (.md).
+- `02_documents/`
+  Exports, PDFs, supplementary documents that are not maintained as Markdown notes, but fulfill one of the tasks in the project vault.
+
+  **Important:** All documents stored here are project-internal. External sources are located under "50_sources".
+
+
+`01_projectvault/` and `02_documents/` share the same main folder structure. To understand this structure, it is recommended to read the README in `01_projectvault/`.
+
+---
+
+#### Distinction: 02_documents vs. 50_sources
+
+| Criterion | 02_documents (internal) | 50_sources (external) |
 |-----------|----------------------|---------------------|
-| **Herkunft** | Im Projekt erstellt | Von außen übernommen |
-| **Änderbarkeit** | Kann im Projekt geändert werden | Unverändert übernommen |
+| **Origin** | Created in project | Adopted from outside |
+| **Changeability** | Can be changed in project | Adopted unchanged |
 
-**Beispiele für 02_Dokumente (intern):**
-- Eigener Messbericht zur Spannungsteiler-Kalibrierung
-- Foto des Testaufbaus
-- Projektspezifische Systemübersicht als PDF-Export
-- Kalibrierschein des eigenen Multimeters
-- Interne Präsentation zum Projektreview
+**Examples for 02_documents (internal):**
+- Own measurement report for voltage divider calibration
+- Photo of test setup
+- Project-specific system overview as PDF export
+- Calibration certificate of own multimeter
+- Internal presentation for project review
 
-**Beispiele für 50_Quellen (extern):**
-- Datenblatt des AD7175-2 von Analog Devices
-- DIN EN 61010-1 Norm als PDF
-- Handbuch des Oszilloskops vom Hersteller
-- wissenschaftliches Paper über dielektrische Elastomere
-- STEP-Modell eines Steckverbinders vom Hersteller
+**Examples for 50_sources (external):**
+- Data sheet of AD7175-2 from Analog Devices
+- DIN EN 61010-1 standard as PDF
+- Oscilloscope manual from manufacturer
+- Scientific paper on dielectric elastomers
+- STEP model of a connector from manufacturer
 
-**Faustregel:** Stammt das Dokument von einem Hersteller, Verlag oder Normungsgremium? → `50_Quellen`. Wurde es im Projekt erstellt? → `02_Dokumente`.
+**Rule of thumb:** Does the document come from a manufacturer, publisher, or standards organization? → `50_sources`. Was it created in the project? → `02_documents`.
 
-### 10_Hardware
-Enthält alle Hardware-Entwurfsdaten.
-- `11_Mechanik_CAD/` CAD-Quellen (modellierbar)
-- `12_Mechanik_Export/` Exporte (STEP, STL, DXF etc.)
-- `13_PCB/` Leiterplatten-Design (z.B. KiCad-Projekte)
-- `14_Elektronik/` Schaltungen, Simulationen, Zusatzdaten (z.B. LTspice)
+### 10_hardware
+Contains all hardware design data.
+- `11_mechanics_CAD/` CAD sources (editable)
+- `12_mechanics_export/` Exports (STEP, STL, DXF etc.)
+- `13_PCB/` PCB design (e.g., KiCad projects)
+- `14_electronics/` Circuits, simulations, additional data (e.g., LTspice)
 
-### 20_Software
-Software-Code nach projektspezifischer Struktur. Wenn es im Projekt mehrere verschiedene Zuständigkeiten gibt, wird empfohlen pro Zuständigkeit ein Ordner anzulegen, sodass pro Ordner ein Repository angelegt werden kann.
+### 20_software
+Software code according to project-specific structure. If there are several different responsibilities in the project, it is recommended to create one folder per responsibility, so that one repository can be created per folder.
 
-### 30_Testdaten
-Messdaten und Auswertungen.
-- `31_Testdaten_roh/` Rohdaten (unverändert)
-- `32_Testdaten_verarbeitet/` aufbereitete Daten (bereinigt, konvertiert)
+### 30_testdata
+Measurement data and evaluations.
+- `31_testdata_raw/` Raw data (unchanged)
+- `32_testdata_processed/` Processed data (cleaned, converted)
 
-### 40_Beschaffung
-Komplette Beschaffungsdokumentation inkl. BOM und kaufmännischer Nachweise.
+### 40_procurement
+Complete procurement documentation including BOM and commercial evidence.
 
-### 50_Quellen
-Single Source of Truth für externe Quellen und Programmlibraries (Datenblätter, Manuals, Bücher, CAD-Libraries, Zotero-Lib etc.).
-Unter 50_Quellen findet sich eine "README.md"-Datei, die den Aufbau, Benennung und Navigation detailiert erläutert.
+### 50_sources
+Single Source of Truth for external sources and program libraries (data sheets, manuals, books, CAD libraries, Zotero library, etc.).
+Under 50_sources there is a "README.md" file that explains the structure, naming, and navigation in detail.
 
 
-### 60_Releases
-Definierte Projektstände (Baseline-Snapshots). Jeder Release enthält:
-- Versionsnummer und Datum
-- Git-Tag-Referenz
-- Zusammenfassung der Änderungen
+### 60_releases
+Defined project states (baseline snapshots). Each release contains:
+- Version number and date
+- Git tag reference
+- Summary of changes
 
-### 90_Administration
-Projektorganisation auf Ebene von Abgaben/Präsentationen/Exporte.
-- Präsentationen, Thesis, Praxisbericht, Exporte, Abgabe-Unterlagen
+### 90_administration
+Project organization at the level of submissions/presentations/exports.
+- Presentations, thesis, practice report, exports, submission documents
 
-### 99_Archiv
-Ablage für alte Stände, überholte Inhalte, nicht mehr aktive Dokumente.
+### 99_archive
+Storage for old versions, obsolete content, no longer active documents.
+
+---
+
+## Using This Template
+
+**This is a template repository.** To use it for your own project:
+
+1. **Clone or download** this repository
+2. **Review the example module:** `00_documentation/01_projectvault/03_architecture_(ARC)/ARC_data_acquisition_example.md`
+3. **Delete example files** (files with `_example` in the name) once you understand the structure
+4. **Create your own modules** following the example patterns
+5. **Update LICENSE** file with your name/organization
+6. **Customize** README files to match your project specifics
+
+**Documentation Entry Points:**
+- Start here: `00_documentation/01_projectvault/README.md`
+- System overview: `00_documentation/01_projectvault/system_overview.md`
+- Example module: `ARC_data_acquisition_example.md` (shows complete traceability)
+
+---
+
+## License
+
+This project is licensed under the **MIT License** - see the LICENSE file for details.
+
+**For template users:** You may keep this license (if open sourcing your project) or replace it with your own license. See `LICENSE_GUIDE.md` for guidance on choosing the right license for your project.
+
+Copyright (c) 2025 [Your Name or Organization]
