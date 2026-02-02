@@ -287,7 +287,7 @@ Documentation: See 07_testing_and_evidence_(TAE)/TAE_voltage_sweep_test.md
 ## Example: Complete Test Campaign
 
 ### Scenario
-Verify ADC linearity for data acquisition module (satisfies REQ-DAQ-002 from example)
+Verify ADC linearity for data acquisition module
 
 ### Folder Structure
 ```

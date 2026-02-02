@@ -14,14 +14,13 @@ This file provides an overview of the major system modules and is the entry poin
 
 This table lists all architectural modules in the project. Each row is a distinct module with its own requirements, components, and interfaces.
 
-| Module (ARC)                     | Brief Description                                                                    | Status           |
-| -------------------------------- | ------------------------------------------------------------------------------------ | ---------------- |
-| [[ARC_data_acquisition_example]] | Universal example: Sensor data acquisition at 10 Hz with buffering and communication | Example/Template |
+| Module (ARC)                     | Brief Description                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| [[ARC_data_acquisition_example]] | Universal example: Sensor data acquisition at 10 Hz with buffering and communication |
 
 **Instructions for Projects:**
 - Add one row per major module
 - Keep descriptions brief (one line, <100 characters)
-- Status options: Active, Example, Deprecated, Planned
 
 ---
 
