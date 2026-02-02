@@ -332,8 +332,8 @@ Results:
   - Linearity: ±0.3% FSR (within spec)
   - See processed data for plots and analysis
 Documentation:
-  - TAE file: 07_testing_and_evidence_(TAE)/TAE_adc_linearity_test_example.md
-  - Requirement: REQ-DAQ-002 (timestamp accuracy)
+  - TAE file: 07_testing_and_evidence_(TAE)/TAE_your_test_file.md
+  - Requirement: REQ-XXX-NNN (link to relevant requirement)
 ```
 
 ---
@@ -421,4 +421,3 @@ Store analysis scripts in: `20_software/data_analysis/`
 
 - **Documentation:** Link test campaigns to TAE files in `07_testing_and_evidence_(TAE)/`
 - **Analysis Scripts:** Store in `20_software/data_analysis/`
-- **Example:** See `ARC_data_acquisition_example.md` verification table for data references

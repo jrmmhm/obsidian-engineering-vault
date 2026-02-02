@@ -1,0 +1,131 @@
+# =============================================================================
+# OBSIDIAN
+# =============================================================================
+# User-specific workspace (open tabs, pane layout, etc.)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Graph view cache
+.obsidian/graph.json
+
+# Plugin data that may contain user-specific paths
+.obsidian/workspace-*.json
+
+# =============================================================================
+# A.I.
+# =============================================================================
+.claude
+
+# =============================================================================
+# OPERATING SYSTEM
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# =============================================================================
+# IDE / EDITORS
+# =============================================================================
+# VS Code (user settings, not project config)
+.vscode/settings.json
+.vscode/launch.json
+.vscode/*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# CAD SOFTWARE
+# =============================================================================
+# KiCad
+*-backups/
+*.kicad_prl
+fp-info-cache
+
+# Autodesk Inventor
+*.ipj
+OldVersions/
+
+# FreeCAD
+*.FCStd1
+*.FCBak
+
+# =============================================================================
+# BUILD / COMPILATION
+# =============================================================================
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+ENV/
+
+# C/C++
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.so
+*.dylib
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# =============================================================================
+# TEMPORARY / CACHE
+# =============================================================================
+*.tmp
+*.temp
+*.log
+*.cache
+.cache/
+
+# =============================================================================
+# LARGE FILES (consider using Git LFS instead)
+# =============================================================================
+# Uncomment if you want to ignore large binary files by default
+# *.zip
+# *.tar.gz
+# *.rar
+# *.7z
+
+# =============================================================================
+# SENSITIVE / PERSONAL
+# =============================================================================
+# Environment files with secrets
+.env
+.env.local
+*.env
+
+# Credentials
+credentials.json
+secrets.json
+*.pem
+*.key

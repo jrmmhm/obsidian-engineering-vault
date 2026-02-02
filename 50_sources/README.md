@@ -1,30 +1,30 @@
-# SOURCES – Ablage- und Benennungsregeln
+# SOURCES – Storage and Naming Conventions
 
-Quellen ist der zentrale Pool für externe Quellen (PDFs, CAD-Modelle, Normen, Libraries etc.).
-Semantik/Parameter (z. B. “welcher Widerstand kann was?”) wird NICHT hier gepflegt, sondern in einer separaten Katalog-Datei im entsprechenden Ordner (z. B. `00_catalog.csv`).
+Sources is the central pool for external sources (PDFs, CAD models, standards, libraries, etc.).
+Semantics/parameters (e.g., "which resistor can do what?") are NOT maintained here, but in a separate catalog file in the corresponding folder (e.g., `00_catalog.csv`).
 
-Grundregeln:
-- Dateinamen sind die primäre Metadatenquelle.
-- Keine tiefen Ordnerbäume (max. wenige Ebenen).
-- Jede Datei trägt eine Versions-/Revisionskennung im Namen: `__rev-...` (Dokumente) oder `__v-...` (Modelle/Exports).
-- Domain (Mechanik/Elektronik/…) steckt im Ordner, nicht im Dateinamen.
+Basic rules:
+- Filenames are the primary metadata source.
+- No deep folder trees (max. a few levels).
+- Each file carries a version/revision identifier in the name: `__rev-...` (documents) or `__v-...` (models/exports).
+- Domain (mechanics/electronics/...) is encoded in the folder, not in the filename.
 
 ---
 
 ## 01_datasheets
-**Inhalt**
-- Datenblätter, Errata, PCNs, EOLs, Safety-Sheets, App Notes (sofern klar bauteilbezogen).
+**Content**
+- Datasheets, errata, PCNs, EOLs, safety sheets, app notes (if clearly component-related).
 
-**Dateinamenkonvention**
+**Filename convention**
 `Vendor__MPN_or_Model__DocType__rev-RevOrYear.pdf`
 
-**Variablen**
-- `Vendor` = Hersteller/Quelle als kurzer stabiler Name (z. B. `AnalogDevices`, `Bosch`, `Murata`)
-- `MPN_or_Model` = konkrete Teilenummer / Modellbezeichnung (z. B. `AD7175-2`, `BME280`, `C3216X7R1E106K`)
-- `DocType` = Dokumenttyp (kontrolliertes Vokabular, siehe unten)
-- `rev-RevOrYear` = Revision, Versionscode oder Datum (z. B. `rev-F`, `rev-1.6`, `rev-2024-05-02`)
+**Variables**
+- `Vendor` = Manufacturer/source as short stable name (e.g., `AnalogDevices`, `Bosch`, `Murata`)
+- `MPN_or_Model` = Specific part number / model designation (e.g., `AD7175-2`, `BME280`, `C3216X7R1E106K`)
+- `DocType` = Document type (controlled vocabulary, see below)
+- `rev-RevOrYear` = Revision, version code, or date (e.g., `rev-F`, `rev-1.6`, `rev-2024-05-02`)
 
-**DocType (Empfehlung)**
+**DocType (recommended)**
 - `datasheet`
 - `appnote`
 - `errata`
@@ -32,7 +32,7 @@ Grundregeln:
 - `eol`
 - `safety`
 
-**Beispiele**
+**Examples**
 - `AnalogDevices__AD7175-2__datasheet__rev-F.pdf`
 - `Bosch__BME280__datasheet__rev-1.6.pdf`
 - `Murata__C3216X7R1E106K__datasheet__rev-2024.pdf`
@@ -40,57 +40,57 @@ Grundregeln:
 ---
 
 ## 02_paper
-**Inhalt**
-- Wissenschaftliche Paper (PDF), Preprints, Konferenzbeiträge.
+**Content**
+- Scientific papers (PDF), preprints, conference contributions.
 
-**Dateinamenkonvention**
+**Filename convention**
 `FirstAuthorEtAl__YYYY__shorttitleslug.pdf`
 
-**Variablen**
-- `FirstAuthorEtAl` = Nachname des ersten Autors + `EtAl` (z. B. `RossetEtAl`)
-- `YYYY` = Veröffentlichungsjahr (vierstellig)
-- `shorttitleslug` = kurzer Titel-Slug, lowercase, `_` statt Leerzeichen (z. B. `dielectric_elastomer_actuators_review`)
+**Variables**
+- `FirstAuthorEtAl` = Last name of first author + `EtAl` (e.g., `RossetEtAl`)
+- `YYYY` = Publication year (four digits)
+- `shorttitleslug` = Short title slug, lowercase, `_` instead of spaces (e.g., `dielectric_elastomer_actuators_review`)
 
-**Beispiel**
+**Example**
 - `RossetEtAl__2016__dielectric_elastomer_actuators_review.pdf`
 
 ---
 
 ## 03_books
-**Inhalt**
-- Fachbücher als PDF/Scan, offizielle E-Books, Buchkapitel (wenn als Buchquelle geführt).
+**Content**
+- Technical books as PDF/scan, official e-books, book chapters (when cited as book source).
 
-**Dateinamenkonvention**
+**Filename convention**
 `Author__YYYY__shorttitleslug__ed-n__LANG.pdf`
 
-**Variablen**
-- `Author` = Nachname (bei mehreren: erster Autor/Editor als Hauptanker)
-- `YYYY` = Erscheinungsjahr
-- `shorttitleslug` = kurzer Titel-Slug (lowercase, `_`)
-- `ed-n` = Edition/Auflage als Zahl (z. B. `ed-1`, `ed-3`)
-- `LANG` = Sprache (z. B. `DE`, `EN`), weil hier relevant
+**Variables**
+- `Author` = Last name (for multiple authors: first author/editor as main anchor)
+- `YYYY` = Publication year
+- `shorttitleslug` = Short title slug (lowercase, `_`)
+- `ed-n` = Edition as number (e.g., `ed-1`, `ed-3`)
+- `LANG` = Language (e.g., `DE`, `EN`), relevant here
 
-**Beispiel**
-- `HerbertBernstein__2020__Messen-mit-dem-Oszilloskop__ed-3__DE.pdf`
+**Example**
+- `HerbertBernstein__2020__measuring_with_oscilloscope__ed-3__DE.pdf`
 
 ---
 
 ## 04_standards
-**Inhalt**
-- Normen als PDF (Volltext oder Auszug), normative Dokumente.
+**Content**
+- Standards as PDF (full text or excerpt), normative documents.
 
-**Dateinamenkonvention**
+**Filename convention**
 `DIN_EN_...__YYYY__LANG__full.pdf`
-oder
+or
 `DIN_EN_...__YYYY__LANG__excerpt.pdf`
 
-**Variablen**
-- `DIN_EN_...` = Normenkennung, wie sie offiziell geführt wird (mit `_` statt Leerzeichen/Bindestrich-Trennung nach Bedarf)
-- `YYYY` = Ausgabejahr / Stand
-- `LANG` = Sprache (`DE`, `EN`, …)
-- `full|excerpt` = Volltext oder Auszug
+**Variables**
+- `DIN_EN_...` = Standard identifier as officially designated (with `_` instead of spaces/hyphens as needed)
+- `YYYY` = Issue year / version
+- `LANG` = Language (`DE`, `EN`, ...)
+- `full|excerpt` = Full text or excerpt
 
-**Beispiele**
+**Examples**
 - `DIN_EN_61010-1__2020__DE__full.pdf`
 - `DIN_EN_50191__2011__DE__full.pdf`
 - `DIN_VDE_0100-410__2018__DE__excerpt.pdf`
@@ -98,17 +98,17 @@ oder
 ---
 
 ## 05_manuals
-**Inhalt**
-- Handbücher, Programming Guides, User Manuals, Installationsanleitungen, Bedienungsanleitungen (nicht primär “Bauteil-Datenblatt”, sondern Produkt-/Systemdoku).
+**Content**
+- Manuals, programming guides, user manuals, installation guides, operating instructions (not primarily "component datasheet", but product/system documentation).
 
-**Dateinamenkonvention**
+**Filename convention**
 `Vendor__Product__DocType__rev-RevOrYear.pdf`
 
-**Variablen**
-- `Vendor` = Hersteller/Quelle
-- `Product` = Produktname/Modell (z. B. `USB220`, `Siglent_SDS814X_HD`)
-- `DocType` = Dokumenttyp (siehe unten)
-- `rev-RevOrDate` = Revision/Version/Datum (z. B. `rev-2025-03-01`)
+**Variables**
+- `Vendor` = Manufacturer/source
+- `Product` = Product name/model (e.g., `USB220`, `Siglent_SDS814X_HD`)
+- `DocType` = Document type (see below)
+- `rev-RevOrDate` = Revision/version/date (e.g., `rev-2025-03-01`)
 
 **DocType**
 - `user-manual`
@@ -117,69 +117,70 @@ oder
 - `installation-guide`
 - `release-notes`
 
-**Beispiel**
+**Example**
 - `Futek__USB220__user-manual__rev-2023.pdf`
 
 ---
 
 ## 06_licenses
-**Inhalt**
-- Lizenztexte, EULAs, Kaufbelege für Normen/Tools, Terms, Rechnungen zu Quellen (wo nötig).
+**Content**
+- License texts, EULAs, purchase receipts for standards/tools, terms, invoices for sources (where needed).
 
-**Dateinamenkonvention**
+**Filename convention**
 `VendorOrSource__Item__YYYY-MM-DD__doctype.pdf`
 
-**Variablen**
-- `VendorOrSource` = Quelle/Anbieter (z. B. `Beuth`, `Autodesk`, `AnalogDevices`)
-- `Item` = was genau (z. B. Norm-ID, Software, Subscription)
-- `YYYY-MM-DD` = Datum
+**Variables**
+- `VendorOrSource` = Source/provider (e.g., `Beuth`, `Autodesk`, `AnalogDevices`)
+- `Item` = What exactly (e.g., standard ID, software, subscription)
+- `YYYY-MM-DD` = Date
 - `doctype` = `invoice` | `license_text` | `terms`
 
-**Beispiel**
+**Example**
 - `Beuth__DIN_EN_61010-1__2025-08-27__invoice.pdf`
 
 ---
 
 ## 07_CAD_files
-**Inhalt**
-- 3D-Modelle (STEP, STL), Zeichnungen/Exports, Footprint- oder Gehäusemodelle, herstellerbezogene CAD-Daten.
-- Keine Projekt-CAD-Quellen (die liegen im jeweiligen Projekt), sondern wiederverwendbare Referenzmodelle.
+**Content**
+- 3D models (STEP, STL), drawings/exports, footprint or housing models, manufacturer-related CAD data.
+- No project CAD sources (those are in the respective project), but reusable reference models.
 
-**Dateinamenkonvention**
+**Filename convention**
 `VendorOrSource__MPN_or_Model_or_Name__v-n.ext`
 
-**Variablen**
-- `VendorOrSource` = Hersteller oder Quelle (z. B. `Schuetzinger`, `Molex`, `Generic`)
-- `MPN_or_Model_or_Name` = Modell/Teilenummer oder klarer Name
-- `v-n` = interne Version des gespeicherten Files (integer)
-- `ext` = Dateiendung (`step`, `stl`, `dxf`, `pdf`, …)
+**Variables**
+- `VendorOrSource` = Manufacturer or source (e.g., `Schuetzinger`, `Molex`, `Generic`)
+- `MPN_or_Model_or_Name` = Model/part number or clear name
+- `v-n` = Internal version of the saved file (integer)
+- `ext` = File extension (`step`, `stl`, `dxf`, `pdf`, ...)
 
-**Beispiele**
+**Examples**
 - `Schuetzinger__HV_Connector_XYZ__v-1.step`
 - `Generic__M3_standoff_20mm__v-1.step`
 
 ---
 
 ## 08_libs
-**Inhalt**
-- Bibliotheken für Software-Tools (wiederverwendbar, tool-spezifisch).
-- Struktur: ein Ordner pro Software.
+**Content**
+- Libraries for software tools (reusable, tool-specific).
+- Structure: one folder per software.
 
-**Unterordnerkonvention**
+**Subfolder convention**
 - `kicad/`
 - `ltspice/`
-- `zotero/` (falls du hier Dinge ablegen willst, ansonsten extern)
-- weitere Tools nach Bedarf
+- `inventor/`
+- `zotero/` (if you want to store things here, otherwise external)
+- Additional tools as needed
 
-**Benennung innerhalb**
-- Tool-intern sinnvoll benennen, aber Versionsstände über Ordner oder Tags abbilden (nicht über 20 Ebenen).
+**Naming inside**
+- Name sensibly within the tool, but represent version states via folders or tags (not over 20 levels deep).
 
 ---
 
 ## 09_rest
-**Inhalt**
-- Temporäre Ablage für Quellen, die noch nicht sauber klassifiziert sind.
-- Ziel: regelmäßig leeren (einsortieren oder löschen).
+**Content**
+- Temporary storage for sources that are not yet cleanly classified.
+- Goal: empty regularly (sort in or delete).
 
-**Konvention**
-- Keine besonderen Regeln außer: sobald klar → in passenden Ordner verschieben und korrekt benennen.
+**Convention**
+- No special rules except: once clear → move to appropriate folder and name correctly.

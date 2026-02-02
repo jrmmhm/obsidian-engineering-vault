@@ -56,6 +56,22 @@ Additionally: few Key Specs (e.g. bit depth, kS/s, channels) — only as many as
 - Test results/measurement values → belong in TAE/EVD (CMP may link)
 
 ---
+## When to Use ARC Instead of CMP
+
+**Use CMP** if the item is a leaf-level building block without internal decomposition.
+
+**Use ARC** if the item:
+- Has multiple subcomponents that interact with each other
+- Has requirements allocated to it
+- Has internal interfaces between subcomponents
+
+In other words: if you need to decompose the item further and track requirement allocation/verification, it's a module (ARC). If it's an atomic building block that you just describe and reference, it's a component (CMP).
+
+**Example:**
+- A specific ADC chip (AD7175-2) → CMP (leaf component, no internal decomposition needed)
+- A "Data Acquisition Module" containing ADC + amplifier + filtering → ARC (has subcomponents, requirements allocated)
+
+---
 ## Minimal Rules for Consistency
 - No values without source.
 - No duplication of detailed knowledge: better create subpage and link.

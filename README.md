@@ -6,11 +6,8 @@ The technical documentation is maintained in the project vault (/00_documentatio
 
 **Template Features:**
 - Obsidian-based documentation with traceability (requirements → architecture → implementation → verification)
-- Universal example module demonstrating best practices
 - Scalable folder structure for hardware, software, and documentation
 - English documentation for international collaboration
-
-**License:** MIT (see LICENSE file) - Free to use for any purpose, including commercial projects
 
 ---
 
@@ -19,24 +16,45 @@ It is highly recommended to use "Obsidian" as software for the technical documen
 
 1) Open Obsidian
 2) "Open folder as vault"
-3) Select folder: `PMDE/00_documentation`
+3) Select folder: `00_documentation`
 4) Entry point: Read `README` under `01_projectvault`
 
 
 ## Folder Structure (Overview)
 
 ### 00_documentation
+Contains all engineering documentation that explains and documents the technical aspects of the project.
+
 - `01_projectvault/`
-  Obsidian vault. Contains all structured project documentation.
+  Obsidian vault. Contains all structured project documentation as Markdown files.
 
   **Important:** Exclusively Markdown files (.md).
 - `02_documents/`
-  Exports, PDFs, supplementary documents that are not maintained as Markdown notes, but fulfill one of the tasks in the project vault.
+  Exports, PDFs, supplementary documents that are not maintained as Markdown notes, but fulfill one of the documentation tasks in the project vault.
 
   **Important:** All documents stored here are project-internal. External sources are located under "50_sources".
 
 
 `01_projectvault/` and `02_documents/` share the same main folder structure. To understand this structure, it is recommended to read the README in `01_projectvault/`.
+
+---
+
+#### Key Principle: What Belongs Under 00_documentation?
+
+**Only engineering documentation belongs under `00_documentation/`.**
+
+The distinction between folders inside `00_documentation/` (like `07_testing_and_evidence`) and folders outside (like `30_testdata` or `90_administration`) follows this rule:
+
+| Inside 00_documentation | Outside 00_documentation |
+|-------------------------|--------------------------|
+| Documents that **explain and document** the engineering work | Raw data, artifacts, and non-engineering materials |
+| Requirements, architecture, decisions, test conclusions | Test data files, presentations, procurement records |
+
+**Examples:**
+- A TAE file documenting **what was tested and why** → `00_documentation/01_projectvault/07_testing_and_evidence/`
+- The actual **CSV measurement files** from that test → `30_testdata/`
+- A **presentation for stakeholders** → `90_administration/`
+- Meeting notes about project logistics → `90_administration/`
 
 ---
 
@@ -74,9 +92,11 @@ Contains all hardware design data.
 Software code according to project-specific structure. If there are several different responsibilities in the project, it is recommended to create one folder per responsibility, so that one repository can be created per folder.
 
 ### 30_testdata
-Measurement data and evaluations.
-- `31_testdata_raw/` Raw data (unchanged)
-- `32_testdata_processed/` Processed data (cleaned, converted)
+Measurement data and evaluations (raw artifacts, not documentation).
+- `31_testdata_raw/` Raw data (unchanged, immutable)
+- `32_testdata_processed/` Processed data (cleaned, converted, analyzed)
+
+**Note:** Test data files go here. The documentation explaining what was tested and the conclusions goes in `00_documentation/01_projectvault/07_testing_and_evidence/`.
 
 ### 40_procurement
 Complete procurement documentation including BOM and commercial evidence.
@@ -93,8 +113,11 @@ Defined project states (baseline snapshots). Each release contains:
 - Summary of changes
 
 ### 90_administration
-Project organization at the level of submissions/presentations/exports.
+Project organization materials that are **not engineering documentation**.
 - Presentations, thesis, practice report, exports, submission documents
+- Meeting notes, schedules, project logistics
+
+**Note:** This is for non-technical project materials. Engineering documentation (even if exported as PDF) belongs under `00_documentation/02_documents/`.
 
 ### 99_archive
 Storage for old versions, obsolete content, no longer active documents.
@@ -105,17 +128,16 @@ Storage for old versions, obsolete content, no longer active documents.
 
 **This is a template repository.** To use it for your own project:
 
-1. **Clone or download** this repository
-2. **Review the example module:** `00_documentation/01_projectvault/03_architecture_(ARC)/ARC_data_acquisition_example.md`
-3. **Delete example files** (files with `_example` in the name) once you understand the structure
-4. **Create your own modules** following the example patterns
+1. **Clone, download or Use this template** this repository
+2. **Read the documentation structure:** Start with `00_documentation/01_projectvault/README.md`
+3. **Understand the file creation rules:** Read `00_documentation_file_creation_and_conventions.md`
+4. **Create your own modules** following the templates in each folder
 5. **Update LICENSE** file with your name/organization
 6. **Customize** README files to match your project specifics
 
 **Documentation Entry Points:**
 - Start here: `00_documentation/01_projectvault/README.md`
 - System overview: `00_documentation/01_projectvault/system_overview.md`
-- Example module: `ARC_data_acquisition_example.md` (shows complete traceability)
 
 ---
 
@@ -123,6 +145,6 @@ Storage for old versions, obsolete content, no longer active documents.
 
 This project is licensed under the **MIT License** - see the LICENSE file for details.
 
-**For template users:** You may keep this license (if open sourcing your project) or replace it with your own license. See `LICENSE_GUIDE.md` for guidance on choosing the right license for your project.
+**For template users:** You may keep this license (if open sourcing your project) or replace it with your own license.
 
-Copyright (c) 2025 [Your Name or Organization]
+Copyright (c) [Year] [Your Name or Organization]
