@@ -34,16 +34,26 @@ If a component has:
 THEN: Create an ARC file (it's a module)
 ELSE: Create a CMP file (it's a leaf component)
 
+**Module Hierarchy Rule:**
+If an ARC module primarily serves as a container for sub-modules (i.e., it delegates requirements, components, and interfaces to sub-ARCs), use the **Main Module template** ([[00_ARC_main_module_file_template]]). This template only contains Context + Submodule table.
+
+If an ARC module directly owns components, interfaces, and requirement allocations, use the **full ARC template** ([[00_ARC_file_template]]) with all 7 sections.
+
+**Example:**
+- `ARC_Electrical` (parent with sub-ARCs for power supply, safety circuit, status indication) --> Main Module template
+- `ARC_Electrical__Safety_Circuit` (directly owns components, interfaces, allocations) --> Full ARC template
+
 
 ---
 
 ## Structure
 
 ### 1) Context
-Describes what the module includes and what it does not, including links to relevant submodules.
+Describes what the module includes and what it does not, using structured Includes/Excludes bullet points and links to relevant modules.
 
 **Rules:**
-- Max. 5–7 sentences
+- Max. 5–7 bullet points
+- Use **Includes** / **Excludes** format for clear scope definition
 - No implementation details (no pinouts, no registers, no schematics)
 - No repetition of REQ/DEC content
 

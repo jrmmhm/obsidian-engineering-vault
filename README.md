@@ -102,7 +102,7 @@ Measurement data and evaluations (raw artifacts, not documentation).
 Complete procurement documentation including BOM and commercial evidence.
 
 ### 50_sources
-Single Source of Truth for external sources and program libraries (data sheets, manuals, books, CAD libraries, Zotero library, etc.).
+Single Source of Truth for external sources and program libraries (data sheets, manuals, books, CAD libraries, reference manager library, etc.).
 Under 50_sources there is a "README.md" file that explains the structure, naming, and navigation in detail.
 
 
@@ -130,7 +130,7 @@ Storage for old versions, obsolete content, no longer active documents.
 
 1. **Clone, download or Use this template** this repository
 2. **Read the documentation structure:** Start with `00_documentation/01_projectvault/README.md`
-3. **Understand the file creation rules:** Read `00_documentation_file_creation_and_conventions.md`
+3. **Understand the file creation rules:** Read `00_documentation/01_projectvault/00_documentation_file_creation_and_conventions.md`
 4. **Create your own modules** following the templates in each folder
 5. **Update LICENSE** file with your name/organization
 6. **Customize** README files to match your project specifics

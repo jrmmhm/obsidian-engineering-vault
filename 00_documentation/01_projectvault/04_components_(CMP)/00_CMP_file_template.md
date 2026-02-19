@@ -1,19 +1,6 @@
-## Source(s)
-- _Zotero link to datasheet or similar (datasheet is then located under 50_sources, same as Zotero lib)_
-- etc.
+This file is kept for backward compatibility. Use the specific templates instead:
 
-## Context
-_Brief description of the component. Possibly links to other parameters of the component._
+- **Individual Part:** [[00_CMP_individual_part_file_template]]
+- **Assembly:** [[00_CMP_assembly_file_template]]
 
-## General Overview
-| Attribute                | Value                                 |
-| ------------------------ | ------------------------------------- |
-| Type                     | (ADC, Sensor, Power Supply, Relay, etc.) |
-| Manufacturer             |                                       |
-| Model                    |                                       |
-| Revision/Variant         |                                       |
-| Key Specification 1      |                                       |
-| Key Specification 2      |                                       |
-| Key Specification 3      |                                       |
-
-
+See [[00_CMP_README]] for the decision rule.

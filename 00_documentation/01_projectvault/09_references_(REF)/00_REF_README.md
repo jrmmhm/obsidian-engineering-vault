@@ -4,7 +4,7 @@ REF is not a literature management replacement and not a complete transcription,
 ---
 
 ## Goal
-- Reference sources unambiguously (Zotero + optional file storage in 50_sources)
+- Reference sources unambiguously (reference manager + optional file storage in 50_sources)
 - Briefly justify relevance of the source for the project
 - Extract project-relevant statements in structured form (chapter by chapter, if sensible)
 - Ensure traceability: each statement can be traced back to the source
@@ -26,7 +26,7 @@ THEN: References (REF)
 Contains the primary reference to the source.
 
 Mandatory:
-- Zotero link
+- Reference manager link (e.g. Zotero, Mendeley, Citavi, or similar)
 
 Optional:
 - Project path to file in `50_sources` (relative to project root), e.g.

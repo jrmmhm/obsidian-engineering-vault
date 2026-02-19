@@ -169,7 +169,7 @@ or
 - `kicad/`
 - `ltspice/`
 - `inventor/`
-- `zotero/` (if you want to store things here, otherwise external)
+- `reference_manager/` (e.g. Zotero, Mendeley, Citavi -- if stored locally, otherwise external)
 - Additional tools as needed
 
 **Naming inside**

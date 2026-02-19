@@ -1,5 +1,5 @@
 ## Source(s)
-- Zotero link
+- Reference manager link
 - (optional) Project path to file in 50_sources: Projectname/50_sources/...
 
 ## Context

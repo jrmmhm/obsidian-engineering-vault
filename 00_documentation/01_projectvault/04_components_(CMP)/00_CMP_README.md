@@ -1,61 +1,32 @@
 CMP notes document components and assemblies as independent, reusable building blocks.
 A CMP note is deliberately minimal: it is a profile with sources and entry point to details.
 
-## Single Source of Truth (SSOT) – Mandatory Rule
-Each "aspect" of a component gets its own file as soon as it needs more than brief info.
+## Component Taxonomy
 
-**Rule:**
-- Information is maintained only once.
-- The main CMP file remains a profile; details are outsourced and linked.
+Every CMP entry must be classified as one of two types:
 
-**Examples for aspects (each own file):**
-- Operating Limits / Derating / Thermals
-- Layout and EMC hints
-- Calibration / Accuracy / Drift
+| Type | Use When | Template |
+| ---- | -------- | -------- |
+| **Individual Part** | Leaf-level component with external datasheet (IC, sensor, connector, mechanical part) | [[00_CMP_individual_part_README]] |
+| **Assembly** | Composed of multiple parts, has physical boundaries (PCB assembly, cable harness, mounting plate, fixture) | [[00_CMP_assembly_README]] |
 
-**Convention (recommended):**
-- CMP_Name_Interfaces
-- CMP_Name_OperatingLimits
-- CMP_Name_Layout
-- CMP_Name_Calibration
-- CMP_Name_Notes
-
-## Structure of a CMP File (Mandatory Sections)
-
-### 1) Source(s)
-Only links to the used primary sources (e.g. datasheet, appnote, product page).
-Before numbers/claims are noted in CMP, a source must exist.
-
-**Example:**
-- Zotero link: Datasheet
-- Zotero link: Appnote / Reference design
+**Decision rule:** If the item has a manufacturer datasheet and is not decomposed further within the project, it is an **Individual Part**. If the item is built from multiple parts and needs scope definition (what belongs to it / what does not), it is an **Assembly**.
 
 ---
-### 2) Context
-Brief description of the component/assembly (3–5 sentences):
-- What is it?
-- What function does it fulfill?
-- What particularities are relevant?
+
+## Single Source of Truth (SSOT) -- Mandatory Rule
+Each "aspect" of a component gets its own file as soon as it needs more than brief info. The main CMP file remains a profile; details are outsourced and linked. See [[00_CMP_individual_part_README]] for the aspect file convention.
 
 ---
-### 3) General Overview (Table)
-The overview contains only the most important specifications (Key Specs) that serve as a quick entry.
 
-**Mandatory fields (recommended):**
-- Type
-- Manufacturer / Model
-- Revision / Variant (if relevant)
-
-Additionally: few Key Specs (e.g. bit depth, kS/s, channels) — only as many as sensible.
+## What Does Not Belong in CMP
+- Architecture assignment ("is part of ARC_X") --> results via backlinks/ARC
+- Interface contracts/parameters (levels, timing, bus mode) --> belong in IFC
+- Implementation (wiring, GPIO, registers, code, concrete schematic locations) --> belongs in IMP
+- Test results/measurement values --> belong in TAE/EVD (CMP may link)
 
 ---
-## What does not belong in CMP
-- Architecture assignment ("is part of ARC_X") → results via backlinks/ARC
-- Interface contracts/parameters (levels, timing, bus mode) → belong in IFC
-- Implementation (wiring, GPIO, registers, code, concrete schematic locations) → belongs in IMP
-- Test results/measurement values → belong in TAE/EVD (CMP may link)
 
----
 ## When to Use ARC Instead of CMP
 
 **Use CMP** if the item is a leaf-level building block without internal decomposition.
@@ -68,10 +39,12 @@ Additionally: few Key Specs (e.g. bit depth, kS/s, channels) — only as many as
 In other words: if you need to decompose the item further and track requirement allocation/verification, it's a module (ARC). If it's an atomic building block that you just describe and reference, it's a component (CMP).
 
 **Example:**
-- A specific ADC chip (AD7175-2) → CMP (leaf component, no internal decomposition needed)
-- A "Data Acquisition Module" containing ADC + amplifier + filtering → ARC (has subcomponents, requirements allocated)
+- A specific ADC chip (AD7175-2) --> CMP Individual Part (leaf component, no internal decomposition needed)
+- A "Data Acquisition Module" containing ADC + amplifier + filtering --> ARC (has subcomponents, requirements allocated)
+- A mounting bracket with screws and standoffs --> CMP Assembly (composed of parts, has physical boundaries)
 
 ---
+
 ## Minimal Rules for Consistency
 - No values without source.
 - No duplication of detailed knowledge: better create subpage and link.

@@ -56,8 +56,8 @@ List of external artifacts that represent or contain the implementation.
   (no Obsidian link, no file:// link, do not copy content)
 
 **Examples:**
-- Schematic: `Projectname/10_hardware/12_electronics/Measurement_Board.kicad_sch`
-- PCB layout: `Projectname/10_hardware/12_electronics/Measurement_Board.kicad_pcb`
+- Schematic: `Projectname/10_hardware/13_PCB/Measurement_Board.kicad_sch`
+- PCB layout: `Projectname/10_hardware/13_PCB/Measurement_Board.kicad_pcb`
 - CAD: `Projectname/10_hardware/11_mechanics_CAD/Housing.step`
 
 **Rules:**
