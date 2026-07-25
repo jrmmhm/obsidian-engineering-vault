@@ -1,3 +1,9 @@
+---
+domain: ARC
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 _What the module includes, and what not. Max. 5-7 bullet points. No implementation details._
 

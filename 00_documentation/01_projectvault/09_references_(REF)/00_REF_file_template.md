@@ -1,3 +1,9 @@
+---
+domain: REF
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Source(s)
 - Reference manager link
 - (optional) Project path to file in 50_sources: Projectname/50_sources/...

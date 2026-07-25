@@ -1,3 +1,9 @@
+---
+domain: REQ
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 _Description of the file context_
 
