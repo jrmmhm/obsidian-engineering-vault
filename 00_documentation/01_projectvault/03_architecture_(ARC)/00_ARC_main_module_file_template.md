@@ -1,3 +1,9 @@
+---
+domain: ARC
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 _Brief module description. 4-6 sentences._
 

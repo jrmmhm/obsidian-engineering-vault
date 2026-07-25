@@ -1,3 +1,9 @@
+---
+domain: IFC
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 _Type of connection (1–2 sentences)_
 
