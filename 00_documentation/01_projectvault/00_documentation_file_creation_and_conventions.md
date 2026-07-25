@@ -43,3 +43,48 @@ Possible timelines:
 - Slow
 - Medium
 - Fast
+
+---
+## 3) File Conventions (human- and AI-readable)
+
+These conventions keep every file usable both for humans in Obsidian and
+for AI agents that find content by exact text search. The mechanically
+checkable subset is enforced by the vault validator
+(`validate_vault.py` in the mechatronics-docs skill); ERRORs block,
+WARNs advise.
+
+### Frontmatter
+Every domain file starts with YAML frontmatter (templates contain it):
+`domain` (folder abbreviation), `status` (`draft | active | superseded |
+deprecated`; DEC files keep their Status line in the body instead),
+`created` and `last-verified` (both `YYYY-MM-DD`). TAE files add
+`verifies: [REQ-DOM-NNN, ...]` naming the requirements they prove.
+`status: draft` does not relax any rule.
+
+### Self-containedness
+The first lines of the Context section must situate the file on their
+own: what it is, which module it belongs to, using exact component
+names and IDs. Never rely on another file for basic understanding — no
+"see above", no pronouns whose referent lives in a different file.
+Search finds exact names, not implicit references.
+
+### Wikilinks
+Link with the exact filename, e.g. `[[REQ_Measurement_(MEG)]]`. Aliases
+(pipe syntax with display text) are allowed for readability, but the
+target must be the exact filename. Link the responsible file once where it matters —
+do not link every mention (guideline: under ~20 outgoing links per
+file; hub files like ARC and system_overview may carry more).
+
+### Length
+A file answers ONE question. Above ~150 lines, re-apply the 4-question
+rule: can the filename still fully describe the content? If not, split.
+Above 400 lines the validator blocks — that size is a structural SSOT
+violation, not a formatting issue.
+
+### Freshness
+Outdated documentation is worse than none: it actively misleads both
+readers and AI tools. When you touch a file and confirm its content,
+update `last-verified`. When content becomes wrong, fix it or mark it
+superseded/deprecated in the same work session — never leave a stale
+claim standing. After changing an artifact (code, schematic, parameter),
+search the vault for files referencing it and update them.

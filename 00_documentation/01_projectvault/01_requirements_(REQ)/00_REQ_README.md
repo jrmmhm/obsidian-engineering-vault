@@ -76,6 +76,23 @@ The actual requirement as a **unique technical statement**.
 **Bad:**
 - "Door must be safe." (not testable)
 
+**Recommended sentence patterns (EARS).** Constraining requirements to
+these five patterns measurably reduces ambiguity:
+- Ubiquitous: "The `<system>` shall `<response>`."
+- Event-driven: "When `<trigger>`, the `<system>` shall `<response>`."
+- State-driven: "While `<state>`, the `<system>` shall `<response>`."
+- Unwanted behavior: "If `<condition>`, then the `<system>` shall `<response>`."
+- Optional feature: "Where `<feature>`, the `<system>` shall `<response>`."
+
+**Anti-smells.** Avoid the defects with the largest measured impact on
+both human and AI interpretation:
+- No pronouns whose referent is outside the sentence ("it", "the system
+  above") — referential ambiguity causes the most wrong interpretations.
+- One requirement per row, atomic — no "and also" chains.
+- Every value measurable with a stated pass/fail condition.
+- No contradictions with other rows or files — a contradicting spec is
+  worse than a missing one.
+
 ---
 ### Column 4 — **Acceptance Criterion**
 
