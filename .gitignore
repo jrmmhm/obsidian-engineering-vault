@@ -1,15 +1,27 @@
 # =============================================================================
 # OBSIDIAN
 # =============================================================================
+# Only app.json and core-plugins.json ship with the template - they carry
+# settings the documentation method depends on (link auto-update, properties
+# view). Everything else below is per-machine taste or state.
+
 # User-specific workspace (open tabs, pane layout, etc.)
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
-
-# Graph view cache
-.obsidian/graph.json
-
-# Plugin data that may contain user-specific paths
 .obsidian/workspace-*.json
+
+# Graph view tuning and theme choice - personal
+.obsidian/graph.json
+.obsidian/appearance.json
+
+# Community plugins are not shipped: listing them without installing only
+# produces load errors for template users.
+.obsidian/community-plugins.json
+.obsidian/plugins/
+
+# Local caches
+.obsidian/cache
+.trash/
 
 # =============================================================================
 # A.I.
