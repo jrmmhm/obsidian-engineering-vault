@@ -1,5 +1,6 @@
 ---
 domain: OAU
+id: OAU-DOM-NNN
 status: draft
 created: YYYY-MM-DD
 last-verified: YYYY-MM-DD
