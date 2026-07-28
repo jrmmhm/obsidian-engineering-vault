@@ -3,13 +3,17 @@
 # mktemp dirs at runtime: a precision vault (realistic, correct content
 # that must produce ZERO findings - guards against false-positive creep),
 # a violation vault (~15 seeded rule violations that must each be
-# detected), plus hook-mode and crash-mode checks, plus a run against the
+# detected), a German/English twin pair that must produce identical
+# findings, plus hook-mode and crash-mode checks, plus a run against the
 # real baseproject template vault (must contain no ERRORs).
 set -u
-SKILL_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+# -P resolves the ~/.claude/skills symlink to the repo. Without it
+# REAL_VAULT points outside the repo and the template-vault check below
+# silently skips - the guard that keeps the shipped vault at 0 errors.
+SKILL_DIR=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 VALIDATOR="$SKILL_DIR/validate_vault.py"
 # Skill lives at <repo>/.claude/skills/mechatronics-docs -> repo root is 3 levels up.
-REAL_VAULT="$(cd -- "$SKILL_DIR/../../.." && pwd)/00_documentation/01_projectvault"
+REAL_VAULT="$(cd -P -- "$SKILL_DIR/../../.." && pwd -P)/00_documentation/01_projectvault"
 FAILURES=0
 TESTS=0
 
@@ -583,6 +587,181 @@ if contains "$out" "^ERROR .*fenced_missing\.sch"; then ok x; else
   fail "fenced dead path inside References must stay ERROR"; fi
 
 # ==========================================================================
+# Fixture 3: German/English twin vaults - byte-identical content, differing
+# only in domain folder names and template FILE names. Everything the
+# language-independence fix governs must behave identically in both, so the
+# finding-code multisets are compared directly.
+#
+# Only ARC, IMP and REF are used: those three keep the same (ABBR) in both
+# languages, which isolates the file-naming variable. Deliberately NOT
+# covered here, because they are out of scope by decision (DECISIONS.md,
+# amendment 2026-07-28): German domain abbreviations (ANF/ENT/KMP/SST/TUE/
+# BUN) never reach the REQ/DEC/TAE checks, and the English-only heuristics
+# (system_overview.md, "References"/"Sources" section names) stay dark - the
+# twins therefore carry no overview file, and both are equally unaffected.
+#
+# Separate mktemp roots on purpose: check_paths probes project_root.parent,
+# so a shared root would let one twin resolve the other twin's artifacts.
+# ==========================================================================
+DE_TMP=$(mktemp -d)
+EN_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP"' EXIT
+
+build_twin() { # build_twin <vault_dir> <arc_dir> <imp_dir> <ref_dir> <template_infix>
+  local V="$1" A="$2" I="$3" R="$4" T="$5"
+  mkdir -p "$V/$A" "$V/$I" "$V/$R"
+
+  cat > "$V/$A/00_ARC_$T.md" <<'EOF'
+## Kontext
+## Komponenten (Dateien)
+## Zuordnung und Verifikation
+EOF
+  cat > "$V/$I/00_IMP_$T.md" <<'EOF'
+## Kontext
+## Referenzen
+## Implementierung
+EOF
+  cat > "$V/$R/00_REF_$T.md" <<'EOF'
+## Quelle(n)
+## Kontext
+## Inhalt
+EOF
+
+  # seeded: code-fence + impl-leak + link-unresolved
+  cat > "$V/$A/ARC_Messkette.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Kontext
+Die Messkette digitalisiert die analogen Eingangssignale des Moduls.
+Der Teiler liefert 3,3 V an die Wandlerstufe.
+
+## Komponenten (Dateien)
+- [[KMP_Fehlt_Absichtlich]]: absichtlich totes Linkziel.
+
+```c
+int leak = 1;
+```
+
+## Zuordnung und Verifikation
+| Teilmodul | Anforderungen | Verifikation | Status |
+| --- | --- | --- | --- |
+| Wandler | keine | keine | Draft |
+EOF
+
+  # seeded: template-sections (missing "Zuordnung und Verifikation")
+  cat > "$V/$A/ARC_Unvollstaendig.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Kontext
+Zweites Architekturmodul, dem eine vom Template geforderte Sektion fehlt.
+Der Rest des Inhalts ist bewusst unauffaellig gehalten.
+
+## Komponenten (Dateien)
+- Keine Komponenten diesem Modul zugeordnet.
+- Zweite Zeile gegen die Stub-Warnung.
+EOF
+
+  # seeded: frontmatter-missing + path-missing
+  cat > "$V/$I/IMP_Messkette.md" <<'EOF'
+## Kontext
+Konkrete Realisierung der Messkette ohne jede Frontmatter.
+
+## Referenzen
+- Datenblatt: 50_Quellen/fehlt_absichtlich.pdf
+
+## Implementierung
+- Abtastung fest eingestellt
+- Zweite Zeile gegen die Stub-Warnung
+EOF
+
+  # clean file: contributes only the vault-wide orphan warning
+  cat > "$V/$R/REF_Datenblatt.md" <<'EOF'
+---
+domain: REF
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Quelle(n)
+- Herstellerdatenblatt des Wandlers
+
+## Kontext
+Externe Quelle zur Linearitaetsangabe der Wandlerstufe.
+
+## Inhalt
+### Kapitel Spezifikationen
+- Linearitaetsangabe stuetzt die Genauigkeitsforderung
+EOF
+}
+
+DE_V="$DE_TMP/Deproj/00_Dokumentation/01_Projektvault"
+EN_V="$EN_TMP/Enproj/00_documentation/01_projectvault"
+build_twin "$DE_V" "03_Architektur_(ARC)" "06_Implementierung_(IMP)" \
+           "09_Referenzen_(REF)" "Dateitemplate"
+build_twin "$EN_V" "03_architecture_(ARC)" "06_implementation_(IMP)" \
+           "09_references_(REF)" "file_template"
+
+# 02_Dokumente mirror: same German domain folder names, NO template files.
+# It must stay unrecognized - link resolution depends on that distinction.
+DE_MIRROR="$DE_TMP/Deproj/00_Dokumentation/02_Dokumente"
+mkdir -p "$DE_MIRROR/03_Architektur_(ARC)" "$DE_MIRROR/06_Implementierung_(IMP)" \
+         "$DE_MIRROR/09_Referenzen_(REF)"
+echo "Export ohne Template" > "$DE_MIRROR/03_Architektur_(ARC)/Export.md"
+
+de_out=$(python3 "$VALIDATOR" "$DE_V" 2>&1); de_rc=$?
+en_out=$(python3 "$VALIDATOR" "$EN_V" 2>&1); en_rc=$?
+
+# recognized at all: exit 1 (findings), never 2 ("could not run")
+TESTS=$((TESTS + 1))
+if [ $de_rc -eq 1 ]; then ok x; else
+  fail "German vault must be recognized and exit 1, got $de_rc:"; printf '%s\n' "$de_out" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if [ $en_rc -eq 1 ]; then ok x; else fail "English twin must exit 1, got $en_rc"; fi
+
+# template sections derived from 00_*Dateitemplate.md - check_sections
+# returns early when no template was found, so this code cannot fire unless
+# the German template files were actually parsed.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "\[template-sections\]"; then ok x; else
+  fail "German vault must derive template sections (no [template-sections] finding)"; fi
+TESTS=$((TESTS + 1))
+if contains "$de_out" "Zuordnung und Verifikation"; then ok x; else
+  fail "German template section name must appear in the template-sections message"; fi
+
+# identical findings for identical content
+codes_of() { printf '%s\n' "$1" | grep -E '^(ERROR|WARN) ' | awk '{print $1, $3}' | sort; }
+TESTS=$((TESTS + 1))
+if [ "$(codes_of "$de_out")" = "$(codes_of "$en_out")" ]; then ok x; else
+  fail "German and English twin must produce identical findings:"
+  diff <(codes_of "$de_out") <(codes_of "$en_out") | sed 's/^/    /'
+fi
+
+# the mirror without template files stays unrecognized, via both entry points
+python3 "$VALIDATOR" "$DE_MIRROR" >/dev/null 2>&1; rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 2 ]; then ok x; else
+  fail "German 02_Dokumente mirror must not be a vault root, got $rc"; fi
+python3 "$VALIDATOR" --file "$DE_MIRROR/03_Architektur_(ARC)/Export.md" >/dev/null 2>&1; rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 2 ]; then ok x; else
+  fail "--file inside the German mirror must find no vault root, got $rc"; fi
+
+# --file auto-detects the German vault root by walking upward
+out=$(python3 "$VALIDATOR" --file "$DE_V/03_Architektur_(ARC)/ARC_Unvollstaendig.md" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -ne 2 ] && contains "$out" "\[template-sections\]"; then ok x; else
+  fail "--file must auto-detect the German vault root, got rc=$rc"; fi
+
+# ==========================================================================
 # Hook modes (violation vault, synthetic payloads)
 # ==========================================================================
 SID="testsession-$$"
@@ -649,12 +828,16 @@ python3 "$VALIDATOR" /nonexistent_vault_root >/dev/null 2>&1; rc=$?
 TESTS=$((TESTS + 1))
 if [ $rc -eq 2 ]; then ok x; else fail "invalid root must exit 2, got $rc"; fi
 
+TESTS=$((TESTS + 1))
 if [ -d "$REAL_VAULT" ]; then
   out=$(python3 "$VALIDATOR" "$REAL_VAULT" 2>&1); rc=$?
-  TESTS=$((TESTS + 1))
   if [ $rc -eq 0 ]; then ok x; else
     fail "real template vault must contain no ERRORs:"; printf '%s\n' "$out" | grep '^ERROR' | sed 's/^/    /'
   fi
+else
+  # A missing REAL_VAULT used to pass silently, which hid the guard
+  # entirely when run.sh was invoked through the ~/.claude/skills symlink.
+  fail "real template vault not found at $REAL_VAULT"
 fi
 
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \

@@ -49,6 +49,14 @@ vault rules (`validate_vault.py`, same directory):
   vault-wide findings (uncovered REQs, orphans, ...) as advisory — they
   never block; the full audit in step 7 remains the authoritative pass.
 
+Two further tiers run the same validator without Claude Code, so a change
+authored in Obsidian or by hand is covered too: a pre-commit hook
+(`hooks/pre_commit_vault.sh`, install by symlinking it to
+`.git/hooks/pre-commit`) that reports findings in the staged files and
+only blocks when `MECHDOCS_PRECOMMIT_BLOCK=1` is set, and a GitHub
+Actions workflow that runs the test suite and the full vault audit on
+every push and pull request.
+
 Rules that follow from this mechanism:
 
 1. **Never modify vault files through Bash** (`sed -i`, `tee`, heredocs) —
