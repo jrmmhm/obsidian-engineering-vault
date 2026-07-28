@@ -56,6 +56,14 @@ TEMPLATE_NAME_RE = re.compile(
 WIKILINK_RE = re.compile(r"(!?)\[\[([^\]|#\n]+)(#[^\]|\n]*)?(\|[^\]\n]*)?\]\]")
 REQ_ID_RE = re.compile(r"REQ-[A-Z]{2,4}-\d{3}")
 DOM_IN_NAME_RE = re.compile(r"\(([A-Z]{2,4})\)")
+# Object identifiers (vault_schema.json, "identifier"): DOMAIN-SCOPE-NNN in
+# frontmatter. Identity lives in the file, not in its name, so a rename does
+# not change what an object is.
+ID_RE = re.compile(r"^(?:REQ|DEC|ARC|CMP|IFC|IMP|TAE|OAU|REF)-[A-Z]{2,4}-\d{3}$")
+REQ_FILE_ID_RE = re.compile(r"^REQ-([A-Z]{2,4})-\d{3}$")
+# Excluded from the scheme: SKILL.md classifies both as not engineering
+# documentation (DECISIONS.md, amendment 2026-07-28b).
+ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 PATH_TOKEN_RE = re.compile(r"(?<![\w(])((?:[\w.-]+/)+[\w.-]+\.\w{1,12})\b")
 PIN_RE = re.compile(r"\b(?:GPIO\d+|P[A-K]\d{1,2}|0x[0-9A-Fa-f]{2,})\b")
@@ -220,14 +228,17 @@ class Vault:
             self._req_index = {}
             reqdir = self.domains.get("REQ")
             if reqdir:
-                for f in reqdir.rglob("*.md"):
+                for f in sorted(reqdir.rglob("*.md")):
                     if f.name.startswith("00_"):
                         continue
-                    m = DOM_IN_NAME_RE.search(f.stem)
-                    if not m:
+                    try:
+                        lines = read_lines(f)
+                    except OSError:
                         continue
-                    dom = m.group(1)
-                    for i, line in enumerate(read_lines(f), 1):
+                    dom = req_scope(f, lines)
+                    if not dom:
+                        continue
+                    for i, line in enumerate(lines, 1):
                         row = parse_table_row(line)
                         if row and len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
                             self._req_index.setdefault(f"REQ-{dom}-{row[1]}", (f, i))
@@ -306,6 +317,44 @@ def section_of(lines, idx, fm_end):
         if j < len(lines) and lines[j].startswith("## "):
             return lines[j][3:].strip().lower()
     return ""
+
+
+def frontmatter_id(lines):
+    """The object identifier of a file, or None. Never raises.
+
+    Only a pattern-conforming identifier counts as an identity. An unfilled
+    template placeholder (ARC-DOM-NNN), an empty 'id:', a trailing comment
+    and a YAML list ('id: [X]', which parse_frontmatter returns as a list)
+    are all NOT identities and must never collide with anything - two files
+    copied from the same template are not two objects claiming one identity.
+    Malformed frontmatter yields None rather than an exception: this runs in
+    the per-file path too, and a crash exits 2, which both hooks swallow.
+    """
+    fm, _, bad = parse_frontmatter(lines)
+    if bad or not fm:
+        return None
+    v = fm.get("id")
+    if not isinstance(v, str):
+        return None
+    v = v.strip()
+    return v if ID_RE.match(v) else None
+
+
+def req_scope(path: Path, lines):
+    """Scope token of a REQ file: its own id first, its filename second.
+
+    Identity lives in the frontmatter (DECISIONS.md, amendment 2026-07-28b),
+    so a renamed REQ file keeps the identity of its rows. The filename
+    fallback keeps every vault that predates the identifier rollout working
+    unchanged - which is every vault except this template today.
+    """
+    fid = frontmatter_id(lines)
+    if fid:
+        m = REQ_FILE_ID_RE.match(fid)
+        if m:
+            return m.group(1)
+    m = DOM_IN_NAME_RE.search(path.stem)
+    return m.group(1) if m else None
 
 
 # --------------------------------------------------------------------------
@@ -651,26 +700,154 @@ def check_inb_age(path, findings):
 # Vault-wide checks (full audit only)
 # --------------------------------------------------------------------------
 
+def head_identifiers(vault: Vault):
+    """{identifier: path} as of git HEAD, or None when HEAD is not readable.
+
+    None ("cannot compare") stays deliberately distinguishable from {} ("HEAD
+    carries no identifier"): a vault folder renamed since HEAD would otherwise
+    look like a vault that lost every identifier at once.
+
+    Nothing here may raise. A crash exits 2, and both hooks swallow exit 2 -
+    a hard failure would silently switch off the whole enforcement layer.
+    """
+    repo = vault.git_root()
+    if repo is None:
+        return None
+    try:
+        rel = vault.root.relative_to(repo)
+    except ValueError:
+        return None
+    # A vault that IS its own repo (both German production vaults are)
+    # yields '.', which is a valid pathspec; '' would be a fatal error.
+    pathspec = str(rel) or "."
+    base = ["git", "--no-pager", "-C", str(repo)]
+    try:
+        # Does the vault path exist at HEAD at all? Without this probe a
+        # renamed vault root makes the grep below return "no match", which
+        # is indistinguishable from "no identifiers".
+        probe = subprocess.run(base + ["ls-tree", "-z", "HEAD", "--", pathspec],
+                               capture_output=True, timeout=10)
+        if probe.returncode != 0 or not probe.stdout.strip():
+            return None
+        # Candidate prefilter. One process spares a vault without identifiers
+        # every per-file read: both German vaults drop to zero git show calls.
+        # Bytes, not text=True: -z keeps paths raw and a non-UTF-8 byte would
+        # otherwise raise UnicodeDecodeError inside subprocess itself.
+        grep = subprocess.run(
+            base + ["grep", "-l", "-z", "-I", "-E", r"^[[:space:]]*id:",
+                    "HEAD", "--", pathspec],
+            capture_output=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if grep.returncode == 1:
+        return {}      # no candidate at HEAD - nothing can have vanished
+    if grep.returncode != 0:
+        return None
+    out = {}
+    for raw in grep.stdout.split(b"\0"):
+        if not raw:
+            continue
+        # Records are "HEAD:<path>"; the rev prefix is fixed, so one split is
+        # unambiguous even for a path containing a colon.
+        name = raw.split(b":", 1)[-1].decode("utf-8", "replace")
+        if not name.endswith(".md"):
+            continue
+        p = repo / name
+        kind, abbr = vault.classify(p)
+        if kind != "domain" or abbr in ID_EXCLUDED_DOMAINS:
+            continue
+        text = git_head_content(vault, p)
+        if text is None:
+            continue
+        fid = frontmatter_id(text.splitlines())
+        if fid:
+            out.setdefault(fid, p)
+    return out
+
+
+def check_identifiers(vault: Vault, all_md, corpus, findings):
+    """Vault-wide identifier checks (advisory-only at the stop gate).
+
+    Only identifiers that are actually PRESENT are compared. Requiring an id
+    would turn every file of a vault predating the scheme into a finding -
+    a convention rollout disguised as a defect report, and both German
+    production vaults carry no identifier at all.
+
+    Severities follow the established split for checks that cannot tell a
+    mistake from an intention: a collision is never legitimate (ERROR), a
+    disappearance can be a retirement, a rename or a loss (WARN).
+    """
+    worktree = {}
+    for p in all_md:
+        kind, abbr = vault.classify(p)
+        if kind != "domain" or abbr in ID_EXCLUDED_DOMAINS:
+            continue
+        fid = frontmatter_id(corpus.get(p, "").splitlines())
+        if not fid:
+            continue
+        if fid in worktree:
+            findings.append(Finding("ERROR", "id-duplicate", str(p), 1,
+                                    f"identifier {fid} is already declared in "
+                                    f"{worktree[fid].name} - an identifier "
+                                    "addresses exactly one object"))
+        else:
+            worktree[fid] = p
+
+    # A REQ file whose own id disagrees with the scope token in its filename
+    # rekeys every one of its rows. Reported here, at the file that causes it,
+    # rather than left to surface as verifies-unknown-req on some TAE file -
+    # which is a per-file ERROR and can block the stop gate on the wrong note.
+    reqdir = vault.domains.get("REQ")
+    if reqdir:
+        for f in sorted(reqdir.rglob("*.md")):
+            if f.name.startswith("00_"):
+                continue
+            fid = frontmatter_id(corpus.get(f, "").splitlines())
+            m = REQ_FILE_ID_RE.match(fid) if fid else None
+            n = DOM_IN_NAME_RE.search(f.stem)
+            if m and n and m.group(1) != n.group(1):
+                findings.append(Finding("WARN", "id-scope-mismatch", str(f), 1,
+                                        f"id scope '{m.group(1)}' differs from the "
+                                        f"filename token '{n.group(1)}' - the id wins, "
+                                        f"so every row of this file is addressed as "
+                                        f"REQ-{m.group(1)}-NNN"))
+
+    head = head_identifiers(vault)
+    if not head:
+        return
+    for fid in sorted(set(head) - set(worktree)):
+        findings.append(Finding("WARN", "id-vanished", str(head[fid]), None,
+                                f"identifier {fid} existed at git HEAD and is no "
+                                "longer present in the vault - retired, renamed or "
+                                "lost; identifiers are never reused"))
+
+
 def validate_vault_wide(vault: Vault):
     findings = []
-    all_md = [p for p in vault.root.rglob("*.md")
-              if ".obsidian" not in p.parts and ".git" not in p.parts]
+    # sorted: which of two colliding files is reported and which is named as
+    # the other one must not depend on filesystem iteration order.
+    all_md = sorted(p for p in vault.root.rglob("*.md")
+                    if ".obsidian" not in p.parts and ".git" not in p.parts)
     domain_files = [p for p in all_md if vault.classify(p)[0] == "domain"]
 
     # duplicate REQ ids across files
     reqdir = vault.domains.get("REQ")
     if reqdir:
         ids = {}
-        for f in reqdir.rglob("*.md"):
+        for f in sorted(reqdir.rglob("*.md")):
             if f.name.startswith("00_"):
                 continue
-            m = DOM_IN_NAME_RE.search(f.stem)
-            if not m:
+            try:
+                lines = read_lines(f)
+            except OSError:
                 continue
-            for i, line in enumerate(read_lines(f), 1):
+            dom = req_scope(f, lines)
+            if not dom:
+                continue
+            for i, line in enumerate(lines, 1):
                 row = parse_table_row(line)
                 if row and len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
-                    rid = f"REQ-{m.group(1)}-{row[1]}"
+                    rid = f"REQ-{dom}-{row[1]}"
                     if rid in ids and ids[rid][0] != f:
                         findings.append(Finding("ERROR", "req-duplicate-global", str(f), i,
                                                 f"{rid} already defined in "
@@ -684,6 +861,8 @@ def validate_vault_wide(vault: Vault):
             corpus[p] = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
             corpus[p] = ""
+
+    check_identifiers(vault, all_md, corpus, findings)
 
     # REQ coverage: every REQ id referenced by some TAE (frontmatter) or ARC table
     for rid, (f, i) in vault.req_index().items():
@@ -766,8 +945,11 @@ def git_head_content(vault: Vault, path: Path):
     except ValueError:
         return None
     try:
+        # errors="replace": a non-UTF-8 byte in a tracked file would other-
+        # wise raise UnicodeDecodeError inside subprocess.run itself.
         r = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{rel}"],
-                           capture_output=True, text=True, timeout=10)
+                           capture_output=True, text=True, errors="replace",
+                           timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout if r.returncode == 0 else None
@@ -935,9 +1117,14 @@ def hook_stop(payload):
     except Exception:
         wide = []
     if wide:
-        shown = wide[:15]
-        if len(wide) > 15:
-            shown.append(f"... +{len(wide) - 15} more")
+        # ERROR-severity vault-wide findings must survive the cap: this
+        # report is their only automatic channel, because hook_post never
+        # shows vault-wide findings at all.
+        errs = [w for w in wide if w.startswith("ERROR")]
+        warns = [w for w in wide if not w.startswith("ERROR")]
+        shown = errs + warns[:max(0, 15 - len(errs))]
+        if len(shown) < len(wide):
+            shown.append(f"... +{len(wide) - len(shown)} more")
         summary.append("vault-wide findings (advisory - not blocking, may "
                        "include legacy state):\n" + "\n".join(shown))
 
