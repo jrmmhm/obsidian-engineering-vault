@@ -1,3 +1,9 @@
+---
+domain: CMP
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 
 - **Purpose:**

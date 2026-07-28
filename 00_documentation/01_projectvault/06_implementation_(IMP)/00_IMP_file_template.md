@@ -1,3 +1,9 @@
+---
+domain: IMP
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 _What is concretely implemented or specified here? 1–3 sentences, with links if appropriate._
 

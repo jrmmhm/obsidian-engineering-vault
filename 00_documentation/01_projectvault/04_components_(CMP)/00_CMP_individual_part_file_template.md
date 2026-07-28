@@ -1,3 +1,9 @@
+---
+domain: CMP
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Source(s)
 - _Link to datasheet or similar via reference manager (datasheet is then located under 50_sources)_
 

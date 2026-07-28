@@ -1,3 +1,8 @@
+---
+domain: DEC
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 Date: YYYY-MM-DD
 Status: Draft | Accepted | Superseded | Deprecated
 Superseded by (only if Status = Superseded): \[\[DEC_New_Topic]] – Short reason: 1 sentence

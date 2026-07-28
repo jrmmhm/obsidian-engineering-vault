@@ -32,6 +32,20 @@ These files can be found in each main folder under:
 	- `/00_FolderAbbreviation_README`
 	- `/00_FolderAbbreviation_file_template`
 
+## AI Documentation Layer
+
+This vault is written for two audiences: humans reading in Obsidian and
+AI agents that retrieve context by exact text search. The conventions in
+[[00_documentation_file_creation_and_conventions]] (frontmatter,
+self-containedness, wikilink discipline, length, freshness) exist for
+both. The mechanically checkable subset is enforced by a validator
+(`validate_vault.py`, part of the `mechatronics-docs` skill that ships
+with this template under `.claude/skills/`): it checks naming, required
+template sections, frontmatter, link and artifact-path integrity,
+requirement-table format and REQ↔TAE coverage, and flags implementation
+details leaking into ARC. Run it manually from the project root with
+`python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault`.
+
 
 Finally, it is recommended to open [[system_overview]], as it centrally describes and explains the main modules in the form of ARC files. The system overview thus serves as a central point of contact.
 
