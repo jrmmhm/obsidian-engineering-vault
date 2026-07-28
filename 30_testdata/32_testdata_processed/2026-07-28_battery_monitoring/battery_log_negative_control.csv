@@ -1,0 +1,17 @@
+# derived_from: 30_testdata/31_testdata_raw/2026-07-28_battery_monitoring/battery_log.csv
+# purpose: negative control - every REQ-BAT check must fail on this file
+# alteration_1: manufacturer and model_name header lines removed (REQ-BAT-003)
+# alteration_2: gap between sample 2 and 3 stretched to 0.9 s (REQ-BAT-001)
+# alteration_3: sample 4 voltage set to 21.500 V, outside the contract (REQ-BAT-002)
+# device: BAT0
+# technology: Li-poly
+# voltage_min_design: 15440000
+# nominal_interval_s: 0.25
+# sample_count: 6
+sample_index,t_rel_s,voltage_v,energy_wh,capacity_pct,status
+0,0.000003,16.668,40.8,80,Not charging
+1,0.258097,16.668,40.8,80,Not charging
+2,0.508574,16.668,40.8,80,Not charging
+3,1.408574,16.668,40.8,80,Not charging
+4,1.658930,21.500,40.8,80,Not charging
+5,1.909305,16.668,40.8,80,Not charging

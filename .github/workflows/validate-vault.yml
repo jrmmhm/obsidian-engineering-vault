@@ -27,3 +27,17 @@ jobs:
       # layout ever moved. This step names the path and fails loudly.
       - name: Template vault audit
         run: python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault
+
+      # The worked example claims its evidence is the real output of a command.
+      # Running that command here is what keeps the claim from decaying: both
+      # the log and the evaluator are committed, so the check is reproducible
+      # on any runner, and the negative control proves it can still fail.
+      - name: Worked example evidence
+        run: |
+          python3 20_software/data_analysis/eval_battery_log.py \
+            30_testdata/31_testdata_raw/2026-07-28_battery_monitoring/battery_log.csv
+          if python3 20_software/data_analysis/eval_battery_log.py \
+               30_testdata/32_testdata_processed/2026-07-28_battery_monitoring/battery_log_negative_control.csv; then
+            echo "negative control passed - the acceptance checks are not falsifiable" >&2
+            exit 1
+          fi

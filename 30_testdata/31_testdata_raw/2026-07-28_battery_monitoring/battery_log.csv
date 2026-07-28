@@ -1,0 +1,28 @@
+# device: BAT0
+# manufacturer: Sunwoda
+# model_name: 5B10W13975
+# technology: Li-poly
+# voltage_min_design: 15440000
+# nominal_interval_s: 0.25
+# sample_count: 20
+sample_index,t_rel_s,voltage_v,energy_wh,capacity_pct,status
+0,3e-06,16.668,40.8,80,Not charging
+1,0.258097,16.668,40.8,80,Not charging
+2,0.508574,16.668,40.8,80,Not charging
+3,0.75897,16.668,40.8,80,Not charging
+4,1.009305,16.668,40.8,80,Not charging
+5,1.267611,16.668,40.8,80,Not charging
+6,1.518036,16.668,40.8,80,Not charging
+7,1.768381,16.668,40.8,80,Not charging
+8,2.018734,16.668,40.8,80,Not charging
+9,2.276819,16.668,40.8,80,Not charging
+10,2.52727,16.668,40.8,80,Not charging
+11,2.777624,16.668,40.8,80,Not charging
+12,3.027969,16.668,40.8,80,Not charging
+13,3.286478,16.668,40.8,80,Not charging
+14,3.536844,16.668,40.8,80,Not charging
+15,3.787172,16.668,40.8,80,Not charging
+16,4.037498,16.668,40.8,80,Not charging
+17,4.295841,16.668,40.8,80,Not charging
+18,4.54618,16.668,40.8,80,Not charging
+19,4.796612,16.668,40.8,80,Not charging
