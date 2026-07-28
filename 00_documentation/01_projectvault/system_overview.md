@@ -16,6 +16,7 @@ This table lists all architectural modules in the project. Each row is a distinc
 
 | Module (ARC) | Brief Description |
 | ------------ | ----------------- |
+| [[ARC_Battery_Monitoring]] | Worked example: records battery telemetry and evaluates the log |
 | *Add your modules here* | *Brief description of the module* |
 
 **Instructions:**
