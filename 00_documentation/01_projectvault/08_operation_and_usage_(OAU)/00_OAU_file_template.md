@@ -1,3 +1,9 @@
+---
+domain: OAU
+status: draft
+created: YYYY-MM-DD
+last-verified: YYYY-MM-DD
+---
 ## Context
 _What is this workflow for? (1–3 sentences). Target state after successful workflow (1 sentence)._
 

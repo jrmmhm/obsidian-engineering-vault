@@ -14,7 +14,12 @@
 # =============================================================================
 # A.I.
 # =============================================================================
-.claude/
+# The mechatronics-docs skill ships WITH this template - keep .claude/skills/
+# tracked. Only machine-local Claude Code state is ignored.
+.claude/*
+!.claude/skills/
+.claude/skills/**/__pycache__/
+.claude/settings.local.json
 
 # =============================================================================
 # OPERATING SYSTEM
