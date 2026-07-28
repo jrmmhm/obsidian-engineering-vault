@@ -44,6 +44,15 @@ STUB_MIN_LINES = 5
 INB_MAX_AGE_DAYS = 7
 
 DOMAIN_DIR_RE = re.compile(r"^\d\d_.+_\(([A-Z]{2,4})\)$")
+# Domain-template file names, matched case-insensitively. The shared Latin
+# root covers English (00_REQ_file_template.md) and German
+# (00_ANF_Dateitemplate.md) alike, and no README carries it. A language
+# that spells it differently adds a marker HERE and nowhere else: this one
+# pattern gates vault-root detection, required-section derivation and
+# template-file classification.
+TEMPLATE_MARKERS = ("template",)
+TEMPLATE_NAME_RE = re.compile(
+    r"^00_.*(?:" + "|".join(re.escape(m) for m in TEMPLATE_MARKERS) + r")", re.I)
 WIKILINK_RE = re.compile(r"(!?)\[\[([^\]|#\n]+)(#[^\]|\n]*)?(\|[^\]\n]*)?\]\]")
 REQ_ID_RE = re.compile(r"REQ-[A-Z]{2,4}-\d{3}")
 DOM_IN_NAME_RE = re.compile(r"\(([A-Z]{2,4})\)")
@@ -75,15 +84,6 @@ STRIP_RES = [
     re.compile(r"\bed-\d+\b"),
 ]
 
-ROOT_ALLOWLIST = {
-    "README.md",
-    "system_overview.md",
-    "00_glossary.md",
-    "00_project_summary.md",
-    "00_documentation_file_creation_and_conventions.md",
-    "00_documentation_subfolders.md",
-}
-
 GENERIC_STATUS = {"draft", "active", "superseded", "deprecated"}
 DEC_BODY_STATUS = {"Draft", "Accepted", "Superseded", "Deprecated"}
 
@@ -109,6 +109,16 @@ class Finding:
 # Vault discovery and indexing
 # --------------------------------------------------------------------------
 
+def template_files(domain_dir: Path):
+    """Template files of one domain dir, in any of the supported languages."""
+    try:
+        return sorted(p for p in domain_dir.iterdir()
+                      if p.is_file() and p.suffix == ".md"
+                      and TEMPLATE_NAME_RE.match(p.name))
+    except OSError:
+        return []
+
+
 def is_vault_root(d: Path) -> bool:
     """A vault root has >=3 domain dirs AND template files below them.
 
@@ -121,7 +131,7 @@ def is_vault_root(d: Path) -> bool:
         return False
     if len(subs) < 3:
         return False
-    return any(next(iter(s.glob("00_*file_template*.md")), None) for s in subs)
+    return any(template_files(s) for s in subs)
 
 
 def find_vault_root(start: Path):
@@ -147,6 +157,26 @@ class Vault:
         self._md_names = None
         self._all_names = None
         self._req_index = None
+        self._git_root = None
+
+    def git_root(self):
+        """Repo root enclosing the vault, or None outside version control.
+
+        Not always project_root: derived projects sometimes version the
+        vault alone (both German vaults do), and then project_root is not
+        a repo at all - which would silently empty the HEAD baseline and
+        make every pre-existing ERROR count as introduced this session.
+        """
+        if self._git_root is None:
+            try:
+                r = subprocess.run(
+                    ["git", "-C", str(self.root), "rev-parse", "--show-toplevel"],
+                    capture_output=True, text=True, timeout=10)
+                self._git_root = (Path(r.stdout.strip())
+                                  if r.returncode == 0 and r.stdout.strip() else False)
+            except (OSError, subprocess.TimeoutExpired):
+                self._git_root = False
+        return self._git_root or None
 
     def templates_for(self, abbr):
         """H2 heading sets of each template of a domain (empty sets excluded)."""
@@ -154,7 +184,7 @@ class Vault:
             self._templates = {}
             for dom, ddir in self.domains.items():
                 sets = []
-                for tf in sorted(ddir.glob("00_*file_template*.md")):
+                for tf in template_files(ddir):
                     try:
                         h2s = extract_h2(tf.read_text(encoding="utf-8", errors="replace"))
                     except OSError:
@@ -296,7 +326,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         return findings
 
     if kind in ("root", "infra"):
-        if kind == "infra" and "file_template" in path.name:
+        if kind == "infra" and TEMPLATE_NAME_RE.match(path.name):
             fm, _, bad = parse_frontmatter(lines)
             if bad:
                 findings.append(Finding("ERROR", "template-unreadable", str(path), 1, bad))
@@ -730,12 +760,13 @@ def load_json(path, default):
 
 
 def git_head_content(vault: Vault, path: Path):
+    repo = vault.git_root() or vault.project_root
     try:
-        rel = path.resolve().relative_to(vault.project_root)
+        rel = path.resolve().relative_to(repo)
     except ValueError:
         return None
     try:
-        r = subprocess.run(["git", "-C", str(vault.project_root), "show", f"HEAD:{rel}"],
+        r = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{rel}"],
                            capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -943,8 +974,9 @@ def main(argv):
             ap.error("vault_root or --file required")
         root = Path(args.vault_root).resolve()
         if not is_vault_root(root):
+            names = "/".join(f"00_*{m}*" for m in TEMPLATE_MARKERS)
             print(f"ERROR - {root} is not a vault root (needs >=3 NN_name_(ABBR) "
-                  "domain folders containing 00_*file_template* files)", file=sys.stderr)
+                  f"domain folders containing {names} files)", file=sys.stderr)
             return 2
         findings = run_full(Vault(root))
 
