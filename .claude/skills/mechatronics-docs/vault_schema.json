@@ -1,0 +1,263 @@
+{
+  "schema_version": "0.1",
+  "decision": "DECISIONS.md, amendment 2026-07-28b",
+  "purpose": [
+    "Declare, as data, which fields an object of a given domain carries and",
+    "which named relations exist between objects. Issue #4 makes the validator",
+    "read this file; today nothing reads it. Every entry therefore carries an",
+    "'enforced' flag: 'validator-internal' means validate_vault.py already",
+    "enforces the rule in Python and this file only describes it, so that the",
+    "duplication can be removed later; 'declared-only' means nothing enforces",
+    "it yet."
+  ],
+  "discovery": {
+    "default": ".claude/skills/mechatronics-docs/vault_schema.json",
+    "per_project_override": "00_documentation/vault_schema.json",
+    "rationale": [
+      "Table header signatures below are language-dependent. A vault written",
+      "in another language ships its own schema next to the vault (not inside",
+      "it - the vault is Markdown-only). Discovery is declared-only; issue #4",
+      "implements it. Fallback if no schema is found: bind relation tables to",
+      "the section position declared by the project's own 00_*template* file,",
+      "the mechanism Vault.templates_for already uses for required sections."
+    ],
+    "enforced": "declared-only"
+  },
+
+  "identifier": {
+    "field": "id",
+    "location": "YAML frontmatter",
+    "pattern": "^(REQ|DEC|ARC|CMP|IFC|IMP|TAE|OAU|REF)-[A-Z]{2,4}-[0-9]{3}$",
+    "parts": {
+      "domain": "folder abbreviation of the object",
+      "scope": "subsystem token; the same token the subsystem's REQ file carries in parentheses in its filename",
+      "number": "three digits, local to the (domain, scope) pair"
+    },
+    "rules": [
+      "Never reused, gaps allowed - same contract as the REQ row IDs.",
+      "REQ files take number 000, reserved for the file itself; REQ table rows use 001 and up, so the file-level and row-level namespaces cannot collide.",
+      "Identity lives in the frontmatter, not in the filename: renaming a file does not change its identifier. Wikilinks remain navigation and may be rewritten by the editor.",
+      "ADM and INB are excluded: SKILL.md classifies them as not engineering documentation."
+    ],
+    "assignment": "No registry. The scope token localises the number space; the next free number is found by scanning the vault, following StrictDoc's approach of reading the tree instead of keeping a counter file.",
+    "collision_policy": {
+      "intent": "Detect, do not prevent. Two branches can assign the same number and merge cleanly.",
+      "today": "Nothing detects an id collision. validate_vault.py checks duplicates only for REQ table rows (req-duplicate-global) and for file basenames (duplicate-basename).",
+      "owed_to_issue": 3
+    },
+    "known_gap": {
+      "what": "REQ row IDs are still derived from the filename: Vault.req_index reads the scope token out of the parentheses in the REQ filename.",
+      "consequence": "Renaming a REQ file still changes the identity of its rows, which is the defect issue #3 describes.",
+      "migration": "The scope token is now also declared in the REQ file's own id (REQ-<SCOPE>-000). Issue #3 makes the validator prefer that and fall back to the filename.",
+      "enforced": "declared-only"
+    },
+    "enforced": "declared-only"
+  },
+
+  "domains": {
+    "REQ": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["REQ"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "note": "REQ-<SCOPE>-000", "enforced": "declared-only"}
+      },
+      "rows": {
+        "note": "The identified object in REQ is the table row, not the file.",
+        "id_pattern": "^REQ-[A-Z]{2,4}-[0-9]{3}$",
+        "columns": ["class", "number", "content", "acceptance_criterion", "source"],
+        "class_values": ["M", "S", "O"],
+        "enforced": "validator-internal"
+      }
+    },
+    "DEC": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["DEC"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      },
+      "body_fields": {
+        "Status": {"type": "enum", "values": ["Draft", "Accepted", "Superseded", "Deprecated"], "required": true, "enforced": "validator-internal"}
+      }
+    },
+    "ARC": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["ARC"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    },
+    "CMP": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["CMP"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    },
+    "IFC": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["IFC"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    },
+    "IMP": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["IMP"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    },
+    "TAE": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["TAE"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "verifies": {"type": "list", "item": "REQ row identifier", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    }
+  },
+
+  "link_annotation": {
+    "form": "[[<exact filename>]] (<identifier>)",
+    "rule": "Every cross-domain link in a domain file is annotated with the target's identifier. Because an identifier begins with its domain token, an annotated link carries its own type - no heading is needed to interpret it.",
+    "example": "[[CMP_Battery_Pack]] (CMP-BAT-001)",
+    "enforced": "declared-only"
+  },
+
+  "table_bindings": {
+    "note": "A relation table is recognised by its header row, not by the heading above it. Files whose name starts with 00_ are excluded: templates and READMEs carry the same header signature with illustrative rows pointing at objects that do not exist.",
+    "exclude_filename_prefix": "00_",
+    "arc_allocation_table": {
+      "domain": "ARC",
+      "header_signature": ["Submodule (ARC/CMP/IFC)", "Allocated Requirements (REQ-IDs)", "Verification (TAE)", "Status"],
+      "column_roles": ["subject", "objects:allocates", "objects:evidence", "qualifier:status"],
+      "qualifier_values": ["Draft", "Approved", "Verified", "Deprecated", "Blocked"]
+    },
+    "arc_interface_table": {
+      "domain": "ARC",
+      "header_signature": ["Interface (IFC)", "Endpoint A", "Endpoint B", "Context"],
+      "column_roles": ["subject", "object:connects", "object:connects", "note"]
+    },
+    "req_table": {
+      "domain": "REQ",
+      "header_signature": ["Class (M/S/O)", "NNN", "Content", "Acceptance Criterion", "Source / Justification (REF/DEC)"],
+      "column_roles": ["qualifier:class", "subject", "text", "text", "objects:justified-by"]
+    },
+    "enforced": "declared-only"
+  },
+
+  "relations": {
+    "note": "Each kind is authored in exactly one place and in exactly one direction. The reverse direction is computed, never authored - the pattern StrictDoc, Doorstop and Sphinx-Needs all use. Reverse keys follow the Sphinx-Needs '<kind>_back' convention.",
+    "allocates": {
+      "subject_domains": ["ARC", "CMP", "IFC"],
+      "object_domains": ["REQ"],
+      "authored_in": "arc_allocation_table",
+      "reverse_key": "allocates_back",
+      "outgoing": "allocates",
+      "incoming": "is allocated to",
+      "enforced": "declared-only"
+    },
+    "evidence": {
+      "subject_domains": ["ARC", "CMP", "IFC"],
+      "object_domains": ["TAE"],
+      "authored_in": "arc_allocation_table",
+      "qualifier": "status",
+      "reverse_key": "evidence_back",
+      "outgoing": "is verified by",
+      "incoming": "verifies the allocation of",
+      "semantics": "A row with several requirements and several evidence notes states that the listed notes together cover the allocation. Which note proves which requirement is answered by 'verifies', not by this relation.",
+      "enforced": "declared-only"
+    },
+    "verifies": {
+      "subject_domains": ["TAE"],
+      "object_domains": ["REQ"],
+      "authored_in": "TAE frontmatter field 'verifies'",
+      "reverse_key": "verifies_back",
+      "outgoing": "verifies",
+      "incoming": "is verified by",
+      "enforced": "validator-internal",
+      "enforced_detail": "Format and existence of the referenced REQ rows are checked; the relation is not otherwise interpreted."
+    },
+    "justified-by": {
+      "subject_domains": ["REQ"],
+      "object_domains": ["DEC", "REF"],
+      "authored_in": "req_table",
+      "reverse_key": "justified-by_back",
+      "outgoing": "is justified by",
+      "incoming": "justifies",
+      "enforced": "declared-only"
+    },
+    "connects": {
+      "subject_domains": ["IFC"],
+      "object_domains": ["CMP", "ARC"],
+      "authored_in": "arc_interface_table",
+      "cardinality": "exactly two objects per row",
+      "reverse_key": "connects_back",
+      "outgoing": "connects",
+      "incoming": "is connected by",
+      "enforced": "declared-only"
+    },
+    "contains": {
+      "subject_domains": ["ARC"],
+      "object_domains": ["REQ", "DEC", "CMP", "IMP"],
+      "authored_in": "annotated links in the ARC body lists",
+      "subtype_from": "domain token of the object identifier",
+      "reverse_key": "contains_back",
+      "outgoing": "contains",
+      "incoming": "belongs to",
+      "enforced": "declared-only"
+    },
+    "test-object": {
+      "subject_domains": ["TAE"],
+      "object_domains": ["CMP", "IFC", "ARC"],
+      "authored_in": "annotated link in the TAE Test Conditions section",
+      "reverse_key": "test-object_back",
+      "outgoing": "was tested on",
+      "incoming": "was the test object of",
+      "enforced": "declared-only"
+    }
+  },
+
+  "consistency_rules": [
+    {
+      "id": "evidence-covers-allocation",
+      "statement": "For every allocation row, the requirements in the 'verifies' frontmatter of the referenced evidence notes should together cover the requirements allocated in that row.",
+      "why": "'verifies' and 'evidence' are separate relations with separate subjects and can disagree without either being wrong on its own.",
+      "enforced": "declared-only",
+      "owed_to_issue": 4
+    },
+    {
+      "id": "verified-needs-evidence",
+      "statement": "An allocation row with status 'Verified' must carry at least one evidence link.",
+      "enforced": "declared-only",
+      "owed_to_issue": 4
+    },
+    {
+      "id": "identifier-uniqueness",
+      "statement": "An identifier appears at most once across the vault, and an identifier present in an earlier commit does not silently disappear.",
+      "enforced": "declared-only",
+      "owed_to_issue": 3
+    }
+  ],
+
+  "untyped_links": {
+    "note": "Links that remain navigation in the worked example and are deliberately not relation edges. Listed so the gap is visible rather than implied.",
+    "items": [
+      "Links from a domain file to a 00_ README or template (documentation pointers).",
+      "Links inside prose in a Context section that repeat a relation already authored elsewhere in the same file."
+    ]
+  }
+}

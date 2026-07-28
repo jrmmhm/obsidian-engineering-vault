@@ -1,0 +1,26 @@
+Test Campaign: Battery Monitoring Log Acceptance
+Date: 2026-07-28
+Equipment:
+  - DUT: internal battery pack of the host machine (Sunwoda 5B10W13975, Li-poly)
+  - Readout: Linux power-supply class, no external instrument
+Purpose: Record a battery telemetry log and verify it against REQ-BAT-001..003
+Test Procedure:
+  1. Run 20_software/data_analysis/collect_battery_log.py with 20 samples at
+     0.25 s nominal interval, writing battery_log.csv into this folder
+  2. Run 20_software/data_analysis/eval_battery_log.py against that log
+  3. Repeat step 2 against the negative control in 32_testdata_processed
+Conditions:
+  - Host on AC, pack at 80 percent, status "Not charging"
+  - No load profile applied; the run characterises the logging chain,
+    not the discharge behaviour of the pack
+Immutability:
+  This log is raw data and is never regenerated. The evidence quoted in the
+  TAE note is the evaluation of exactly this file. Re-running the collector
+  produces a new campaign folder with a new date instead.
+Results:
+  - PASS 3/3, see the TAE note for the verbatim evaluator output
+  - Negative control: 32_testdata_processed/2026-07-28_battery_monitoring/
+    battery_log_negative_control.csv, FAIL 0/3 by construction
+Documentation:
+  - TAE file: 07_testing_and_evidence_(TAE)/TAE_Battery_Log_Acceptance.md
+  - Requirements: REQ-BAT-001, REQ-BAT-002, REQ-BAT-003

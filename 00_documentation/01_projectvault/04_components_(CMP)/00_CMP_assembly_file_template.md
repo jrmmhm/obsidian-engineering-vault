@@ -1,5 +1,6 @@
 ---
 domain: CMP
+id: CMP-DOM-NNN
 status: draft
 created: YYYY-MM-DD
 last-verified: YYYY-MM-DD
