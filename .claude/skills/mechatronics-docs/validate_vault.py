@@ -92,8 +92,96 @@ STRIP_RES = [
     re.compile(r"\bed-\d+\b"),
 ]
 
-GENERIC_STATUS = {"draft", "active", "superseded", "deprecated"}
-DEC_BODY_STATUS = {"Draft", "Accepted", "Superseded", "Deprecated"}
+# --------------------------------------------------------------------------
+# Schema (vault_schema.json)
+# --------------------------------------------------------------------------
+# The field vocabulary, the permitted values and the required keys are DATA,
+# read from the packaged schema beside this file. One packaged schema, no
+# per-project override: the ERRORs that reach the stop gate's blocking set
+# come from the checks below, so a project-local override would be an
+# uncommitted off-switch for the gate (DECISIONS.md, amendment 2026-07-28d).
+SCHEMA_PATH = Path(__file__).resolve().with_name("vault_schema.json")
+SCHEMA_MAX_BYTES = 1 << 20
+
+# Used ONLY when the packaged schema cannot be read. Deliberately minimal -
+# it is not a second copy of the schema, it is the answer to "check nothing
+# or check the essentials", and validating nothing silently is the failure
+# mode this project has already been bitten by.
+FALLBACK_SCHEMA = {
+    "domain_defaults": {"fields": {
+        "domain": {"type": "folder-abbreviation", "required": True,
+                   "code": "frontmatter-domain", "enforced": "schema-driven"},
+        "status": {"type": "enum", "required": True, "code": "frontmatter-status",
+                   "values": ["draft", "active", "superseded", "deprecated"],
+                   "enforced": "schema-driven"},
+        "created": {"type": "date", "required": True, "code": "frontmatter-date",
+                    "enforced": "schema-driven"},
+        "last-verified": {"type": "date", "required": True, "code": "frontmatter-date",
+                          "enforced": "schema-driven"},
+        "id": {"type": "identifier", "required": False, "enforced": "declared-only"},
+        "verifies": {"type": "list", "item": "req-row-identifier", "required": False,
+                     "code": "verifies-format", "empty_code": "verifies-empty",
+                     "enforced": "declared-only"},
+    }},
+    "domains": {
+        "DEC": {"fields": {"status": {"required": False}},
+                "body_fields": {"Status": {
+                    "type": "enum", "code": "dec-status", "enforced": "schema-driven",
+                    "values": ["Draft", "Accepted", "Superseded", "Deprecated"]}}},
+        "TAE": {"fields": {"verifies": {"required": True, "hint": "verifies: [REQ-...]",
+                                        "enforced": "schema-driven"}}},
+        "REQ": {"rows": {"class_values": ["M", "S", "O"]}},
+    },
+    "editor_fields": {
+        "values": ["tags", "aliases", "cssclasses", "publish", "permalink",
+                   "description", "image", "cover"],
+        "prefixes": ["excalidraw-"],
+    },
+}
+
+_SCHEMA_CACHE = {}
+
+
+def _dict(node, key):
+    """node[key] if it is a dict, else {} - never raises, never propagates junk.
+
+    Every schema read goes through this. A schema that parses but declares
+    nonsense (`"body_fields": 5`) must not reach a nested subscript: that
+    raises TypeError, which exits 2, which both hooks swallow.
+    """
+    v = node.get(key) if isinstance(node, dict) else None
+    return v if isinstance(v, dict) else {}
+
+
+def _strlist(node, key):
+    """node[key] as a list of strings, else [] - never raises."""
+    v = node.get(key) if isinstance(node, dict) else None
+    return [x for x in v if isinstance(x, str)] if isinstance(v, list) else []
+
+
+def load_schema(path=SCHEMA_PATH):
+    """-> (schema_dict, error_message|None). Cached per path. Never raises."""
+    key = str(path)
+    if key not in _SCHEMA_CACHE:
+        _SCHEMA_CACHE[key] = _read_schema(path)
+    return _SCHEMA_CACHE[key]
+
+
+def _read_schema(path):
+    try:
+        raw = path.read_bytes()
+    except OSError as e:
+        return FALLBACK_SCHEMA, f"cannot read {path.name} ({type(e).__name__})"
+    if len(raw) > SCHEMA_MAX_BYTES:
+        return FALLBACK_SCHEMA, f"{path.name} exceeds {SCHEMA_MAX_BYTES} bytes"
+    try:
+        # RecursionError, not ValueError, is what deeply nested JSON raises.
+        data = json.loads(raw.decode("utf-8", "replace"))
+    except (ValueError, RecursionError):
+        return FALLBACK_SCHEMA, f"{path.name} is not valid JSON"
+    if not isinstance(data, dict):
+        return FALLBACK_SCHEMA, f"{path.name} is not a JSON object"
+    return data, None
 
 
 class Finding:
@@ -166,6 +254,45 @@ class Vault:
         self._all_names = None
         self._req_index = None
         self._git_root = None
+        self._schema = None
+        self._schema_error = None
+        self._schema_reported = False
+        self._fields = {}
+
+    def schema(self):
+        if self._schema is None:
+            self._schema, self._schema_error = load_schema()
+        return self._schema
+
+    def schema_error(self):
+        self.schema()
+        return self._schema_error
+
+    def fields_for(self, abbr):
+        """Field descriptors of a domain: the defaults, then the domain's deltas.
+
+        The merge is attribute-wise, so a domain entry that only says
+        {"required": false} keeps the type, the values and the finding code
+        declared once in domain_defaults. A domain this schema does not name -
+        every domain of a vault written in another language - gets the defaults
+        alone, which is exactly the contract those vaults are held to today.
+        """
+        if abbr not in self._fields:
+            s = self.schema()
+            merged = {}
+            for name, desc in _dict(_dict(s, "domain_defaults"), "fields").items():
+                if isinstance(desc, dict):
+                    merged[name] = dict(desc)
+            for name, desc in _dict(_dict(_dict(s, "domains"), abbr), "fields").items():
+                if isinstance(desc, dict):
+                    merged[name] = {**merged.get(name, {}), **desc}
+            self._fields[abbr] = merged
+        return self._fields[abbr]
+
+    def editor_fields(self):
+        """(names, prefixes) of keys the editor and its plugins own."""
+        ef = _dict(self.schema(), "editor_fields")
+        return set(_strlist(ef, "values")), tuple(_strlist(ef, "prefixes"))
 
     def git_root(self):
         """Repo root enclosing the vault, or None outside version control.
@@ -368,6 +495,15 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         return findings
     lines = content.splitlines() if content is not None else read_lines(path)
 
+    # Reported once per vault, and never on a git-HEAD baseline pass (whose
+    # WARNs are discarded, which would swallow this one silently).
+    if content is None and vault.schema_error() and not vault._schema_reported:
+        vault._schema_reported = True
+        findings.append(Finding("WARN", "schema-unreadable", str(SCHEMA_PATH), None,
+                                vault.schema_error() + " - falling back to the built-in "
+                                "field set; declared values and editor fields are not "
+                                "in effect"))
+
     if kind == "inbox":
         check_links(vault, path, lines, findings, strict_links, hub=False)
         if content is None:
@@ -375,10 +511,17 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         return findings
 
     if kind in ("root", "infra"):
-        if kind == "infra" and TEMPLATE_NAME_RE.match(path.name):
+        if kind == "infra":
             fm, _, bad = parse_frontmatter(lines)
-            if bad:
+            if bad and TEMPLATE_NAME_RE.match(path.name):
                 findings.append(Finding("ERROR", "template-unreadable", str(path), 1, bad))
+            elif fm:
+                # Vocabulary only. A template's VALUES are placeholders
+                # (created: YYYY-MM-DD, id: ARC-DOM-NNN) and cannot be
+                # checked - but a key nobody declared propagates silently
+                # into every file copied from it, so the template is the one
+                # place where catching it is worth the most.
+                check_undeclared(vault, fm, abbr, path, findings)
         # infra/root files carry placeholder example links - never strict
         check_links(vault, path, lines, findings, strict=False,
                     hub=path.name == "system_overview.md")
@@ -399,7 +542,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                                 "(domain, status, created, last-verified)"))
         fm, fm_end = {}, 0
     else:
-        check_frontmatter(fm, abbr, path, findings)
+        check_frontmatter(vault, fm, abbr, path, findings)
 
     check_sections(vault, abbr, path, lines, findings)
     check_length(path, lines, findings)
@@ -407,11 +550,11 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     check_leaks(abbr, path, lines, fm_end, findings)
     check_paths(vault, path, lines, fm_end, findings)
     if abbr == "REQ":
-        check_req_table(path, lines, findings)
+        check_req_table(vault, path, lines, findings)
     if abbr == "TAE":
         check_tae_verifies(vault, fm, path, findings)
     if abbr == "DEC":
-        check_dec_status(path, lines, findings)
+        check_dec_status(vault, path, lines, findings)
 
     body = [l for l in lines[fm_end:] if l.strip()]
     if len(body) < STUB_MIN_LINES:
@@ -421,42 +564,102 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     return findings
 
 
-def check_frontmatter(fm, abbr, path, findings):
-    required = ["domain", "created", "last-verified"]
-    if abbr != "DEC":
-        required.insert(1, "status")
-    for key in required:
+def check_frontmatter(vault, fm, abbr, path, findings):
+    """Frontmatter rules, read from vault_schema.json rather than from Python.
+
+    Only fields flagged 'schema-driven' are enforced. A 'declared-only' field
+    is part of the vocabulary - so it is never reported as undeclared - but
+    its value is not checked: that is how 'id' keeps its unfilled template
+    placeholder befinding-free, and how 'verifies' stays enforced in TAE
+    alone while a German evidence domain carrying it costs nothing.
+    """
+    fields = vault.fields_for(abbr)
+    for key in sorted(fields):
+        desc = fields[key]
+        if desc.get("enforced") != "schema-driven":
+            continue
         if key not in fm:
-            findings.append(Finding("ERROR", "frontmatter-key", str(path), 1,
-                                    f"frontmatter missing required key '{key}'"))
-    if fm.get("domain") and fm["domain"] != abbr:
-        findings.append(Finding("ERROR", "frontmatter-domain", str(path), 1,
-                                f"frontmatter domain '{fm['domain']}' != folder domain '{abbr}'"))
-    # str(): parse_frontmatter returns a LIST for 'status: [active]', and an
-    # unhashable left operand makes 'not in <set>' raise TypeError. That crash
-    # exits 2, which both hooks swallow - one such file would switch the whole
-    # enforcement layer off silently. Normalising reports it as the ERROR it is.
-    if abbr != "DEC" and fm.get("status") and str(fm["status"]) not in GENERIC_STATUS:
-        findings.append(Finding("ERROR", "frontmatter-status", str(path), 1,
-                                f"status '{fm['status']}' not in {sorted(GENERIC_STATUS)}"))
-    for key in ("created", "last-verified"):
-        v = fm.get(key)
-        if v and not DATE_RE.match(str(v)):
-            findings.append(Finding("ERROR", "frontmatter-date", str(path), 1,
-                                    f"'{key}' must be YYYY-MM-DD, got '{v}'"))
-    if abbr == "TAE":
-        ver = fm.get("verifies")
-        if ver is None:
-            findings.append(Finding("ERROR", "frontmatter-key", str(path), 1,
-                                    "TAE frontmatter missing 'verifies: [REQ-...]'"))
-        elif isinstance(ver, list):
-            for rid in ver:
-                if not REQ_ID_RE.fullmatch(rid):
-                    findings.append(Finding("ERROR", "verifies-format", str(path), 1,
-                                            f"'{rid}' is not a REQ-DOM-NNN id"))
-            if not ver:
-                findings.append(Finding("WARN", "verifies-empty", str(path), 1,
-                                        "TAE verifies no requirement - what does it prove?"))
+            if desc.get("required"):
+                hint = desc.get("hint")
+                msg = f"frontmatter missing required key '{key}'"
+                if isinstance(hint, str) and hint:
+                    msg += f" ({hint})"
+                findings.append(Finding("ERROR", "frontmatter-key", str(path), 1, msg))
+            continue
+        check_field_value(key, fm[key], desc, abbr, path, findings)
+    check_undeclared(vault, fm, abbr, path, findings)
+
+
+def check_field_value(key, value, desc, abbr, path, findings):
+    """One frontmatter value against its declared type. Never raises.
+
+    str() before every comparison: parse_frontmatter returns a list for
+    'status: [active]', and an unhashable operand in a membership test raises
+    TypeError - which exits 2, which both hooks swallow.
+    """
+    kind = desc.get("type")
+    code = desc.get("code") or "frontmatter-value"
+
+    if kind == "list":
+        if not isinstance(value, list):
+            return          # a scalar where a list belongs: unreported, as before
+        if not value:
+            empty_code = desc.get("empty_code")
+            if empty_code and desc.get("required"):
+                findings.append(Finding("WARN", empty_code, str(path), 1,
+                                        f"'{key}' names no requirement - "
+                                        "what does this file prove?"))
+        elif desc.get("item") == "req-row-identifier":
+            for item in value:
+                if not (isinstance(item, str) and REQ_ID_RE.fullmatch(item)):
+                    findings.append(Finding("ERROR", code, str(path), 1,
+                                            f"'{item}' is not a REQ-DOM-NNN id"))
+        return
+
+    # An empty scalar is a missing scalar; the required-key check owns it.
+    if not value:
+        return
+    text = str(value)
+
+    if kind == "folder-abbreviation":
+        if text != abbr:
+            findings.append(Finding("ERROR", code, str(path), 1,
+                                    f"frontmatter {key} '{text}' != "
+                                    f"folder domain '{abbr}'"))
+    elif kind == "enum":
+        values = _strlist(desc, "values")
+        if values and text not in values:
+            findings.append(Finding("ERROR", code, str(path), 1,
+                                    f"{key} '{text}' not in {sorted(values)}"))
+    elif kind == "date":
+        if not DATE_RE.match(text):
+            findings.append(Finding("ERROR", code, str(path), 1,
+                                    f"'{key}' must be YYYY-MM-DD, got '{text}'"))
+
+
+def check_undeclared(vault, fm, abbr, path, findings):
+    """Frontmatter keys nobody declared - the silent defect class.
+
+    A mistyped key ('crated') is the only frontmatter mistake that fails
+    completely quietly: the field looks present and takes effect nowhere.
+
+    WARN, not ERROR. The check cannot tell a typo from a deliberate plugin
+    field, which is Clippy's stated disqualification for a deny-by-default
+    lint and Tricorder's for a blocking one. One grouped finding per file:
+    a file with five stray keys must not produce five lines, the lesson of
+    the aggregated link feedback in amendment 2026-07-27.
+    """
+    known = set(vault.fields_for(abbr))
+    editor_names, editor_prefixes = vault.editor_fields()
+    unknown = sorted(k for k in fm
+                     if k not in known and k not in editor_names
+                     and not k.startswith(editor_prefixes))
+    if unknown:
+        findings.append(Finding("WARN", "frontmatter-undeclared", str(path), 1,
+                                f"frontmatter key(s) {unknown} are declared neither "
+                                f"for domain {abbr} nor as editor fields - a typo "
+                                "takes effect nowhere; declare the field in "
+                                "vault_schema.json if it is intended"))
 
 
 def check_sections(vault, abbr, path, lines, findings):
@@ -625,7 +828,11 @@ def check_paths(vault, path, lines, fm_end, findings):
                 findings.append(Finding(sev, "path-missing", str(path), i, msg))
 
 
-def check_req_table(path, lines, findings):
+def check_req_table(vault, path, lines, findings):
+    # The class vocabulary is data; the table structure below is not - it is
+    # row grammar rather than a value list (vault_schema.json, domains.REQ.rows).
+    classes = _strlist(_dict(_dict(_dict(vault.schema(), "domains"), "REQ"), "rows"),
+                       "class_values") or ["M", "S", "O"]
     seen = {}
     header_ok = False
     for i, line in enumerate(lines, 1):
@@ -640,9 +847,9 @@ def check_req_table(path, lines, findings):
         cls, nnn, content, crit = row[0], row[1], row[2], row[3]
         if not (cls or nnn or content):
             continue  # empty template row
-        if cls not in ("M", "S", "O"):
+        if cls not in classes:
             findings.append(Finding("ERROR", "req-class", str(path), i,
-                                    f"class '{cls}' must be exactly M, S or O"))
+                                    f"class '{cls}' must be one of {', '.join(classes)}"))
         if not re.fullmatch(r"\d{3}", nnn):
             findings.append(Finding("ERROR", "req-nnn", str(path), i,
                                     f"NNN '{nnn}' must be 3 digits"))
@@ -668,15 +875,21 @@ def check_tae_verifies(vault, fm, path, findings):
                                     f"{rid} is not defined in any REQ file"))
 
 
-def check_dec_status(path, lines, findings):
+def check_dec_status(vault, path, lines, findings):
+    # The value list is data. The companion rule below - Superseded needs a
+    # successor link - stays here: it is a cross-reference requirement, not a
+    # vocabulary (vault_schema.json, domains.DEC.body_fields.Status).
+    desc = _dict(_dict(_dict(_dict(vault.schema(), "domains"), "DEC"),
+                       "body_fields"), "Status")
+    allowed = _strlist(desc, "values") if desc.get("enforced") == "schema-driven" else []
     status = None
     for i, line in enumerate(lines, 1):
         m = re.match(r"^Status:\s*(.+)$", line.strip())
         if m:
             status = m.group(1).strip()
-            if status not in DEC_BODY_STATUS:
+            if allowed and status not in allowed:
                 findings.append(Finding("ERROR", "dec-status", str(path), i,
-                                        f"Status '{status}' not in {sorted(DEC_BODY_STATUS)}"))
+                                        f"Status '{status}' not in {sorted(allowed)}"))
             if status == "Superseded":
                 joined = "\n".join(lines)
                 if not re.search(r"Superseded by.*\[\[", joined):
