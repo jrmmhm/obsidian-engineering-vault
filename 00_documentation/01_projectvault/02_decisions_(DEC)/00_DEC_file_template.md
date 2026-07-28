@@ -1,5 +1,6 @@
 ---
 domain: DEC
+id: DEC-DOM-NNN
 created: YYYY-MM-DD
 last-verified: YYYY-MM-DD
 ---

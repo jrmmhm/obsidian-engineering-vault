@@ -61,6 +61,30 @@ deprecated`; DEC files keep their Status line in the body instead),
 `verifies: [REQ-DOM-NNN, ...]` naming the requirements they prove.
 `status: draft` does not relax any rule.
 
+### Identifiers and typed relations
+Every domain file also carries `id`, of the form `DOMAIN-SCOPE-NNN` — the
+folder abbreviation, the subsystem token the matching REQ file carries in
+parentheses, and a three-digit number local to that pair. Numbers are
+never reused and gaps are allowed, exactly like requirement row IDs. A
+REQ file uses number `000`, reserved for the file itself, so its rows
+keep `001` and up. The identifier lives in the frontmatter and not in the
+filename, so renaming a file does not change what it is.
+
+Cross-domain links carry the identifier of their target after the link:
+`[[CMP_Battery_Pack]] (CMP-BAT-001)`. Because an identifier starts with
+its domain, an annotated link states what kind of relation it is without
+anyone reading the heading above it. Which relations exist, and where
+each one is written down, is declared in
+`.claude/skills/mechatronics-docs/vault_schema.json`. Each relation has
+exactly one place where it is authored; the opposite direction is never
+written by hand.
+
+The worked example under
+[[ARC_Battery_Monitoring]] shows all of this in one thread. The validator
+does not yet check identifiers or relations — that is planned work, and
+the schema file marks per entry what is enforced today and what is only
+declared.
+
 ### Self-containedness
 The first lines of the Context section must situate the file on their
 own: what it is, which module it belongs to, using exact component

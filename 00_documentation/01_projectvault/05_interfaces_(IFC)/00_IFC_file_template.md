@@ -1,5 +1,6 @@
 ---
 domain: IFC
+id: IFC-DOM-NNN
 status: draft
 created: YYYY-MM-DD
 last-verified: YYYY-MM-DD
