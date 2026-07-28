@@ -37,43 +37,84 @@ and a machine that checks it.**
 
 ## How the pieces connect
 
-Nine domains, each answering a different question, wired into a traceable chain
-from goal to evidence:
+The nine domains are not a pipeline. **`ARC` is the orchestrator** — one note per
+module that references every other domain and owns none of their content. Read
+an ARC note and you have the whole module; read it and follow one link and you
+have the detail.
 
 ```mermaid
-flowchart LR
-    REF["<b>REF</b><br/>What does the<br/>source say?"]
-    REQ["<b>REQ</b><br/>What should be<br/>achieved?"]
-    DEC["<b>DEC</b><br/>Why was it<br/>chosen?"]
-    ARC["<b>ARC</b><br/>How does it<br/>connect?"]
-    CMP["<b>CMP</b><br/>Which building<br/>blocks?"]
-    IFC["<b>IFC</b><br/>Which contracts<br/>between parts?"]
-    IMP["<b>IMP</b><br/>How is it<br/>implemented?"]
-    TAE["<b>TAE</b><br/>Did it<br/>work?"]
-    OAU["<b>OAU</b><br/>How is it<br/>operated?"]
+flowchart TB
+    SYS(["<b>system_overview</b> — the way in<br/>lists every top-level module"])
 
-    REF --> REQ
-    REF --> CMP
-    REQ --> ARC
-    DEC --> ARC
-    ARC --> CMP
-    ARC --> IFC
+    REF["<b>REF</b><br/>external truth<br/><i>datasheet · standard · manual</i>"]
+    REQ["<b>REQ</b><br/>what must hold<br/><i>REQ-DOM-NNN + acceptance</i>"]
+    DEC["<b>DEC</b><br/>why this way<br/><i>options · consequences</i>"]
+
+    ARC{{"<b>ARC — the module</b><br/>context: includes / excludes<br/>links, never copies"}}
+    SUB{{"<b>sub-ARC</b><br/>same structure,<br/>finer scope"}}
+
+    CMP["<b>CMP</b><br/>leaf part<br/><i>no sub-parts of its own</i>"]
+    IFC["<b>IFC</b><br/>contract<br/><i>endpoint A ↔ endpoint B</i>"]
+
+    IMP["<b>IMP</b><br/>how + where<br/><i>points at the artifact</i>"]
+    OAU["<b>OAU</b><br/>runbook<br/><i>operate · recover</i>"]
+    TAE["<b>TAE</b><br/>evidence<br/><i>command + real output</i>"]
+
+    ALLOC[["<b>Allocation &amp; Verification</b><br/>one row: REQ-IDs · owner · TAE · status<br/><i>this table is where the loop closes</i>"]]
+
+    SYS --> ARC
+    REF -->|"grounds"| REQ
+    REF -->|"grounds"| CMP
+    REQ -->|"one sentence:<br/>why relevant here"| ARC
+    DEC -->|"one sentence:<br/>what it shapes"| ARC
+    ARC -->|"delegates to"| SUB
+    ARC -->|"owns"| CMP
+    ARC -->|"owns"| IFC
     CMP --> IMP
     IFC --> IMP
-    IMP --> TAE
     IMP --> OAU
-    TAE -. "verifies" .-> REQ
+    IMP --> TAE
+
+    ARC ==> ALLOC
+    REQ -.->|"REQ-IDs, not text"| ALLOC
+    CMP -.->|"the owner"| ALLOC
+    IFC -.->|"the owner"| ALLOC
+    TAE -.->|"the proof"| ALLOC
 
     classDef goal fill:#1e3a8a,stroke:#3b82f6,color:#fff
+    classDef hub fill:#5b21b6,stroke:#a78bfa,color:#fff
     classDef build fill:#134e4a,stroke:#14b8a6,color:#fff
     classDef proof fill:#78350f,stroke:#f59e0b,color:#fff
-    class REQ,DEC,REF goal
-    class ARC,CMP,IFC,IMP build
-    class TAE,OAU proof
+    classDef entry fill:#334155,stroke:#94a3b8,color:#fff
+    class REF,REQ,DEC goal
+    class ARC,SUB hub
+    class CMP,IFC,IMP build
+    class TAE,OAU,ALLOC proof
+    class SYS entry
 ```
 
-The dotted line is the one that matters. `TAE` files declare which requirements
-they verify, and the validator reports every requirement that nothing proves.
+Four things in that picture do the real work:
+
+**ARC references, it never absorbs.** A requirement gets one sentence in an ARC
+note saying why it matters here — never its text. A decision gets one sentence
+saying what it shapes — never its justification. This is what keeps a fact in
+exactly one place while still making the module readable end to end.
+
+**ARC nests, the other domains do not.** A module that mostly contains other
+modules uses the main-module template: context plus a table of sub-modules,
+nothing else. A module that directly owns parts uses the full template. That
+single choice is what stops the architecture layer from flattening into a list.
+
+**The CMP/ARC line is a decision rule, not a feeling.** If a thing has
+sub-parts that interact, requirements allocated to it, and internal interfaces,
+it is a module and gets an ARC note. Otherwise it is a leaf and gets a CMP note.
+
+**The allocation table is the load-bearing structure.** Each row names the
+requirement IDs, the component or interface that owns them, the evidence note,
+and a status. A row only reaches `Verified` when a TAE link actually exists —
+`Draft → Approved → Verified`, per allocation, not per file. That is what turns
+"we tested it" into "these three requirements are still unproven", and it is
+the one rule the validator can check for you.
 
 | Domain | Question it answers | Change rate |
 | ------ | ------------------- | ----------- |
