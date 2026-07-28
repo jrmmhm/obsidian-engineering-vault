@@ -31,6 +31,29 @@ Implementation_(IMP) contains:
 - IMP files are SHORT (1-2 pages max)
 - IMP files are pointers, not duplicates. Link to actual artifacts.
 
+## Artifacts on Other Machines
+
+The pointer rule protects one property: a copied artifact drifts against its original, a path cannot.
+It therefore applies to artifacts this project owns — things that exist as files in this repository.
+
+A system whose parts run on other machines has artifacts that are not files here and never will be: the state of a directory on a server, a configuration in effect on a host, a command that establishes or verifies one.
+There is no path to point at, because there is no file.
+Such a block is not a copy of anything — it is the only record of an observation, and its currency is carried by `last-verified`, not by a source file.
+
+**Rules:**
+- A block up to 15 content lines is a single observation. It needs no declaration.
+- A longer block must either give way to a path pointing at the file it was copied from, or name the machine it is true on, written into the fence's info string after the language:
+
+```bash host=userver
+systemctl --user status navidrome
+```
+
+- Use the same machine name you would use in a host-qualified path (`userver:/etc/systemd/system/navidrome.service`). It is the name under which the machine is documented, not an IP and not a connection string.
+- Never write `localhost`. The vault is read on other machines than the one you are sitting at, and `localhost` names a different machine for every reader.
+- A declared block is reported as a warning, deliberately: nothing can verify that no source file exists, so the claim stays visible and is yours.
+- A repeatable multi-step procedure belongs in OAU. A single command that verifies one fact is not a runbook — it stays with the fact it proves.
+- In ARC none of this applies: ARC is a map and holds no blocks at all.
+
 
 ## Structure of an IMP File
 

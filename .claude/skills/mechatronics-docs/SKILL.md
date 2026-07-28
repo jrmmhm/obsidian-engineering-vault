@@ -221,7 +221,8 @@ The most common misplacements. Follow strictly:
 | Calibration equation (as evidence) | IMP only | TAE Evidence + IMP (link to TAE) |
 | Repeatable test procedure | TAE | OAU (TAE links to it) |
 | Component selection rationale | CMP | DEC |
-| Code blocks / firmware snippets | IMP | Source files (IMP has paths only) |
+| Copy of a file this repository owns | IMP | The file itself (IMP carries the path) |
+| State of, or command against, a foreign host | OAU, when it is a procedure | IMP, in a block naming the machine |
 | External PDF (datasheet, standard) | 02_documents | 50_sources |
 | Project-created PDF (export, report) | 50_sources | 02_documents |
 | Raw test data | 32_processed | 31_raw (IMMUTABLE) |
@@ -239,8 +240,21 @@ The most common misplacements. Follow strictly:
    separate files.
 3. **CMP is for things with datasheets.** A project-designed controller or
    firmware module is IMP (plus its own ARC if complex), not CMP.
-4. **IMP is pointers, not copies.** Reference artifact paths; never embed
-   code blocks or schematics. Keep IMP short (1–2 pages).
+4. **IMP is pointers, not copies — for artifacts this project owns.** If the
+   thing exists as a file in this repository, reference its path and copy
+   nothing: a copy drifts against its original, a path cannot. An artifact
+   that is not a file here — the state of another machine, a command that
+   establishes or verifies one — has no path to point at. It is not a copy
+   but a record of an observation, it stays in IMP, and `last-verified`
+   carries its currency. Blocks up to 15 content lines are single
+   observations and need nothing; a longer block must either give way to a
+   path or name the machine it is true on, in the fence's info string:
+   ```` ```bash host=userver ````. Use the same machine name as in a
+   host-qualified path (rule 4 under Cross-Linking), and name the machine,
+   never `localhost` — this vault is read on other machines than yours.
+   A repeatable multi-step procedure is OAU; a single verification command
+   is not a runbook and does not become one by being moved. Keep IMP short
+   (1–2 pages). In ARC no block is allowed at all — ARC is a map.
 5. **TAE Conclusion introduces no new values** — all numbers appear in
    Evidence first.
 6. **Both Assembly AND Individual Parts for PCBs.** The board gets a CMP

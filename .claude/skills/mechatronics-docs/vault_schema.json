@@ -61,6 +61,29 @@
     "enforced_detail": "The pattern above is NOT compiled from this file at runtime, and the presence of the field is not required. Two separate reasons. (1) Presence: requiring the field would turn every file of a vault predating this scheme into a finding, and only pattern-conforming values take part in any comparison, so two files freshly copied from one template never collide on its placeholder. (2) The pattern stays a Python constant (ID_RE / REQ_ID_RE / ID_EXCLUDED_DOMAINS) because identity resolution runs in module-level functions without a schema in hand, and because it decides which values are compared against git HEAD - a rule that decides what counts as an identity should not be re-readable from the tree being judged. Drift between the two is caught by tests/run.sh, which asserts that the Python constants and the patterns declared here accept and reject the same samples."
   },
 
+  "code_fences": {
+    "note": "Fenced blocks are restricted where the vault holds pointers rather than copies. The rule is about drift against a named source, not about the three backticks: a copy of a file this repository owns drifts against its original, while a block recording the state of, or a command against, a machine this project does not own is not a copy but a record - ISO 9000:2015 3.8.10, 'document stating results achieved or providing evidence of activities performed', which 'need not be under revision control'.",
+    "banned_domains": ["IMP", "ARC"],
+    "exempt_domains": ["IMP"],
+    "exempt_domains_note": "ARC is a map and stores nothing, so no declaration lifts its ban. IMP is where an implementation fact and the observation proving it belong together.",
+    "record_max_content_lines": 15,
+    "record_max_provenance": "Measured, not chosen: the smallest genuine script excerpt across both German production vaults has 16 content lines, so 15 is the largest value that still catches every measured copy. Effect at that value, same run pair: homelab code-fence 127 -> 9, PMDE 17 -> 7, template vault unchanged.",
+    "declaration": {
+      "form": "```<language> host=<machine>",
+      "position": "any token of the info string, because 23 of 127 blocks in one production vault and 14 of 17 in the other carry no language at all",
+      "value": "the name under which the machine is documented - the same name a host-qualified path uses (userver:/etc/...), never an IP, never localhost",
+      "spec": "CommonMark 0.31.2: the first word of an info string is typically the language, but 'this spec does not mandate any particular treatment of the info string'. GFM discards further tokens and keeps the language class, so highlighting survives."
+    },
+    "codes": {
+      "code-fence": "ERROR - a block past the threshold with no declaration, and every block in ARC",
+      "fence-host": "ERROR - 'host=' naming no machine; a declaration that names nothing is not a declaration",
+      "fence-record": "WARN - a declared block past the threshold. Deliberately not silent: nothing can verify that no source file exists, so the exemption stays visible, greppable and countable. It is never an ERROR, because the check cannot distinguish a legitimate record from a disguised copy - Clippy reserves deny-by-default for lints 'free of false positives', Tricorder demands 'no effective false positives' of a blocking check."
+    },
+    "enforced": "validator-internal",
+    "enforced_detail": "The domain lists, the threshold and the attribute name are Python constants (FENCE_BANNED_DOMAINS, FENCE_EXEMPT_DOMAINS, FENCE_RECORD_MAX, FENCE_HOST_RE) for the same reason ID_RE is: they decide what counts as a finding at all, and check_leaks runs per line without a schema in hand. Declared here so the vocabulary has one written home and so a reader finds the reasoning with the rule.",
+    "not_enforced": "That a declared block genuinely has no source file. No rule can establish it from the vault alone; it is the doc-claim grep check (follow-up 2 of the 2026-07-25 decision). Validating the machine name against a declared inventory is the other half and has no home yet - there is no per-project registry location, because the per-project schema override was rejected in amendment 2026-07-28d."
+  },
+
   "editor_fields": {
     "note": "Frontmatter keys written by the editor or its plugins. They carry no vault semantics, are never required, and are tolerated in every domain - the undeclared-field check must not report them. Listing them is what keeps that check at WARN-worthy precision instead of flagging a legitimate plugin field as a defect.",
     "values": [

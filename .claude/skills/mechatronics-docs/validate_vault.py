@@ -67,6 +67,26 @@ ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 PATH_TOKEN_RE = re.compile(r"(?<![\w(])((?:[\w.-]+/)+[\w.-]+\.\w{1,12})\b")
 PIN_RE = re.compile(r"\b(?:GPIO\d+|P[A-K]\d{1,2}|0x[0-9A-Fa-f]{2,})\b")
+# Fenced blocks. Both CommonMark markers count ("a code fence is a sequence of
+# at least three consecutive backtick characters or tildes"): a tilde fence
+# renders identically, and recognising only backticks made it the cheaper way
+# out of every rule that keys on fences - including two WRONG findings, since
+# check_links and check_paths then read the block's content as prose.
+FENCE_RE = re.compile(r"^(?:```|~~~)")
+# The machine a block is true on, declared in the info string at ANY token
+# position. CommonMark: the first word is typically the language, but "this
+# spec does not mandate any particular treatment of the info string". Position
+# is not fixed because 23 of 127 blocks in one production vault and 14 of 17
+# in the other carry no language at all - "language first, host second" would
+# have had no spelling for them.
+FENCE_HOST_RE = re.compile(r"(?:^|\s)host=(\S*)")
+# Content lines above which a block is too long to be a single observation.
+# Measured, not chosen: the smallest genuine script excerpt in the two German
+# production vaults has 16 content lines, so 15 is the largest value that
+# still catches every measured copy (DECISIONS.md, amendment 2026-07-28f).
+FENCE_RECORD_MAX = 15
+FENCE_BANNED_DOMAINS = ("IMP", "ARC")
+FENCE_EXEMPT_DOMAINS = ("IMP",)
 # Project-artifact path shape (NN_folder/... per the vault conventions);
 # gates the dead-path scan in BOTH zones so ratio notation (3.3V/1.8V),
 # bare domains (heise.de/...) and foreign paths (/etc/..., ~/.config/...)
@@ -406,6 +426,30 @@ def extract_h2(text: str):
     return {l[3:].strip() for l in text.splitlines() if l.startswith("## ")}
 
 
+def fence_info(line: str):
+    """Info string of a fence line, or None when the line is not a fence.
+
+    One definition of a fence for every check that tracks fence state, so
+    check_leaks, check_links and check_paths can never disagree about where a
+    block starts. Returns '' for a bare fence, which is NOT None - callers
+    distinguish "no fence here" from "a fence declaring nothing".
+    """
+    s = line.lstrip()
+    if not FENCE_RE.match(s):
+        return None
+    return s.lstrip("`~").strip()
+
+
+def fence_host(info: str):
+    """Declared machine of a fence, or None when it declares none.
+
+    '' means the author wrote host= and named nothing - a declaration that
+    names no machine, which is a finding rather than an exemption.
+    """
+    m = FENCE_HOST_RE.search(info)
+    return m.group(1).strip("\"'") if m else None
+
+
 def parse_table_row(line: str):
     s = line.strip()
     if not (s.startswith("|") and s.endswith("|") and s.count("|") >= 3):
@@ -700,7 +744,7 @@ def check_links(vault, path, lines, findings, strict, hub=False):
     total = 0
     in_fence = False
     for i, line in enumerate(lines, 1):
-        if line.lstrip().startswith("```"):
+        if fence_info(line) is not None:
             in_fence = not in_fence
             continue
         if in_fence:
@@ -729,6 +773,54 @@ def check_links(vault, path, lines, findings, strict, hub=False):
                                     f"[[{t}]] linked {c}x in one file."))
 
 
+def check_fence(abbr, path, line, info, body_lines, findings):
+    """One fenced block in a domain where fences are restricted.
+
+    The rule is about drift against a named source, not about the three
+    backticks (DECISIONS.md, amendment 2026-07-28f). A copy of a file this
+    repository owns drifts against its original and must be replaced by the
+    path. A block recording the state of, or a command against, a machine
+    this project does not own has no path to point at: it is not a copy but a
+    record - ISO 9000:2015 3.8.10, "document stating results achieved or
+    providing evidence of activities performed", which "need not be under
+    revision control". Its currency is carried by last-verified.
+
+    Length is what decides whether the question is even asked, because it is
+    the only signal that correlates with drift risk and needs nothing from
+    the author. Up to FENCE_RECORD_MAX content lines a block is a single
+    observation and is silent. Above it, the block must either go (ERROR) or
+    name the machine it is true on (WARN - visible, greppable and countable,
+    because nothing here can prove that no source file exists).
+    """
+    if abbr not in FENCE_BANNED_DOMAINS:
+        return
+    if abbr not in FENCE_EXEMPT_DOMAINS:
+        findings.append(Finding("ERROR", "code-fence", str(path), line,
+                                f"code blocks are banned in {abbr} - {abbr} is a map and "
+                                "stores nothing; link the file or the IMP note instead "
+                                "(a host declaration does not lift this)"))
+        return
+    host = fence_host(info)
+    if host == "":
+        findings.append(Finding("ERROR", "fence-host", str(path), line,
+                                "'host=' names no machine - a declaration that names "
+                                "nothing is not a declaration; write host=<machine>"))
+        return
+    if body_lines <= FENCE_RECORD_MAX:
+        return
+    if host:
+        findings.append(Finding("WARN", "fence-record", str(path), line,
+                                f"{body_lines} content lines declared as a record of "
+                                f"'{host}' - nothing verifies that no source file "
+                                "exists; keep it only while it is the only record"))
+        return
+    findings.append(Finding("ERROR", "code-fence", str(path), line,
+                            f"{body_lines} content lines > {FENCE_RECORD_MAX} in {abbr} - "
+                            "too long to be one observation. Reference the artifact path "
+                            "(pointers, not copies), or, if the block records a machine "
+                            "this project does not own, declare it: ```lang host=<machine>"))
+
+
 def check_leaks(abbr, path, lines, fm_end, findings):
     """Implementation-detail leak detector.
 
@@ -736,18 +828,19 @@ def check_leaks(abbr, path, lines, fm_end, findings):
     concrete values outright) and DEC Context (WARN) are scanned; the
     value-bearing domains (REQ tables, CMP specs, IFC specs, TAE evidence,
     IMP, OAU) are legitimate homes for numbers and are never flagged.
-    Code fences are banned in IMP and ARC (pointers, not copies).
+    Fenced blocks are restricted in IMP and ARC - see check_fence.
     """
-    in_fence = False
+    fence_line, fence_str = 0, ""
     for i, line in enumerate(lines, 1):
-        if line.lstrip().startswith("```"):
-            in_fence = not in_fence
-            if in_fence and abbr in ("IMP", "ARC"):
-                findings.append(Finding("ERROR", "code-fence", str(path), i,
-                                        f"code blocks are banned in {abbr} - link the "
-                                        "source file instead (pointers, not copies)"))
+        info = fence_info(line)
+        if info is not None:
+            if fence_line:
+                check_fence(abbr, path, fence_line, fence_str, i - fence_line - 1, findings)
+                fence_line, fence_str = 0, ""
+            else:
+                fence_line, fence_str = i, info
             continue
-        if in_fence or abbr not in ("ARC", "DEC") or i <= fm_end:
+        if fence_line or abbr not in ("ARC", "DEC") or i <= fm_end:
             continue
         sec = section_of(lines, i - 1, fm_end)
         if abbr == "DEC" and "context" not in sec:
@@ -767,6 +860,11 @@ def check_leaks(abbr, path, lines, fm_end, findings):
                                        if abbr == "ARC" else
                                        " - Context frames the problem; concrete numbers "
                                        "belong in Options or in IMP/CMP")))
+    if fence_line:
+        # Opened and never closed. Evaluated to EOF rather than dropped: one
+        # unclosed marker would otherwise switch the rule off for everything
+        # below it, which is the cheapest bypass a fence rule can have.
+        check_fence(abbr, path, fence_line, fence_str, len(lines) - fence_line, findings)
 
 
 def check_paths(vault, path, lines, fm_end, findings):
@@ -788,14 +886,20 @@ def check_paths(vault, path, lines, fm_end, findings):
     body the same finding is a WARN, inline code and fenced blocks are
     skipped, and an explicit marker on the line or its governing heading
     suppresses it. Fence state is tracked first so fenced '## ' lines
-    never switch zones.
+    never switch zones. A fence declaring a machine (```lang host=<name>)
+    is skipped even in the strict zone: its content is true elsewhere and
+    this project cannot resolve it - the same ownership rule, now reachable
+    because the block says so instead of the validator guessing.
     """
     in_ref = False
     in_fence = False
+    declared_host = None
     pending_scope = False
     for i, line in enumerate(lines, 1):
-        if line.lstrip().startswith("```"):
+        info = fence_info(line)
+        if info is not None:
             in_fence = not in_fence
+            declared_host = fence_host(info) if in_fence else None
             continue
         if not in_fence:
             if line.startswith("## "):
@@ -809,6 +913,11 @@ def check_paths(vault, path, lines, fm_end, findings):
         if i <= fm_end:
             continue
         if in_ref:
+            if declared_host:
+                # The block states which machine its content is true on, so its
+                # paths are not this project's to resolve - the same ownership
+                # rule the shape gate applies (amendment 2026-07-28e).
+                continue
             scan = line
         elif in_fence:
             continue
