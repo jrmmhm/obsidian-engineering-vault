@@ -432,7 +432,11 @@ def check_frontmatter(fm, abbr, path, findings):
     if fm.get("domain") and fm["domain"] != abbr:
         findings.append(Finding("ERROR", "frontmatter-domain", str(path), 1,
                                 f"frontmatter domain '{fm['domain']}' != folder domain '{abbr}'"))
-    if abbr != "DEC" and fm.get("status") and fm["status"] not in GENERIC_STATUS:
+    # str(): parse_frontmatter returns a LIST for 'status: [active]', and an
+    # unhashable left operand makes 'not in <set>' raise TypeError. That crash
+    # exits 2, which both hooks swallow - one such file would switch the whole
+    # enforcement layer off silently. Normalising reports it as the ERROR it is.
+    if abbr != "DEC" and fm.get("status") and str(fm["status"]) not in GENERIC_STATUS:
         findings.append(Finding("ERROR", "frontmatter-status", str(path), 1,
                                 f"status '{fm['status']}' not in {sorted(GENERIC_STATUS)}"))
     for key in ("created", "last-verified"):

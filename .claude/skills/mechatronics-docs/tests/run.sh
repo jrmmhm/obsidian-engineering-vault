@@ -510,6 +510,26 @@ EOF
   for i in $(seq 1 400); do printf 'filler line without any concrete values here\n'; done
 } > "$W/03_architecture_(ARC)/ARC_Long.md"
 
+# A list-valued scalar field. 'x not in <set>' hashes its left operand, so an
+# unnormalised list raised TypeError -> exit 2 -> both hooks fail open, i.e. one
+# such file silently disabled the entire enforcement layer. It must be an
+# ordinary ERROR, and the vault must still exit 1 rather than 2.
+cat > "$W/03_architecture_(ARC)/ARC_ListStatus.md" <<'EOF'
+---
+domain: ARC
+status: [active]
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+Architecture note whose status is written as a YAML list instead of a
+scalar. The value is wrong either way; the point is that it is reported
+rather than crashing the validator.
+
+## Requirements (Files)
+- None allocated in this seeded fixture.
+EOF
+
 cat > "$W/06_implementation_(IMP)/IMP_Bad.md" <<'EOF'
 ---
 domain: IMP
@@ -618,6 +638,12 @@ if contains "$out" "^ERROR .*does_not_exist\.kicad_sch"; then ok x; else
 TESTS=$((TESTS + 1))
 if contains "$out" "^ERROR .*fenced_missing\.sch"; then ok x; else
   fail "fenced dead path inside References must stay ERROR"; fi
+
+# a list-valued status must be reported, not crash the validator. The exit-1
+# assertion above is the other half: a crash would have made it exit 2.
+TESTS=$((TESTS + 1))
+if contains "$out" "ARC_ListStatus\.md.*\[frontmatter-status\]"; then ok x; else
+  fail "list-valued status must produce frontmatter-status, not a crash"; fi
 
 # identifier collision: ERROR, and it must name BOTH locations. The reported
 # file is the second one in sorted order, so the message is reproducible -
