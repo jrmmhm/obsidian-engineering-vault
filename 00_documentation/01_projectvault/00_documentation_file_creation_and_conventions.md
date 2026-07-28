@@ -61,6 +61,17 @@ deprecated`; DEC files keep their Status line in the body instead),
 `verifies: [REQ-DOM-NNN, ...]` naming the requirements they prove.
 `status: draft` does not relax any rule.
 
+These fields are not a habit the validator memorised: they are declared,
+with their types and their permitted values, in
+`.claude/skills/mechatronics-docs/vault_schema.json`, and the validator
+reads that file. A key that is declared neither there nor as an editor
+field — Obsidian's own `tags`, `aliases`, `cssclasses` and the
+`excalidraw-*` family are recognised — is reported as
+`frontmatter-undeclared`. The check exists for one specific mistake:
+`crated` instead of `created` looks like a filled-in field and takes
+effect nowhere. Adding a field to the vault's vocabulary is an edit to
+the schema file, not a change to the validator.
+
 ### Identifiers and typed relations
 Every domain file also carries `id`, of the form `DOMAIN-SCOPE-NNN` — the
 folder abbreviation, the subsystem token the matching REQ file carries in
@@ -84,8 +95,10 @@ The worked example under
 checks the identifiers it can see: the same value on two files is an
 error, and a value that was present in the last commit but is gone now is
 reported. It does not require an identifier — a file without one is not a
-finding — and it does not yet read the relations. The schema file marks
-per entry what is enforced today and what is only declared.
+finding — and it does not read the relations: the relation kinds are
+declared so that a reader and a future export know what an annotated link
+means, but nothing walks them into a graph yet. Every schema entry states
+which of the two it is, and that flag is what the validator acts on.
 
 ### Self-containedness
 The first lines of the Context section must situate the file on their
