@@ -199,6 +199,13 @@ contradicting or duplicating a live decision.
    in the body. Mark intentionally-not-yet-existing paths with
    pending/planned/TBD on the line or its heading; markers never
    silence References/Sources sections.
+   Only the relative form is checked. A path that starts at a
+   filesystem root, at `~`, at a host name or at a URL scheme names an
+   artifact on another machine — it is never reported as dead, and for
+   the same reason never verified. So write a project artifact
+   relatively, or you switch its staleness check off, and name the host
+   when the artifact is foreign: the path alone does not say which
+   machine it is true on.
 5. **Never duplicate content across files.** One file owns the information,
    others link to it.
 

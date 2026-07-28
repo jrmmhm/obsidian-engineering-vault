@@ -114,6 +114,31 @@ target must be the exact filename. Link the responsible file once where it matte
 do not link every mention (guideline: under ~20 outgoing links per
 file; hub files like ARC and system_overview may carry more).
 
+### Paths and artifacts on other machines
+Artifacts of this project — testdata, source code, CAD files, documents,
+sources — are referenced by a path relative to the project root, starting
+with its numbered top-level folder (`30_testdata/2026-01-10_run/log.csv`),
+optionally with the project folder name in front of it. Only that form is
+checked: a path that does not exist is an ERROR inside a References or
+Sources section and a WARN elsewhere in the body, where a
+`pending`/`planned`/`TBD` marker on the line or its heading suppresses it.
+
+An artifact that lives on a different machine is written the way that
+machine addresses it — absolute (`/etc/libvirt/network.conf`),
+home-relative (`~/.config/hypr/monitors.conf`), qualified by host
+(`omarchy:/etc/keyd/default.conf`), as a git remote or as a URL. RFC 8089
+defines `file://host/path` as the formal spelling of the same thing. Name
+the host in one of these ways: the path alone does not say which machine
+it is true on, and a reader on a different machine cannot recover it.
+
+The validator does not resolve any of those. It cannot tell a file that
+was deleted from a file on a machine that is simply not attached, so it
+reports neither — the claim is carried by you alone, and `last-verified`
+is the only record that it was checked. The reverse follows: writing a
+project artifact with an absolute path removes it from the check as well.
+Keep project paths relative, so the vault keeps noticing when a file
+moves.
+
 ### Length
 A file answers ONE question. Above ~150 lines, re-apply the 4-question
 rule: can the filename still fully describe the content? If not, split.
