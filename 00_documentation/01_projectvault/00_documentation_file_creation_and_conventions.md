@@ -139,6 +139,29 @@ project artifact with an absolute path removes it from the check as well.
 Keep project paths relative, so the vault keeps noticing when a file
 moves.
 
+The same question arises one level down, for content rather than for
+paths. IMP and ARC hold no copies, because a copied artifact drifts
+against its original — but a directory listing from a server, or the
+command that proves a setting is in effect, is not a copy of anything
+this repository holds. There is no file to point at, and the block is
+the only record of that observation. In IMP such a block may stay, and
+above 15 content lines it names the machine it is true on, in the fence's
+info string after the language:
+
+````
+```bash host=userver
+systemctl --user status navidrome
+```
+````
+
+The machine name is the same one a host-qualified path uses
+(`userver:/etc/systemd/system/navidrome.service`) — one fact, written in
+two positions, never two different names. Write the machine, never
+`localhost`: this vault is read on other machines than yours. A declared
+block is reported as a warning and not silently accepted, because nothing
+can verify that no source file exists; the claim stays visible and stays
+yours. In ARC no block is permitted at all, declared or not.
+
 ### Length
 A file answers ONE question. Above ~150 lines, re-apply the 4-question
 rule: can the filename still fully describe the content? If not, split.

@@ -350,12 +350,50 @@ last-verified: 2026-07-01
 
 ## Implementation (Files)
 - [[IMP_MainBoard_ADC]]: Wiring and driver configuration on the main board.
+- [[IMP_Labhost_Backup]]: Log archival on the lab host.
 
 ## Allocation and Verification
 | Submodule (ARC/CMP/IFC) | Allocated Requirements (REQ-IDs) | Verification (TAE) | Status |
 | ----------------------- | -------------------------------- | ------------------ | ------ |
 | [[CMP_AD7175-2]] | REQ-MEG-001 | [[TAE_ADC_Linearity]] | Verified |
 | [[IFC_SPI_ADC]] | REQ-MEG-002 | [[TAE_ADC_Linearity]] | Verified |
+EOF
+
+# An IMP note whose artifacts are files on ANOTHER machine - the case the
+# pointer rule had no destination for (issue #11). Everything here must be
+# silent, and the zero-findings assertion below is what proves it: short
+# blocks are single observations, and the declared block in References must
+# NOT have its paths resolved against project_root, although
+# 'deploy/20_software/...' is shaped exactly like a project artifact.
+cat > "$V/06_implementation_(IMP)/IMP_Labhost_Backup.md" <<'EOF'
+---
+domain: IMP
+id: IMP-MEG-002
+status: active
+created: 2026-01-08
+last-verified: 2026-07-01
+---
+## Context
+Log archival for the acquisition chain, running on the lab host. Its unit
+file and its target directory are files on that machine and are never
+artifacts of this repository.
+
+## References
+- Service unit: labhost:/etc/systemd/system/lab-backup.service
+```text host=labhost
+deploy/20_software/archive/run.sh
+/srv/backup/adc/latest
+```
+
+## Implementation
+- Retention: 7 daily, 4 weekly
+```bash host=labhost
+systemctl --user status lab-backup.timer
+```
+- The same fact without a declaration, short enough to be one observation:
+```
+readlink -f /srv/backup/adc/latest
+```
 EOF
 
 out=$(python3 "$VALIDATOR" "$V" 2>&1); rc=$?
@@ -529,6 +567,10 @@ relay coil is driven with 24 V from the supply rail.
 int leak = 1;
 ```
 
+```bash host=labhost
+uptime
+```
+
 - [[Nonexistent_File]]: dead link target.
 - [[Another_Missing]]: second dead link target.
 EOF
@@ -649,6 +691,52 @@ Seeded conclusion.
 EOF
 cp "$W/07_testing_and_evidence_(TAE)/TAE_Dup.md" "$W/02_decisions_(DEC)/TAE_Dup.md"
 
+# Fenced blocks past the record threshold. IMP_Host_Copy carries a bare one
+# (a copy - ERROR) and a declaration that names nothing (not a declaration -
+# ERROR). IMP_Host_Record carries the same length WITH a machine named, which
+# must be a WARN and must NOT be a code-fence: that negative is the whole
+# point of the change and is asserted file-scoped below, because the violation
+# vault produces code-fence findings from other files anyway.
+{
+  printf -- '---\ndomain: IMP\nstatus: active\ncreated: 2026-01-08\nlast-verified: 2026-07-01\n---\n'
+  printf '## Context\nCopy of a script that lives in this repository.\n\n'
+  printf '## References\n- Driver source: Badproj/20_software/driver.c\n\n'
+  printf '## Implementation\n'
+  printf '```bash\n'
+  for i in $(seq 1 20); do printf 'echo "copied line %d"\n' "$i"; done
+  printf '```\n'
+  printf '```bash host=\n'
+  printf 'systemctl status nothing\n'
+  printf '```\n'
+} > "$W/06_implementation_(IMP)/IMP_Host_Copy.md"
+
+{
+  printf -- '---\ndomain: IMP\nstatus: active\ncreated: 2026-01-08\nlast-verified: 2026-07-01\n---\n'
+  printf '## Context\nDirectory layout of a host this project does not own.\n\n'
+  printf '## References\n- Host: labhost\n\n'
+  printf '## Implementation\n'
+  printf '```text host=labhost\n'
+  for i in $(seq 1 20); do printf '/srv/data/dir_%d\n' "$i"; done
+  printf '```\n'
+} > "$W/06_implementation_(IMP)/IMP_Host_Record.md"
+
+# A tilde fence is a fence (CommonMark: "at least three consecutive backtick
+# characters or tildes"). Recognising only backticks made '~~~' the cheaper
+# way out of this rule AND made check_links/check_paths read the block as
+# prose. An unclosed fence is evaluated to EOF for the same reason: one
+# unclosed marker must not silence everything below it.
+{
+  printf -- '---\ndomain: IMP\nstatus: active\ncreated: 2026-01-08\nlast-verified: 2026-07-01\n---\n'
+  printf '## Context\nSame copy behind a tilde fence and behind an unclosed one.\n\n'
+  printf '## References\n- none\n\n'
+  printf '## Implementation\n'
+  printf '~~~bash\n'
+  for i in $(seq 1 20); do printf 'echo "tilde line %d"\n' "$i"; done
+  printf '~~~\n'
+  printf '```bash\n'
+  for i in $(seq 1 20); do printf 'echo "unclosed line %d"\n' "$i"; done
+} > "$W/06_implementation_(IMP)/IMP_Host_Tilde.md"
+
 echo "old inbox note" > "$W/99_inbox_(INB)/old_note.md"
 touch -t 202601010000 "$W/99_inbox_(INB)/old_note.md"
 
@@ -660,7 +748,8 @@ for code in filename-prefix frontmatter-missing frontmatter-malformed \
     length code-fence impl-leak link-unresolved req-class req-nnn \
     req-duplicate req-criterion req-duplicate-global verifies-unknown-req \
     verifies-empty dec-status dec-superseded path-missing req-uncovered \
-    inb-age duplicate-basename orphan id-duplicate id-scope-mismatch; do
+    inb-age duplicate-basename orphan id-duplicate id-scope-mismatch \
+    fence-host fence-record; do
   TESTS=$((TESTS + 1))
   if contains "$out" "\[$code\]"; then ok x; else fail "violation vault: [$code] not detected"; fi
 done
@@ -694,6 +783,44 @@ if contains "$out" "^ERROR .*anchored_missing\.kicad_sch"; then ok x; else
 TESTS=$((TESTS + 1))
 if ! contains "$out" "etc/badproj" && ! contains "$out" "config/badproj"; then ok x; else
   fail "foreign host paths in References must produce no finding"; fi
+
+# Fenced blocks are judged by drift risk, not by syntax. Every assertion here
+# is file-scoped: the violation vault produces code-fence findings from ARC
+# anyway, so a bare "contains [code-fence]" would prove nothing about any
+# single case.
+TESTS=$((TESTS + 1))
+if contains "$out" "IMP_Host_Copy\.md.*\[code-fence\]"; then ok x; else
+  fail "a block past the record threshold without a declaration must be ERROR"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "IMP_Host_Copy\.md.*\[fence-host\]"; then ok x; else
+  fail "'host=' naming no machine must be ERROR [fence-host]"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "^WARN .*IMP_Host_Record\.md.*\[fence-record\]"; then ok x; else
+  fail "a declared long block must be WARN [fence-record]"; fi
+# The negative that carries the whole change: the declaration lifts the ERROR,
+# and it is the only thing that does.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "IMP_Host_Record\.md.*\[code-fence\]"; then ok x; else
+  fail "a declared block must not produce [code-fence]"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "^ERROR .*\[fence-record\]"; then ok x; else
+  fail "fence-record must never be an ERROR - it cannot prove a source is absent"; fi
+# Short blocks are single observations and stay silent - IMP_Bad.md carries a
+# two-line and a one-line fence that were ERRORs before this rule.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "IMP_Bad\.md.*\[code-fence\]"; then ok x; else
+  fail "a block within the record threshold must be silent"; fi
+# A tilde fence is a fence, and an unclosed fence is evaluated to EOF -
+# otherwise both are cheaper ways out of the rule than the declaration.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -c "IMP_Host_Tilde\.md.*\[code-fence\]") || true
+if [ "$n" -eq 2 ]; then ok x; else
+  fail "tilde fence and unclosed fence must both be ERROR, got $n of 2"; fi
+# ARC is a map and stores nothing: a declaration does not lift its ban.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -c "ARC_Leaky\.md.*\[code-fence\]") || true
+if [ "$n" -eq 2 ]; then ok x; else
+  fail "every ARC fence must be ERROR, declared or not, got $n of 2"; fi
 
 # undeclared frontmatter keys: reported, grouped into ONE line, and naming
 # every unknown key. WARN and never ERROR - the check cannot tell a typo from
