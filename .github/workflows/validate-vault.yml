@@ -1,0 +1,29 @@
+name: vault
+
+# Enforcement that does not depend on one editor being used. The Claude
+# Code hooks only see Edit/Write/MultiEdit; this runs on every push and
+# pull request regardless of how the change was authored.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The validator is stdlib-only, and ubuntu-latest ships python3
+      # preinstalled - no setup-python, no dependency installation step.
+      - name: Validator self-test
+        run: bash .claude/skills/mechatronics-docs/tests/run.sh
+
+      # Deliberately not redundant with the self-test: run.sh reaches the
+      # template vault through a relative path and would skip it if the
+      # layout ever moved. This step names the path and fails loudly.
+      - name: Template vault audit
+        run: python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault
