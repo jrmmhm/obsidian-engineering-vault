@@ -1,33 +1,39 @@
 {
-  "schema_version": "0.1",
-  "decision": "DECISIONS.md, amendment 2026-07-28b",
+  "schema_version": "0.2",
+  "decision": "DECISIONS.md, amendments 2026-07-28b and 2026-07-28d",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",
-    "which named relations exist between objects. Issue #4 makes the validator",
-    "read this file; today nothing reads it. Every entry therefore carries an",
-    "'enforced' flag: 'validator-internal' means validate_vault.py already",
-    "enforces the rule in Python and this file only describes it, so that the",
-    "duplication can be removed later; 'declared-only' means nothing enforces",
-    "it yet."
+    "which named relations exist between objects. validate_vault.py READS this",
+    "file: the field vocabulary, the permitted values and the required keys are",
+    "taken from here, not from Python literals. Adding a field is an edit to",
+    "this file, not a code change - which is what issue #4 asked for.",
+    "Every entry carries an 'enforced' flag, and the flag is the switch, not a",
+    "comment: see enforcement_levels."
   ],
+
+  "enforcement_levels": {
+    "schema-driven": "The validator reads this entry from this file. Changing the entry changes what is enforced, with no code change.",
+    "validator-internal": "The rule lives in validate_vault.py and this file only describes it. Every occurrence names why it was not moved.",
+    "declared-only": "Nothing enforces this. It is declared so that readers - and the undeclared-field check - know the name exists."
+  },
+
   "discovery": {
-    "default": ".claude/skills/mechatronics-docs/vault_schema.json",
-    "per_project_override": "00_documentation/vault_schema.json",
-    "rationale": [
-      "Table header signatures below are language-dependent. A vault written",
-      "in another language ships its own schema next to the vault (not inside",
-      "it - the vault is Markdown-only). Discovery is declared-only; issue #4",
-      "implements it. Fallback if no schema is found: bind relation tables to",
-      "the section position declared by the project's own 00_*template* file,",
-      "the mechanism Vault.templates_for already uses for required sections."
+    "path": ".claude/skills/mechatronics-docs/vault_schema.json",
+    "rule": "One packaged schema, read from beside validate_vault.py. There is no per-project override; a vault is checked against the schema shipped with the validator that checks it.",
+    "rejected_override": [
+      "A per-project override at 00_documentation/vault_schema.json was declared by schema 0.1 and is deliberately NOT implemented. It would be a silent off-switch for the blocking gate: the ERRORs that reach the stop gate's blocking set come from check_frontmatter, check_dec_status and check_req_table, which are exactly the checks this file now drives, so a two-line override flipping an entry to 'declared-only' would disable a blocking check from an uncommitted file. That is the same class as 'status: draft' relaxing a rule, which this project rejects outright.",
+      "It would also not work where it was meant to. Vault.doc_root is the vault's parent, but a derived project often versions the vault alone - both German production vaults do - so the override path lies outside version control and would not travel with the vault.",
+      "A project that genuinely needs different rules forks the skill, which is visible in a diff."
     ],
-    "enforced": "declared-only"
+    "fallback": "If this file is missing or unparseable the validator falls back to a minimal embedded field set and reports schema-unreadable (WARN) once per vault. Validating nothing silently is the failure mode this project has already been bitten by (DECISIONS.md, amendment 2026-07-28).",
+    "enforced": "schema-driven"
   },
 
   "identifier": {
     "field": "id",
     "location": "YAML frontmatter",
     "pattern": "^(REQ|DEC|ARC|CMP|IFC|IMP|TAE|OAU|REF)-[A-Z]{2,4}-[0-9]{3}$",
+    "excluded_domains": ["ADM", "INB"],
     "parts": {
       "domain": "folder abbreviation of the object",
       "scope": "subsystem token; the same token the subsystem's REQ file carries in parentheses in its filename",
@@ -52,101 +58,131 @@
       "enforced": "validator-internal"
     },
     "enforced": "declared-only",
-    "enforced_detail": "Uniqueness and disappearance are enforced; see consistency_rules/identifier-uniqueness. The pattern above and the presence of the field are NOT: an id is optional, and only pattern-conforming values take part in any comparison, so two files freshly copied from one template never collide on its placeholder. Requiring the field would turn every file of a vault predating this scheme into a finding, which is a convention rollout rather than a defect report."
+    "enforced_detail": "The pattern above is NOT compiled from this file at runtime, and the presence of the field is not required. Two separate reasons. (1) Presence: requiring the field would turn every file of a vault predating this scheme into a finding, and only pattern-conforming values take part in any comparison, so two files freshly copied from one template never collide on its placeholder. (2) The pattern stays a Python constant (ID_RE / REQ_ID_RE / ID_EXCLUDED_DOMAINS) because identity resolution runs in module-level functions without a schema in hand, and because it decides which values are compared against git HEAD - a rule that decides what counts as an identity should not be re-readable from the tree being judged. Drift between the two is caught by tests/run.sh, which asserts that the Python constants and the patterns declared here accept and reject the same samples."
+  },
+
+  "editor_fields": {
+    "note": "Frontmatter keys written by the editor or its plugins. They carry no vault semantics, are never required, and are tolerated in every domain - the undeclared-field check must not report them. Listing them is what keeps that check at WARN-worthy precision instead of flagging a legitimate plugin field as a defect.",
+    "values": [
+      "tags", "aliases", "cssclasses",
+      "publish", "permalink", "description", "image", "cover"
+    ],
+    "prefixes": ["excalidraw-"],
+    "provenance": "Obsidian Help, 'Properties': tags/aliases/cssclasses are the default properties, publish/permalink/description/image/cover the Obsidian Publish ones. The deprecated singular spellings tag/alias/cssclass are deliberately absent - support for them was dropped in Obsidian 1.9, so a file still carrying one should be reported. A prefix covers the Excalidraw plugin, which writes a whole excalidraw-* family that no enumeration would stay current with.",
+    "enforced": "schema-driven"
+  },
+
+  "domain_defaults": {
+    "note": "The vault-wide field vocabulary. It applies to EVERY domain, including the ones 'domains' below does not name - a vault in another language spells its folders ANF/ENT/KMP/SST/TUE/BUN, and reading only the named domains would leave those files unchecked. Per-domain entries in 'domains' merge into this profile attribute by attribute, so a domain that only changes 'required' keeps the type, the values and the finding code declared here. The vault's own SSOT rule applied to its schema: a field shared by every domain is declared once.",
+    "field_keys": {
+      "type": "folder-abbreviation | enum | date | list | identifier",
+      "values": "permitted values, for type enum",
+      "format": "for type date",
+      "item": "element type, for type list",
+      "required": "whether a missing key is a finding",
+      "code": "finding code emitted when the value violates its type",
+      "empty_code": "finding code (WARN) when a required list is empty",
+      "hint": "appended to the missing-key message",
+      "enforced": "see enforcement_levels; anything but schema-driven is not checked"
+    },
+    "fields": {
+      "domain": {
+        "type": "folder-abbreviation",
+        "required": true,
+        "code": "frontmatter-domain",
+        "note": "The value must equal the abbreviation of the folder the file sits in. Declared as a type rather than an enum per domain, because the same rule has to hold for a domain this schema does not name.",
+        "enforced": "schema-driven"
+      },
+      "status": {
+        "type": "enum",
+        "values": ["draft", "active", "superseded", "deprecated"],
+        "required": true,
+        "code": "frontmatter-status",
+        "note": "status: draft relaxes no other check.",
+        "enforced": "schema-driven"
+      },
+      "created": {
+        "type": "date",
+        "format": "YYYY-MM-DD",
+        "required": true,
+        "code": "frontmatter-date",
+        "enforced": "schema-driven"
+      },
+      "last-verified": {
+        "type": "date",
+        "format": "YYYY-MM-DD",
+        "required": true,
+        "code": "frontmatter-date",
+        "enforced": "schema-driven"
+      },
+      "id": {
+        "type": "identifier",
+        "required": false,
+        "note": "Declared vault-wide so that an id is never reported as an undeclared field. The value itself is not checked - see identifier.enforced_detail.",
+        "enforced": "declared-only"
+      },
+      "verifies": {
+        "type": "list",
+        "item": "req-row-identifier",
+        "required": false,
+        "code": "verifies-format",
+        "empty_code": "verifies-empty",
+        "note": "Declared vault-wide, enforced only in TAE (see domains.TAE). A vault in another language carries this field on its own evidence domain - homelab has 37 such files, all with an empty list - and enforcing the rule there would be a convention rollout on a vault that never had the convention, not a defect report. Extending it belongs to the domain-alias follow-up of amendment 2026-07-28.",
+        "enforced": "declared-only"
+      }
+    }
   },
 
   "domains": {
     "REQ": {
+      "note": "Carries the default fields. The identified object in REQ is the table row, not the file; the file's own id reserves number 000.",
       "fields": {
-        "domain": {"type": "enum", "values": ["REQ"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "note": "REQ-<SCOPE>-000", "enforced": "declared-only"}
+        "id": {"note": "REQ-<SCOPE>-000"}
       },
       "rows": {
-        "note": "The identified object in REQ is the table row, not the file.",
         "id_pattern": "^REQ-[A-Z]{2,4}-[0-9]{3}$",
         "columns": ["class", "number", "content", "acceptance_criterion", "source"],
         "class_values": ["M", "S", "O"],
-        "enforced": "validator-internal"
+        "enforced": "validator-internal",
+        "enforced_detail": "class_values IS read from here (req-class). The rest - req-nnn, req-duplicate, req-criterion, req-duplicate-global - stays in Python because it is table structure rather than a value vocabulary. id_pattern is compared against the validator's REQ_ID_RE by the test suite instead of being compiled at runtime."
       }
     },
     "DEC": {
+      "note": "The only domain without a frontmatter status: a decision carries its state in the body Status line instead, so that the state and its justification stay in one place.",
       "fields": {
-        "domain": {"type": "enum", "values": ["DEC"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+        "status": {
+          "required": false,
+          "note": "Not required, but checked against the same value list when present, so a stray frontmatter status cannot contradict the body Status line unnoticed."
+        }
       },
       "body_fields": {
-        "Status": {"type": "enum", "values": ["Draft", "Accepted", "Superseded", "Deprecated"], "required": true, "enforced": "validator-internal"}
+        "Status": {
+          "type": "enum",
+          "values": ["Draft", "Accepted", "Superseded", "Deprecated"],
+          "required": true,
+          "code": "dec-status",
+          "location": "body line 'Status: <value>'",
+          "enforced": "schema-driven",
+          "enforced_detail": "The value list is read from here. The companion rule - Status 'Superseded' requires a 'Superseded by: [[DEC_...]]' link (dec-superseded, ERROR) - stays in Python: it is a cross-reference requirement, not a value vocabulary. See relations/superseded-by."
+        }
       }
     },
-    "ARC": {
-      "fields": {
-        "domain": {"type": "enum", "values": ["ARC"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
-      }
-    },
-    "CMP": {
-      "fields": {
-        "domain": {"type": "enum", "values": ["CMP"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
-      }
-    },
-    "IFC": {
-      "fields": {
-        "domain": {"type": "enum", "values": ["IFC"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
-      }
-    },
-    "IMP": {
-      "fields": {
-        "domain": {"type": "enum", "values": ["IMP"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
-      }
-    },
+    "ARC": {"note": "Carries the default fields.", "fields": {}},
+    "CMP": {"note": "Carries the default fields.", "fields": {}},
+    "IFC": {"note": "Carries the default fields.", "fields": {}},
+    "IMP": {"note": "Carries the default fields.", "fields": {}},
     "TAE": {
+      "note": "The evidence domain. It is the only domain in which 'verifies' is required and checked.",
       "fields": {
-        "domain": {"type": "enum", "values": ["TAE"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "verifies": {"type": "list", "item": "REQ row identifier", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+        "verifies": {
+          "required": true,
+          "hint": "verifies: [REQ-...]",
+          "enforced": "schema-driven"
+        }
       }
     },
-    "OAU": {
-      "fields": {
-        "domain": {"type": "enum", "values": ["OAU"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
-      }
-    },
-    "REF": {
-      "fields": {
-        "domain": {"type": "enum", "values": ["REF"], "required": true, "enforced": "validator-internal"},
-        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
-        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
-        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
-      }
-    }
+    "OAU": {"note": "Carries the default fields.", "fields": {}},
+    "REF": {"note": "Carries the default fields.", "fields": {}}
   },
 
   "link_annotation": {
@@ -175,11 +211,12 @@
       "header_signature": ["Class (M/S/O)", "NNN", "Content", "Acceptance Criterion", "Source / Justification (REF/DEC)"],
       "column_roles": ["qualifier:class", "subject", "text", "text", "objects:justified-by"]
     },
-    "enforced": "declared-only"
+    "enforced": "declared-only",
+    "enforced_detail": "Nothing reads these signatures yet, and no rule asserts that a vault's own tables still match them. Both belong with the consumer: the traceability export (issue #2) is what turns a signature into a graph, and a check reporting that extraction failed is meaningless while no extraction exists. The signatures remain language-dependent - a vault in another language matches none of them - which is why the fallback recorded in amendment 2026-07-28b is binding relations to the section position declared by the project's own 00_*template* file, the mechanism Vault.templates_for already uses."
   },
 
   "relations": {
-    "note": "Each kind is authored in exactly one place and in exactly one direction. The reverse direction is computed, never authored - the pattern StrictDoc, Doorstop and Sphinx-Needs all use. Reverse keys follow the Sphinx-Needs '<kind>_back' convention.",
+    "note": "Each kind is authored in exactly one place and in exactly one direction. The reverse direction is computed, never authored - the pattern StrictDoc, Doorstop and Sphinx-Needs all use. Reverse keys follow the Sphinx-Needs '<kind>_back' convention, except where the reverse already has a natural name.",
     "allocates": {
       "subject_domains": ["ARC", "CMP", "IFC"],
       "object_domains": ["REQ"],
@@ -208,7 +245,7 @@
       "outgoing": "verifies",
       "incoming": "is verified by",
       "enforced": "validator-internal",
-      "enforced_detail": "Format and existence of the referenced REQ rows are checked; the relation is not otherwise interpreted."
+      "enforced_detail": "The field's presence and the format of its elements are schema-driven (domains.TAE). That the referenced REQ rows exist is checked in Python (verifies-unknown-req), because it needs the vault-wide REQ row index rather than a value vocabulary."
     },
     "justified-by": {
       "subject_domains": ["REQ"],
@@ -217,6 +254,7 @@
       "reverse_key": "justified-by_back",
       "outgoing": "is justified by",
       "incoming": "justifies",
+      "note": "Issue #4 calls this kind 'references'. Named justified-by here after the REQ table column it is authored in ('Source / Justification'), because a bare 'references' would name the mechanism rather than the meaning - every relation in this file is a reference.",
       "enforced": "declared-only"
     },
     "connects": {
@@ -247,6 +285,17 @@
       "outgoing": "was tested on",
       "incoming": "was the test object of",
       "enforced": "declared-only"
+    },
+    "superseded-by": {
+      "subject_domains": ["DEC"],
+      "object_domains": ["DEC"],
+      "authored_in": "DEC body line 'Superseded by: [[DEC_...]]'",
+      "reverse_key": "supersedes",
+      "outgoing": "is superseded by",
+      "incoming": "supersedes",
+      "note": "Issue #4 names this kind 'supersedes'. It is authored in the superseded decision, so the subject of the authored line is the OLD decision and the authored direction is superseded-by; 'supersedes' is the computed reverse. Naming it the other way round would reverse the arrow against the other seven kinds, which are all authored subject-first.",
+      "enforced": "validator-internal",
+      "enforced_detail": "dec-superseded (ERROR) requires the link to be present whenever the body Status is 'Superseded'. The link target is not resolved to a DEC object; that is graph work and belongs to issue #2."
     }
   },
 
@@ -256,19 +305,28 @@
       "statement": "For every allocation row, the requirements in the 'verifies' frontmatter of the referenced evidence notes should together cover the requirements allocated in that row.",
       "why": "'verifies' and 'evidence' are separate relations with separate subjects and can disagree without either being wrong on its own.",
       "enforced": "declared-only",
-      "owed_to_issue": 4
+      "owed_to_issue": 2,
+      "note": "Reassigned from issue #4 to issue #2: the rule compares two relations, and neither is extracted until something reads the allocation table into a graph. Issue #4 declares the relations; #2 builds the graph that makes this checkable."
     },
     {
       "id": "verified-needs-evidence",
       "statement": "An allocation row with status 'Verified' must carry at least one evidence link.",
       "enforced": "declared-only",
-      "owed_to_issue": 4
+      "owed_to_issue": 2,
+      "note": "Reassigned from issue #4 for the same reason: it reads a parsed allocation row."
     },
     {
       "id": "identifier-uniqueness",
       "statement": "An identifier appears at most once across the vault, and an identifier present in an earlier commit does not silently disappear.",
       "enforced": "validator-internal",
       "enforced_detail": "id-duplicate (ERROR) for the first clause, id-vanished (WARN) for the second; ADM and INB are excluded from both. The severities differ because the checks differ in kind: a collision is never legitimate, whereas a disappearance can equally be a retirement, a rename or an accidental loss, and no validator can tell those apart."
+    },
+    {
+      "id": "declared-fields-only",
+      "statement": "A frontmatter key is either declared for its domain, or declared as an editor field, or it is reported.",
+      "why": "A mistyped key is the one defect class that fails completely silently: the field looks present and takes effect nowhere.",
+      "enforced": "schema-driven",
+      "enforced_detail": "frontmatter-undeclared (WARN), one grouped finding per file listing the unknown keys. WARN and not ERROR because the check cannot distinguish a typo from a deliberate plugin field - Clippy reserves its deny-by-default correctness group for lints free of false positives and files anything that might be intentional under warn-level suspicious, and Tricorder requires a blocking check to produce no effective false positives. Measured cost when introduced: zero findings on the template vault and on both German production vaults."
     }
   ],
 

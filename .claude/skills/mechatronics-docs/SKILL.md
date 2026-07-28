@@ -49,6 +49,16 @@ vault rules (`validate_vault.py`, same directory):
   vault-wide findings (uncovered REQs, orphans, ...) as advisory — they
   never block; the full audit in step 7 remains the authoritative pass.
 
+Which frontmatter fields exist, of what type and with which permitted
+values, is declared in `vault_schema.json` beside the validator — the
+validator reads it rather than knowing the rules by heart. A key that is
+declared neither for its domain nor as an editor field (Obsidian's own
+`tags`, `aliases`, ... and the `excalidraw-*` family) is reported as
+`frontmatter-undeclared`. It is a WARN, because a stray key can be a
+deliberate plugin field — but a mistyped one is the single frontmatter
+defect that fails completely silently, so do not wave it through: either
+fix the spelling or declare the field in the schema.
+
 Two further tiers run the same validator without Claude Code, so a change
 authored in Obsidian or by hand is covered too: a pre-commit hook
 (`hooks/pre_commit_vault.sh`, install by symlinking it to

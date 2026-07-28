@@ -181,6 +181,11 @@ data acquisition module. Selected in [[DEC_ADC_Selection]].
 | Max rate | 250 kS/s |
 EOF
 
+# Editor-owned frontmatter keys. They carry no vault semantics, and the
+# undeclared-field check must not report them - a plugin's own field is not
+# a defect. Seeded in the PRECISION fixture on purpose: this file must stay
+# at zero findings, so the tolerance is asserted by the zero-findings check
+# itself rather than by a pattern that could silently stop matching.
 cat > "$V/04_components_(CMP)/CMP_MCU_Board.md" <<'EOF'
 ---
 domain: CMP
@@ -188,6 +193,8 @@ id: CMP-MEG-002
 status: active
 created: 2026-01-06
 last-verified: 2026-07-01
+tags: [hardware, adc]
+excalidraw-plugin: parsed
 ---
 ## Source(s)
 - Datasheet: Testproj/50_sources/01_datasheets/electronics/AnalogDevices__AD7175-2__datasheet__rev-F.pdf
@@ -365,6 +372,20 @@ for d in "01_requirements_(REQ)" "02_decisions_(DEC)" "03_architecture_(ARC)" \
   cp "$V/$d/"00_*file_template*.md "$W/$d/" 2>/dev/null || true
 done
 
+# A template is the file every new file is copied from, so an undeclared key
+# in it propagates silently. Same H2 set as the copy it replaces, so section
+# checks are unaffected. Its VALUES are placeholders and must stay unchecked -
+# 'created: YYYY-MM-DD' may not become a frontmatter-date ERROR.
+cat > "$W/01_requirements_(REQ)/00_REQ_file_template.md" <<'EOF'
+---
+domain: REQ
+created: YYYY-MM-DD
+squad: nobody
+---
+## Context
+_Description_
+EOF
+
 cat > "$W/01_requirements_(REQ)/wrongname.md" <<'EOF'
 no frontmatter, wrong name, no sections
 line
@@ -373,11 +394,17 @@ line
 line
 EOF
 
+# 'crated' is the silent defect class the undeclared check exists for: the
+# key looks present and takes effect nowhere. 'owner' is a deliberate-looking
+# foreign field. Both must be named, and in ONE line - a file with several
+# stray keys must not produce several findings.
 cat > "$W/01_requirements_(REQ)/REQ_Power (PWR).md" <<'EOF'
 ---
 domain: REQ
 status: active
 created: 2026-01-05
+crated: 2026-01-05
+owner: nobody
 last-verified: 2026-07-01
 ---
 ## Context
@@ -510,6 +537,26 @@ EOF
   for i in $(seq 1 400); do printf 'filler line without any concrete values here\n'; done
 } > "$W/03_architecture_(ARC)/ARC_Long.md"
 
+# A list-valued scalar field. 'x not in <set>' hashes its left operand, so an
+# unnormalised list raised TypeError -> exit 2 -> both hooks fail open, i.e. one
+# such file silently disabled the entire enforcement layer. It must be an
+# ordinary ERROR, and the vault must still exit 1 rather than 2.
+cat > "$W/03_architecture_(ARC)/ARC_ListStatus.md" <<'EOF'
+---
+domain: ARC
+status: [active]
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+Architecture note whose status is written as a YAML list instead of a
+scalar. The value is wrong either way; the point is that it is reported
+rather than crashing the validator.
+
+## Requirements (Files)
+- None allocated in this seeded fixture.
+EOF
+
 cat > "$W/06_implementation_(IMP)/IMP_Bad.md" <<'EOF'
 ---
 domain: IMP
@@ -619,6 +666,35 @@ TESTS=$((TESTS + 1))
 if contains "$out" "^ERROR .*fenced_missing\.sch"; then ok x; else
   fail "fenced dead path inside References must stay ERROR"; fi
 
+# undeclared frontmatter keys: reported, grouped into ONE line, and naming
+# every unknown key. WARN and never ERROR - the check cannot tell a typo from
+# a deliberate plugin field, which disqualifies it from blocking.
+TESTS=$((TESTS + 1))
+if contains "$out" "REQ_Power (PWR)\.md.*\[frontmatter-undeclared\].*'crated'.*'owner'"; then
+  ok x; else fail "undeclared keys must be reported in one line naming both"; fi
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -c "REQ_Power (PWR)\.md.*frontmatter-undeclared") || true
+if [ "$n" -eq 1 ]; then ok x; else
+  fail "two stray keys must produce exactly ONE finding, got $n"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "^ERROR .*frontmatter-undeclared"; then ok x; else
+  fail "frontmatter-undeclared must never be an ERROR"; fi
+
+# templates are checked for vocabulary but never for values: the propagation
+# source is worth catching, its placeholders are not defects
+TESTS=$((TESTS + 1))
+if contains "$out" "00_REQ_file_template\.md.*\[frontmatter-undeclared\].*'squad'"; then
+  ok x; else fail "an undeclared key in a template must be reported"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "00_REQ_file_template\.md.*frontmatter-date"; then ok x; else
+  fail "template placeholder values must not be value-checked"; fi
+
+# a list-valued status must be reported, not crash the validator. The exit-1
+# assertion above is the other half: a crash would have made it exit 2.
+TESTS=$((TESTS + 1))
+if contains "$out" "ARC_ListStatus\.md.*\[frontmatter-status\]"; then ok x; else
+  fail "list-valued status must produce frontmatter-status, not a crash"; fi
+
 # identifier collision: ERROR, and it must name BOTH locations. The reported
 # file is the second one in sorted order, so the message is reproducible -
 # without the sort it would depend on filesystem iteration order.
@@ -686,6 +762,7 @@ id: ARC-MES-001
 status: active
 created: 2026-01-09
 last-verified: 2026-07-01
+zustaendig: niemand
 ---
 ## Kontext
 Die Messkette digitalisiert die analogen Eingangssignale des Moduls.
@@ -994,6 +1071,134 @@ if [ $rc -ne 2 ] && ! contains "$out" "REQ-THM-000" && ! contains "$out" "verifi
   fail "a renamed REQ file must keep its identifier and its row identities:"
   printf '%s\n' "$out" | grep -E "REQ-THM|verifies-unknown-req" | sed 's/^/    /'
 fi
+
+# ==========================================================================
+# Fixture 5: the schema itself. The validator reads vault_schema.json from
+# beside its own file, so a copy of the validator into a directory holding a
+# different schema is a full A/B test of "is this actually data-driven?" -
+# without touching a single line of Python.
+# ==========================================================================
+SC_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP" "$SC_TMP"' EXIT
+
+# (a) unreadable schema: must WARN, must fall back, must NOT exit 2. Exit 2 is
+# reserved for a real crash, and both hooks swallow it - a schema typo that
+# silently disabled enforcement would be the worst possible failure mode.
+mkdir -p "$SC_TMP/broken"
+cp "$VALIDATOR" "$SC_TMP/broken/validate_vault.py"
+printf '{ this is not json' > "$SC_TMP/broken/vault_schema.json"
+out=$(python3 "$SC_TMP/broken/validate_vault.py" "$W" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 1 ]; then ok x; else fail "unreadable schema must exit 1, not $rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "\[schema-unreadable\]"; then ok x; else
+  fail "unreadable schema must be reported, not silently ignored"; fi
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -c "schema-unreadable") || true
+if [ "$n" -eq 1 ]; then ok x; else
+  fail "schema-unreadable must be reported once per vault, got $n"; fi
+# the fallback must still enforce: the seeded violations stay detected
+TESTS=$((TESTS + 1))
+if contains "$out" "\[frontmatter-status\]" && contains "$out" "\[req-class\]" \
+   && contains "$out" "\[dec-status\]"; then ok x; else
+  fail "the built-in fallback must keep enforcing the essentials"; fi
+
+# (b) a schema that DECLARES the stray key: the very same vault, the very same
+# Python, one datum changed - and the finding disappears. This is the whole
+# claim of issue #4 in one assertion.
+mkdir -p "$SC_TMP/declared"
+cp "$VALIDATOR" "$SC_TMP/declared/validate_vault.py"
+python3 - "$SKILL_DIR/vault_schema.json" "$SC_TMP/declared/vault_schema.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+s["domain_defaults"]["fields"]["owner"] = {
+    "type": "enum", "values": ["nobody"], "required": False,
+    "code": "frontmatter-owner", "enforced": "schema-driven"}
+json.dump(s, open(sys.argv[2], "w"))
+PY
+out2=$(python3 "$SC_TMP/declared/validate_vault.py" "$W" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$out2" "\[frontmatter-undeclared\].*'owner'"; then ok x; else
+  fail "declaring a field in the schema must stop it being undeclared"; fi
+TESTS=$((TESTS + 1))
+if contains "$out2" "\[frontmatter-undeclared\].*'crated'"; then ok x; else
+  fail "declaring 'owner' must not silence the other stray key"; fi
+# and the newly declared field is now value-checked, from data alone
+TESTS=$((TESTS + 1))
+if ! contains "$out2" "frontmatter-owner"; then ok x; else
+  fail "'owner: nobody' matches the declared value list and must not be flagged"; fi
+
+# (c) a schema that parses but declares nonsense must not crash a consumer.
+# check_dec_status and check_req_table read nested keys; a scalar where an
+# object belongs would raise TypeError -> exit 2 -> hooks fail open.
+mkdir -p "$SC_TMP/nonsense"
+cp "$VALIDATOR" "$SC_TMP/nonsense/validate_vault.py"
+printf '{"domain_defaults": 5, "domains": {"DEC": {"body_fields": {"Status": 7}}, "REQ": {"rows": []}}, "editor_fields": null}' \
+  > "$SC_TMP/nonsense/vault_schema.json"
+python3 "$SC_TMP/nonsense/validate_vault.py" "$W" >/dev/null 2>&1; rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -ne 2 ]; then ok x; else
+  fail "a structurally invalid schema must not crash the validator"; fi
+
+# (d) drift guards. The identifier patterns stay Python constants on purpose
+# (they decide what is compared against git HEAD), so nothing but a test keeps
+# them in step with the patterns this schema declares.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import json, re, sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+s = json.load(open(sys.argv[1] + "/vault_schema.json"))
+ident = re.compile(s["identifier"]["pattern"])
+req = re.compile(s["domains"]["REQ"]["rows"]["id_pattern"])
+samples = ["REQ-BAT-001", "ARC-MEG-010", "REQ-B-1", "arc-bat-001", "REQ-BATTERY-001",
+           "ARC-DOM-NNN", "REQ-BAT-0001", "", "REQ-BAT-00"]
+for x in samples:
+    assert bool(ident.match(x)) == bool(vv.ID_RE.match(x)), f"identifier.pattern vs ID_RE: {x!r}"
+    assert bool(req.fullmatch(x)) == bool(vv.REQ_ID_RE.fullmatch(x)), f"rows.id_pattern vs REQ_ID_RE: {x!r}"
+assert s["identifier"]["excluded_domains"] == list(vv.ID_EXCLUDED_DOMAINS), "excluded_domains drift"
+PY
+then ok x; else fail "schema patterns and validator constants have drifted apart"; fi
+
+# The embedded fallback is the path taken exactly when nobody is looking, so
+# it must agree with the shipped schema on what is required and permitted.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+real, err = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+assert err is None, err
+def profile(schema, abbr):
+    out = {}
+    for name, d in schema.get("domain_defaults", {}).get("fields", {}).items():
+        out[name] = dict(d)
+    for name, d in schema.get("domains", {}).get(abbr, {}).get("fields", {}).items():
+        out[name] = {**out.get(name, {}), **d}
+    return {k: (v.get("required"), v.get("enforced"), tuple(v.get("values", [])))
+            for k, v in out.items()}
+for abbr in ("REQ", "DEC", "TAE", "ARC", "ANF"):
+    assert profile(real, abbr) == profile(vv.FALLBACK_SCHEMA, abbr), f"fallback drift in {abbr}"
+PY
+then ok x; else fail "FALLBACK_SCHEMA and vault_schema.json have drifted apart"; fi
+
+# Every named domain must resolve to the same vocabulary as an unnamed one.
+# The undeclared check is language-symmetric only as long as that holds; a
+# future domain-exclusive field has to break this test and think about it.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+schema, _ = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+base = set(schema["domain_defaults"]["fields"])
+for abbr, entry in schema["domains"].items():
+    extra = set(entry.get("fields", {})) - base
+    assert not extra, f"{abbr} declares {extra} outside the shared vocabulary"
+PY
+then ok x; else fail "a domain-exclusive field breaks language symmetry of the undeclared check"; fi
 
 # ==========================================================================
 # Hook modes (violation vault, synthetic payloads)
