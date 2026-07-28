@@ -247,6 +247,12 @@ main board.
 
 ## References
 - Schematic: Testproj/10_hardware/13_PCB/main_board.kicad_sch
+- Host config: /etc/udev/rules.d/99-adc.rules
+- Operator home: ~/.config/adc-logger/logger.conf
+- Host qualified: `labhost:~/.config/Code - OSS/User/settings.json`
+- Git remote: git@github.com:example/adc-firmware.git
+- Env-rooted: $HOME/.local/state/adc/last_run.json
+- Datasheet online: https://www.analog.com/media/en/AD7175-2.pdf
 
 ## Implementation
 - SPI clock fixed at 5 MHz
@@ -569,6 +575,10 @@ Implementation note with seeded violations.
 
 ## References
 - Schematic: Badproj/10_hardware/13_PCB/does_not_exist.kicad_sch
+- Markdown link: [board](Badproj/10_hardware/13_PCB/linked_missing.kicad_sch)
+- Repo anchored: /10_hardware/13_PCB/anchored_missing.kicad_sch
+- Host path: /etc/badproj/does_not_exist.conf
+- Operator home: ~/.config/badproj/missing.conf
 ```text
 Badproj/10_hardware/13_PCB/fenced_missing.sch
 ```
@@ -665,6 +675,25 @@ if contains "$out" "^ERROR .*does_not_exist\.kicad_sch"; then ok x; else
 TESTS=$((TESTS + 1))
 if contains "$out" "^ERROR .*fenced_missing\.sch"; then ok x; else
   fail "fenced dead path inside References must stay ERROR"; fi
+
+# The References zone checks the same thing the body does: a token shaped like
+# a project artifact. Two forms reach the shape gate through a leading
+# character the path regex cannot consume, and both must survive - a Markdown
+# link matches only from its second segment, and a repo-anchored path starts
+# with a slash. They are the guard against "fix the false positives by
+# switching the zone off".
+TESTS=$((TESTS + 1))
+if contains "$out" "^ERROR .*linked_missing\.kicad_sch"; then ok x; else
+  fail "dead project path inside a Markdown link must stay ERROR"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "^ERROR .*anchored_missing\.kicad_sch"; then ok x; else
+  fail "repo-anchored dead project path must stay ERROR"; fi
+# ... while a path this project cannot own is not a stale pointer, in either
+# zone. Reported here as the explicit negative, and by the precision vault's
+# zero-findings assertion for the remaining foreign forms.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "etc/badproj" && ! contains "$out" "config/badproj"; then ok x; else
+  fail "foreign host paths in References must produce no finding"; fi
 
 # undeclared frontmatter keys: reported, grouped into ONE line, and naming
 # every unknown key. WARN and never ERROR - the check cannot tell a typo from
