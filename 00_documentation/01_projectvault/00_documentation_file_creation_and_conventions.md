@@ -81,9 +81,11 @@ written by hand.
 
 The worked example under
 [[ARC_Battery_Monitoring]] shows all of this in one thread. The validator
-does not yet check identifiers or relations — that is planned work, and
-the schema file marks per entry what is enforced today and what is only
-declared.
+checks the identifiers it can see: the same value on two files is an
+error, and a value that was present in the last commit but is gone now is
+reported. It does not require an identifier — a file without one is not a
+finding — and it does not yet read the relations. The schema file marks
+per entry what is enforced today and what is only declared.
 
 ### Self-containedness
 The first lines of the Context section must situate the file on their

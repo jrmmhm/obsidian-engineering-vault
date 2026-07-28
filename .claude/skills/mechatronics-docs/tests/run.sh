@@ -105,6 +105,7 @@ EOF
 cat > "$V/01_requirements_(REQ)/REQ_Measurement (MEG).md" <<'EOF'
 ---
 domain: REQ
+id: REQ-MEG-000
 status: active
 created: 2026-01-05
 last-verified: 2026-07-01
@@ -125,6 +126,7 @@ EOF
 cat > "$V/02_decisions_(DEC)/DEC_ADC_Selection.md" <<'EOF'
 ---
 domain: DEC
+id: DEC-MEG-001
 created: 2026-01-06
 last-verified: 2026-07-01
 ---
@@ -157,6 +159,7 @@ EOF
 cat > "$V/04_components_(CMP)/CMP_AD7175-2.md" <<'EOF'
 ---
 domain: CMP
+id: CMP-MEG-001
 status: active
 created: 2026-01-06
 last-verified: 2026-07-01
@@ -181,6 +184,7 @@ EOF
 cat > "$V/04_components_(CMP)/CMP_MCU_Board.md" <<'EOF'
 ---
 domain: CMP
+id: CMP-MEG-002
 status: active
 created: 2026-01-06
 last-verified: 2026-07-01
@@ -203,6 +207,7 @@ EOF
 cat > "$V/05_interfaces_(IFC)/IFC_SPI_ADC.md" <<'EOF'
 ---
 domain: IFC
+id: IFC-MEG-001
 status: active
 created: 2026-01-07
 last-verified: 2026-07-01
@@ -224,6 +229,7 @@ EOF
 cat > "$V/06_implementation_(IMP)/IMP_MainBoard_ADC.md" <<'EOF'
 ---
 domain: IMP
+id: IMP-MEG-001
 status: active
 created: 2026-01-08
 last-verified: 2026-07-01
@@ -246,6 +252,7 @@ EOF
 cat > "$V/07_testing_and_evidence_(TAE)/TAE_ADC_Linearity.md" <<'EOF'
 ---
 domain: TAE
+id: TAE-MEG-001
 status: active
 created: 2026-01-10
 last-verified: 2026-07-01
@@ -279,6 +286,7 @@ EOF
 cat > "$V/09_references_(REF)/REF_AD7175_Datasheet.md" <<'EOF'
 ---
 domain: REF
+id: REF-MEG-001
 status: active
 created: 2026-01-05
 last-verified: 2026-07-01
@@ -299,6 +307,7 @@ EOF
 cat > "$V/03_architecture_(ARC)/ARC_Data_Acquisition.md" <<'EOF'
 ---
 domain: ARC
+id: ARC-MEG-001
 status: active
 created: 2026-01-09
 last-verified: 2026-07-01
@@ -399,9 +408,29 @@ trigger the global duplicate check.
 | M | 001 | duplicate across files | Pass if measured | none |
 EOF
 
+cat > "$W/01_requirements_(REQ)/REQ_Thermal (THM).md" <<'EOF'
+---
+domain: REQ
+id: REQ-XYZ-000
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Third requirement file whose frontmatter id declares a scope token that
+contradicts the token in its own filename. The id wins, so this file's rows
+are addressed as REQ-XYZ-NNN - which is exactly the silent rekeying the
+scope-mismatch check exists to surface.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source / Justification (REF/DEC) |
+| ------------- | --: | ------- | -------------------- | -------------------------------- |
+| M | 001 | scope mismatch row | Pass if measured | none |
+EOF
+
 cat > "$W/02_decisions_(DEC)/DEC_Bad.md" <<'EOF'
 ---
 domain: DEC
+id: DEC-PWR-001
 created: 01.02.2026
 last-verified: 2026-07-01
 ---
@@ -428,6 +457,7 @@ EOF
 cat > "$W/02_decisions_(DEC)/DEC_Superseded_NoLink.md" <<'EOF'
 ---
 domain: DEC
+id: DEC-PWR-001
 created: 2026-01-06
 last-verified: 2026-07-01
 ---
@@ -453,6 +483,7 @@ EOF
 cat > "$W/03_architecture_(ARC)/ARC_Leaky.md" <<'EOF'
 ---
 domain: CMP
+id: ARC-DOM-NNN
 status: active
 created: 2026-01-09
 last-verified: 2026-07-01
@@ -470,7 +501,9 @@ int leak = 1;
 EOF
 
 {
-  printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\nlast-verified: 2026-07-01\n---\n'
+  # same unfilled placeholder as ARC_Leaky.md: two files freshly copied from
+  # one template are not two objects claiming one identity - must NOT collide
+  printf -- '---\ndomain: ARC\nid: ARC-DOM-NNN\nstatus: active\ncreated: 2026-01-09\nlast-verified: 2026-07-01\n---\n'
   printf '## Context\n'
   printf '## Requirements (Files)\n## Decisions (Files)\n## Components (Files)\n'
   printf '## Interfaces\n## Implementation (Files)\n## Allocation and Verification\n'
@@ -570,7 +603,7 @@ for code in filename-prefix frontmatter-missing frontmatter-malformed \
     length code-fence impl-leak link-unresolved req-class req-nnn \
     req-duplicate req-criterion req-duplicate-global verifies-unknown-req \
     verifies-empty dec-status dec-superseded path-missing req-uncovered \
-    inb-age duplicate-basename orphan; do
+    inb-age duplicate-basename orphan id-duplicate id-scope-mismatch; do
   TESTS=$((TESTS + 1))
   if contains "$out" "\[$code\]"; then ok x; else fail "violation vault: [$code] not detected"; fi
 done
@@ -585,6 +618,22 @@ if contains "$out" "^ERROR .*does_not_exist\.kicad_sch"; then ok x; else
 TESTS=$((TESTS + 1))
 if contains "$out" "^ERROR .*fenced_missing\.sch"; then ok x; else
   fail "fenced dead path inside References must stay ERROR"; fi
+
+# identifier collision: ERROR, and it must name BOTH locations. The reported
+# file is the second one in sorted order, so the message is reproducible -
+# without the sort it would depend on filesystem iteration order.
+TESTS=$((TESTS + 1))
+if contains "$out" "DEC_Superseded_NoLink\.md.*\[id-duplicate\].*DEC-PWR-001.*already declared in DEC_Bad\.md"; then
+  ok x; else fail "id-duplicate must name both locations deterministically"; fi
+# unfilled template placeholders share one value by construction and must
+# never be read as an identity collision (they fail the identifier pattern)
+TESTS=$((TESTS + 1))
+if ! contains "$out" "ARC-DOM-NNN"; then ok x; else
+  fail "unfilled placeholder id must never produce a finding"; fi
+# a scope token that contradicts the filename rekeys every row of that file
+TESTS=$((TESTS + 1))
+if contains "$out" "REQ_Thermal.*\[id-scope-mismatch\].*'XYZ'.*'THM'"; then ok x; else
+  fail "id-scope-mismatch must name both the id scope and the filename token"; fi
 
 # ==========================================================================
 # Fixture 3: German/English twin vaults - byte-identical content, differing
@@ -627,10 +676,13 @@ EOF
 ## Inhalt
 EOF
 
-  # seeded: code-fence + impl-leak + link-unresolved
+  # seeded: code-fence + impl-leak + link-unresolved + id-duplicate (with
+  # ARC_Unvollstaendig below). Identifiers go through this one function on
+  # purpose: both twins must stay byte-identical in content.
   cat > "$V/$A/ARC_Messkette.md" <<'EOF'
 ---
 domain: ARC
+id: ARC-MES-001
 status: active
 created: 2026-01-09
 last-verified: 2026-07-01
@@ -652,10 +704,12 @@ int leak = 1;
 | Wandler | keine | keine | Draft |
 EOF
 
-  # seeded: template-sections (missing "Zuordnung und Verifikation")
+  # seeded: template-sections (missing "Zuordnung und Verifikation") +
+  # the second half of the id-duplicate pair
   cat > "$V/$A/ARC_Unvollstaendig.md" <<'EOF'
 ---
 domain: ARC
+id: ARC-MES-001
 status: active
 created: 2026-01-09
 last-verified: 2026-07-01
@@ -686,6 +740,7 @@ EOF
   cat > "$V/$R/REF_Datenblatt.md" <<'EOF'
 ---
 domain: REF
+id: REF-MES-001
 status: active
 created: 2026-01-05
 last-verified: 2026-07-01
@@ -745,6 +800,17 @@ if [ "$(codes_of "$de_out")" = "$(codes_of "$en_out")" ]; then ok x; else
   diff <(codes_of "$de_out") <(codes_of "$en_out") | sed 's/^/    /'
 fi
 
+# the identifier scheme is language-independent by construction: the id is
+# neither a folder name nor a section heading, so it must be detected in the
+# German twin exactly as in the English one
+TESTS=$((TESTS + 1))
+if contains "$de_out" "\[id-duplicate\].*ARC-MES-001"; then ok x; else
+  fail "German twin must detect the seeded id collision"; fi
+# neither twin lives in a repository: the vanished check must skip silently
+TESTS=$((TESTS + 1))
+if ! contains "$de_out" "id-vanished" && ! contains "$en_out" "id-vanished"; then ok x; else
+  fail "vault outside version control must not report vanished identifiers"; fi
+
 # the mirror without template files stays unrecognized, via both entry points
 python3 "$VALIDATOR" "$DE_MIRROR" >/dev/null 2>&1; rc=$?
 TESTS=$((TESTS + 1))
@@ -760,6 +826,174 @@ out=$(python3 "$VALIDATOR" --file "$DE_V/03_Architektur_(ARC)/ARC_Unvollstaendig
 TESTS=$((TESTS + 1))
 if [ $rc -ne 2 ] && contains "$out" "\[template-sections\]"; then ok x; else
   fail "--file must auto-detect the German vault root, got rc=$rc"; fi
+
+# ==========================================================================
+# Fixture 4: identity vault UNDER version control - the only fixture with a
+# real repository. Two behaviours need one: the vanished-identifier check
+# reads git HEAD, and rename survival needs a committed state to survive.
+#
+# The violation vault deliberately stays outside version control: a populated
+# HEAD baseline there would make every seeded ERROR pre-existing, and both
+# "stop hook must block" assertions would invert.
+#
+# Hermetic git on purpose. A CI runner has no user identity configured
+# ("Author identity unknown", exit 128), and ambient global config can inject
+# hooks, a template dir or gpg signing - the last of which hangs on a
+# passphrase prompt rather than failing.
+# ==========================================================================
+ID_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP"' EXIT
+
+# Every other fixture assumes mktemp dirs lie outside any repository - the
+# whole "not under version control" branch depends on it. Make it explicit.
+TESTS=$((TESTS + 1))
+if ! git -C "$ID_TMP" rev-parse --show-toplevel >/dev/null 2>&1; then ok x; else
+  fail "TMPDIR lies inside a git repository - fixture isolation is void"; fi
+
+hgit() { # git, independent of whatever this machine has configured globally
+  env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+      GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
+      GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+      git -C "$ID_TMP/Idproj" "$@"
+}
+
+I="$ID_TMP/Idproj/00_documentation/01_projectvault"
+mkdir -p "$I/01_requirements_(REQ)" "$I/03_architecture_(ARC)" \
+         "$I/07_testing_and_evidence_(TAE)"
+printf '## Context\n' > "$I/01_requirements_(REQ)/00_REQ_file_template.md"
+printf '## Context\n' > "$I/03_architecture_(ARC)/00_ARC_file_template.md"
+printf '## Context\n## Evidence\n' > "$I/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+
+# NO parenthesised scope token in the filename: the scope comes from the id
+# alone. This is the rename-survival case issue #3 describes.
+cat > "$I/01_requirements_(REQ)/REQ_Thermal.md" <<'EOF'
+---
+domain: REQ
+id: REQ-THM-000
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Thermal requirements of the module. This file carries no scope token in its
+filename; its rows are addressed as REQ-THM-NNN because the frontmatter id
+says so, which is what makes a rename harmless.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source / Justification (REF/DEC) |
+| ------------- | --: | ------- | -------------------- | -------------------------------- |
+| M | 001 | Case temperature stays below the limit | Pass if measured below the limit | none |
+EOF
+
+# The mirror image: scope token in the filename, no id at all - the state
+# every vault predating the identifier scheme is in.
+cat > "$I/01_requirements_(REQ)/REQ_Power (PWR).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Power requirements. No frontmatter id at all, so the scope token can only
+come from the parentheses in the filename - the fallback that keeps every
+legacy vault working unchanged.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source / Justification (REF/DEC) |
+| ------------- | --: | ------- | -------------------- | -------------------------------- |
+| M | 001 | Idle current stays below the budget | Pass if measured below the budget | none |
+EOF
+
+cat > "$I/07_testing_and_evidence_(TAE)/TAE_Thermal.md" <<'EOF'
+---
+domain: TAE
+id: TAE-THM-001
+status: active
+created: 2026-01-10
+last-verified: 2026-07-01
+verifies: [REQ-THM-001, REQ-PWR-001]
+---
+## Context
+Verifies one requirement resolved through the frontmatter id and one through
+the filename fallback. If either resolution path breaks, the corresponding
+id turns into a verifies-unknown-req ERROR - so the ABSENCE of that code is
+the assertion.
+
+## Evidence
+| Quantity | Value |
+| -------- | ----- |
+| Case temperature | below limit |
+EOF
+
+cat > "$I/03_architecture_(ARC)/ARC_Thermal.md" <<'EOF'
+---
+domain: ARC
+id: ARC-THM-001
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+Thermal module. Deleted from the worktree further below, after being
+committed, so that its identifier is the one that vanishes.
+EOF
+
+# Unborn HEAD: a repository without a single commit must not crash the
+# validator. Exit 2 would make both hooks fail open - enforcement silently off.
+hgit init -q
+out=$(python3 "$VALIDATOR" "$I" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -ne 2 ] && ! contains "$out" "id-vanished"; then ok x; else
+  fail "unborn HEAD must neither crash nor report vanished ids, got rc=$rc"; fi
+
+# Both resolution paths at once: REQ-THM-001 can only resolve through the id,
+# REQ-PWR-001 only through the filename token.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "verifies-unknown-req"; then ok x; else
+  fail "REQ scope must resolve from the id AND from the filename:"
+  printf '%s\n' "$out" | grep verifies-unknown-req | sed 's/^/    /'
+fi
+
+hgit add -A >/dev/null 2>&1
+hgit commit -q --no-verify --no-gpg-sign -m "identity fixture baseline" >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if hgit rev-parse --verify --quiet HEAD >/dev/null 2>&1; then ok x; else
+  fail "hermetic commit failed - fixture 4 cannot run"; fi
+
+# Clean tree: HEAD and worktree agree, nothing may be reported as vanished.
+out=$(python3 "$VALIDATOR" "$I" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -ne 2 ] && ! contains "$out" "id-vanished"; then ok x; else
+  fail "clean worktree must report no vanished identifier, got rc=$rc"; fi
+
+# The object disappears from the worktree while HEAD still carries it.
+rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md"
+out=$(python3 "$VALIDATOR" "$I" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if contains "$out" "^WARN .*\[id-vanished\].*ARC-THM-001"; then ok x; else
+  fail "deleted object must report its identifier as vanished:"
+  printf '%s\n' "$out" | sed 's/^/    /'
+fi
+# WARN and never ERROR: retirement, rename and accidental loss cannot be told
+# apart, and a gate that blocks on all three teaches its user to ignore it.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "^ERROR .*id-vanished"; then ok x; else
+  fail "id-vanished must never be an ERROR"; fi
+# Identifiers that are still present must not be swept up by the diff.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "id-vanished.*REQ-THM-000" && ! contains "$out" "id-vanished.*TAE-THM-001"; then
+  ok x; else fail "surviving identifiers must not be reported as vanished"; fi
+
+# The promise of the whole scheme: renaming a file changes neither its own
+# identifier nor the identity of the rows it carries.
+mv "$I/01_requirements_(REQ)/REQ_Thermal.md" \
+   "$I/01_requirements_(REQ)/REQ_Thermal_Chain.md"
+out=$(python3 "$VALIDATOR" "$I" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -ne 2 ] && ! contains "$out" "REQ-THM-000" && ! contains "$out" "verifies-unknown-req"; then
+  ok x; else
+  fail "a renamed REQ file must keep its identifier and its row identities:"
+  printf '%s\n' "$out" | grep -E "REQ-THM|verifies-unknown-req" | sed 's/^/    /'
+fi
 
 # ==========================================================================
 # Hook modes (violation vault, synthetic payloads)

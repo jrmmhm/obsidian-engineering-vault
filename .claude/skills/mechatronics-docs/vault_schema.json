@@ -42,16 +42,17 @@
     "assignment": "No registry. The scope token localises the number space; the next free number is found by scanning the vault, following StrictDoc's approach of reading the tree instead of keeping a counter file.",
     "collision_policy": {
       "intent": "Detect, do not prevent. Two branches can assign the same number and merge cleanly.",
-      "today": "Nothing detects an id collision. validate_vault.py checks duplicates only for REQ table rows (req-duplicate-global) and for file basenames (duplicate-basename).",
-      "owed_to_issue": 3
+      "today": "validate_vault.py reports a collision as id-duplicate (ERROR) and an identifier that was present at git HEAD but is absent from the working tree as id-vanished (WARN). Both are vault-wide checks, so they stay advisory at the stop gate and never block a turn.",
+      "enforced": "validator-internal"
     },
-    "known_gap": {
-      "what": "REQ row IDs are still derived from the filename: Vault.req_index reads the scope token out of the parentheses in the REQ filename.",
-      "consequence": "Renaming a REQ file still changes the identity of its rows, which is the defect issue #3 describes.",
-      "migration": "The scope token is now also declared in the REQ file's own id (REQ-<SCOPE>-000). Issue #3 makes the validator prefer that and fall back to the filename.",
-      "enforced": "declared-only"
+    "scope_resolution": {
+      "what": "The scope token of a REQ file comes from its own id when one is present, and from the parentheses in its filename otherwise.",
+      "consequence": "A REQ file carrying an id survives a rename with the identity of its rows intact. A REQ file without an id keeps the historical filename behaviour, which is what every vault predating this scheme relies on.",
+      "residual": "The two sources can disagree. The id wins, and id-scope-mismatch (WARN) reports the divergence at the REQ file rather than leaving it to surface as verifies-unknown-req on an unrelated evidence note.",
+      "enforced": "validator-internal"
     },
-    "enforced": "declared-only"
+    "enforced": "declared-only",
+    "enforced_detail": "Uniqueness and disappearance are enforced; see consistency_rules/identifier-uniqueness. The pattern above and the presence of the field are NOT: an id is optional, and only pattern-conforming values take part in any comparison, so two files freshly copied from one template never collide on its placeholder. Requiring the field would turn every file of a vault predating this scheme into a finding, which is a convention rollout rather than a defect report."
   },
 
   "domains": {
@@ -125,6 +126,24 @@
         "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
         "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
         "verifies": {"type": "list", "item": "REQ row identifier", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    },
+    "OAU": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["OAU"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
+      }
+    },
+    "REF": {
+      "fields": {
+        "domain": {"type": "enum", "values": ["REF"], "required": true, "enforced": "validator-internal"},
+        "status": {"type": "enum", "values": ["draft", "active", "superseded", "deprecated"], "required": true, "enforced": "validator-internal"},
+        "created": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
+        "last-verified": {"type": "date", "format": "YYYY-MM-DD", "required": true, "enforced": "validator-internal"},
         "id": {"type": "identifier", "required": false, "enforced": "declared-only"}
       }
     }
@@ -248,8 +267,8 @@
     {
       "id": "identifier-uniqueness",
       "statement": "An identifier appears at most once across the vault, and an identifier present in an earlier commit does not silently disappear.",
-      "enforced": "declared-only",
-      "owed_to_issue": 3
+      "enforced": "validator-internal",
+      "enforced_detail": "id-duplicate (ERROR) for the first clause, id-vanished (WARN) for the second; ADM and INB are excluded from both. The severities differ because the checks differ in kind: a collision is never legitimate, whereas a disappearance can equally be a retirement, a rename or an accidental loss, and no validator can tell those apart."
     }
   ],
 

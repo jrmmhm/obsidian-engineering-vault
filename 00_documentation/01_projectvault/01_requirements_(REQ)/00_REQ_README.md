@@ -17,12 +17,12 @@ The ID of each requirement table row is unique and allows unambiguous assignment
 **REQ-_DOM_-_NNN_**
 
 - **REQ**: Prefix for "Requirement"
-- **DOM**: 3-letter domain abbreviation of the file (appears after the file name in parentheses, e.g. `KRA`)
+- **DOM**: scope token of the file. Taken from the file's own `id` (`REQ-_DOM_-000`) when it carries one, and from the parentheses after the file name otherwise, e.g. `KRA`
 - **NNN**: sequential number within this file (001, 002, 003 …) – appears as ID in the table
 
 **Important:**
 - Only **NNN** is entered in the table. The Full-ID is automatically derived from **DOM + NNN**.
-- **DOM is stable**: meaning of DOM is never changed.
+- **DOM is stable**: meaning of DOM is never changed. Once the file carries an `id`, renaming the file does not change DOM either — identity lives in the frontmatter, not in the file name.
 - **NNN is never reused or renumbered**. Gaps are allowed.
 - If a requirement becomes obsolete: ID remains occupied.
 
