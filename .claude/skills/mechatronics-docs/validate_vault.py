@@ -68,8 +68,9 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 PATH_TOKEN_RE = re.compile(r"(?<![\w(])((?:[\w.-]+/)+[\w.-]+\.\w{1,12})\b")
 PIN_RE = re.compile(r"\b(?:GPIO\d+|P[A-K]\d{1,2}|0x[0-9A-Fa-f]{2,})\b")
 # Project-artifact path shape (NN_folder/... per the vault conventions);
-# gates the body-wide dead-path scan so ratio notation (3.3V/1.8V),
-# bare domains (heise.de/...) and foreign paths never WARN.
+# gates the dead-path scan in BOTH zones so ratio notation (3.3V/1.8V),
+# bare domains (heise.de/...) and foreign paths (/etc/..., ~/.config/...)
+# are never reported as stale pointers - this project cannot own them.
 ARTIFACT_SEG_RE = re.compile(r"^\d{2}_")
 # Explicit open-item markers suppress the body-wide dead-path WARN only -
 # never the References/Sources ERROR (silent-bypass prevention).
@@ -771,13 +772,23 @@ def check_leaks(abbr, path, lines, fm_end, findings):
 def check_paths(vault, path, lines, fm_end, findings):
     """Dead-pointer check over the whole body.
 
-    References/Sources H2 sections keep the strict historical contract:
-    every path token is checked, dead ones ERROR, no suppression, fenced
-    content included. The rest of the body is scanned advisorily: only
-    project-artifact-shaped tokens (NN_ segment), WARN severity, inline
-    code and fenced blocks skipped, and an explicit pending/planned/TBD
-    marker on the line or its governing heading suppresses the finding.
-    Fence state is tracked first so fenced '## ' lines never switch zones.
+    What counts as a project artifact is one rule in both zones: a token
+    is checked only where it is shaped like one (ARTIFACT_SEG_RE, an NN_
+    first or second segment). Everything else names something this
+    project cannot own - a host path (/etc/..., ~/.config/...), the
+    remainder of a URL after '://', a git remote, a fragment cut out of a
+    quoted path containing a space - and resolving it against
+    project_root could only ever report it as dead (DECISIONS.md,
+    amendment 2026-07-28e).
+
+    The zones still differ where that was decided on purpose. Under an H2
+    naming references or sources, dead pointers are ERROR, fenced and
+    backticked content is scanned, and no pending/planned/TBD marker
+    suppresses anything (silent-bypass prevention). In the rest of the
+    body the same finding is a WARN, inline code and fenced blocks are
+    skipped, and an explicit marker on the line or its governing heading
+    suppresses it. Fence state is tracked first so fenced '## ' lines
+    never switch zones.
     """
     in_ref = False
     in_fence = False
@@ -810,8 +821,8 @@ def check_paths(vault, path, lines, fm_end, findings):
             if token.startswith(("http", "Projectname/", "www.")):
                 continue
             segs = token.split("/")
-            if not in_ref and not (ARTIFACT_SEG_RE.match(segs[0])
-                                   or (len(segs) > 2 and ARTIFACT_SEG_RE.match(segs[1]))):
+            if not (ARTIFACT_SEG_RE.match(segs[0])
+                    or (len(segs) > 2 and ARTIFACT_SEG_RE.match(segs[1]))):
                 continue
             candidates = [
                 vault.project_root / token,
