@@ -12,7 +12,7 @@ A validator enforces it mechanically, so the documentation cannot quietly rot.
 [![Use this template](https://img.shields.io/badge/GitHub-use%20this%20template-2ea44f?logo=github)](../../generate)
 [![Obsidian](https://img.shields.io/badge/Obsidian-vault-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill%20included-D97757)](.claude/skills/mechatronics-docs)
-[![Validator](https://img.shields.io/badge/validator-47%20tests%20passing-success)](.claude/skills/mechatronics-docs/tests/run.sh)
+[![Vault checks](https://github.com/jrmmhm/obsidian-engineering-vault/actions/workflows/validate-vault.yml/badge.svg?branch=main)](https://github.com/jrmmhm/obsidian-engineering-vault/actions/workflows/validate-vault.yml)
 
 </div>
 
