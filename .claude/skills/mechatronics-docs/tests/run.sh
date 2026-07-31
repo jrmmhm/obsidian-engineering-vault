@@ -1674,6 +1674,226 @@ else
   fail "real template vault not found at $REAL_VAULT"
 fi
 
+# ==========================================================================
+# Fixture 7: the traceability exporter. One vault carrying every construct
+# the production corpora actually contain - a range, a number continuation,
+# a prose subject, a qualified status, an identifier that does not exist, a
+# table quoted inside a code fence, an escaped pipe, a script tag and a
+# spreadsheet formula - built twice, once in English and once in German.
+#
+# The two builds must produce the same numbers. That is the whole point of
+# binding relations to the section the project's own template declares:
+# measured on the real vaults, the header row drifts and the section title
+# does not.
+# ==========================================================================
+EXPORTER="$SKILL_DIR/export_traceability.py"
+EX_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$EX_TMP"' EXIT
+
+build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
+                       # <alloc_sec> <iface_sec> <sub_sec> <req_abbr> <tae_abbr>
+  local V="$1" RQ="$2" AR="$3" TA="$4" T="$5" CTX="$6" ALLOC="$7" IFACE="$8" \
+        SUB="$9" P="${10}" EV="${11}"
+  mkdir -p "$V/$RQ" "$V/$AR" "$V/$TA"
+
+  printf '## %s\n\n| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n| --- | --: | --- | --- | --- |\n|  |  |  |  |  |\n' \
+    "$CTX" > "$V/$RQ/00_${P}_$T.md"
+  printf '## %s\n\n## %s\n| Interface | Endpoint A | Endpoint B | Context |\n| --- | --- | --- | --- |\n| a | b | c | d |\n\n## %s\n| Submodule | Allocated | Verification | Status |\n| --- | --- | --- | --- |\n| a | b | c | Draft |\n' \
+    "$CTX" "$IFACE" "$ALLOC" > "$V/$AR/00_ARC_$T.md"
+  printf '## %s\n\n## %s\n| Submodule | Description |\n| --- | --- |\n| a | b |\n' \
+    "$CTX" "$SUB" > "$V/$AR/00_ARC_main_$T.md"
+  printf '## %s\n' "$CTX" > "$V/$TA/00_${EV}_$T.md"
+
+  # Requirement rows 001-005. Row 002 carries an escaped pipe, row 003 a
+  # script tag and row 004 a leading '=' - the three payloads whose handling
+  # decides whether the HTML and the CSV are safe to hand to anyone.
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n---\n' "$P"
+    printf '## %s\n\nRequirements of the export example.\n\n' "$CTX"
+    printf 'A table quoted as documentation must not become data:\n\n'
+    printf '```markdown\n| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n| M | 900 | quoted | quoted | none |\n```\n\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | plain requirement | pass if plain | none |\n'
+    printf '| M | 002 | value a \\| b in one cell | pass if one cell | none |\n'
+    printf '| M | 003 | <script>alert(1)</script> | pass if escaped | none |\n'
+    printf '| M | 004 | formula cell | =1+1 | none |\n'
+    printf '| M | 005 | last one | pass if last | none |\n'
+  } > "$V/$RQ/${P}_Export (EXP).md"
+
+  {
+    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n---\n'
+    printf '## %s\n\nThe module under export.\n\n' "$CTX"
+    printf '## %s\n| Submodule | Allocated | Verification | Status |\n' "$ALLOC"
+    printf '| --- | --- | --- | --- |\n'
+    printf '| [[ARC_Export]] | %s-EXP-001 | [[%s_Export]] | Verified |\n' "$P" "$EV"
+    printf '| Tailnet resolver port 53 | %s-EXP-002 | [[%s_Export]] | Verified (Rebuild: Draft) |\n' "$P" "$EV"
+    printf '| ranged | %s-EXP-003 bis %s-EXP-005 | [[%s_Export]] | Verified |\n' "$P" "$P" "$EV"
+    printf '| continued | %s-EXP-001, 002 | [[%s_Export]] | Verified |\n' "$P" "$EV"
+    printf '| ghost | %s-EXP-900 | prose only | Verified |\n' "$P"
+    printf '| too wide | %s-EXP-004 bis %s-EXP-008 | [[%s_Export]] | Verified |\n' "$P" "$P" "$EV"
+  } > "$V/$AR/ARC_Export.md"
+
+  {
+    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n---\n'
+    printf '## %s\n\nTop module.\n\n' "$CTX"
+    printf '## %s\n| Submodule | Description |\n| --- | --- |\n' "$SUB"
+    printf '| [[ARC_Export]] | the module under export |\n'
+  } > "$V/$AR/ARC_Top.md"
+
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n' "$EV"
+    printf 'verifies: [%s-EXP-001, %s-EXP-002]\n---\n' "$P" "$P"
+    printf '## %s\n\nEvidence for the export example.\n' "$CTX"
+  } > "$V/$TA/${EV}_Export.md"
+}
+
+EN_V="$EX_TMP/En/00_documentation/01_projectvault"
+DE_V="$EX_TMP/De/00_Dokumentation/01_Projektvault"
+build_export_vault "$EN_V" "01_requirements_(REQ)" "03_architecture_(ARC)" \
+  "07_testing_and_evidence_(TAE)" "file_template" "Context" \
+  "Allocation and Verification" "Interfaces" "Submodules" "REQ" "TAE"
+build_export_vault "$DE_V" "01_Anforderungen_(ANF)" "03_Architektur_(ARC)" \
+  "07_Test_und_Evidenz_(TUE)" "Dateitemplate" "Kontext" \
+  "Zuordnung und Verifikation" "Schnittstellen" "Submodule" "ANF" "TUE"
+
+EN_OUT="$EX_TMP/out-en"
+DE_OUT="$EX_TMP/out-de"
+eout=$(python3 "$EXPORTER" "$EN_V" --output-dir "$EN_OUT" --no-timestamp 2>&1); erc=$?
+check "exporter exits 0 on a well-formed vault" $erc
+dout=$(python3 "$EXPORTER" "$DE_V" --output-dir "$DE_OUT" --no-timestamp 2>&1)
+
+TESTS=$((TESTS + 1))
+if [ -f "$EN_OUT/traceability.json" ] && [ -f "$EN_OUT/traceability.html" ] && \
+   [ -f "$EN_OUT/traceability_requirements.csv" ] && \
+   [ -f "$EN_OUT/traceability_edges.csv" ]; then ok x; else
+  fail "exporter must write json, html and both csv views"; fi
+
+# The German twin must not be a smaller graph. This is the assertion the
+# header-signature binding would have failed on every production vault.
+en_counts=$(python3 - "$EN_OUT/traceability.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(len(d["requirements"]), sum(1 for c in d["coverage"].values() if c["proven"]),
+      len(d["edges"]))
+PY
+)
+de_counts=$(python3 - "$DE_OUT/traceability.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(len(d["requirements"]), sum(1 for c in d["coverage"].values() if c["proven"]),
+      len(d["edges"]))
+PY
+)
+TESTS=$((TESTS + 1))
+if [ "$en_counts" = "$de_counts" ]; then ok x; else
+  fail "German and English twin must export the same graph: '$en_counts' vs '$de_counts'"; fi
+TESTS=$((TESTS + 1))
+if [ "$en_counts" = "5 4 15" ]; then ok x; else
+  fail "expected 5 requirements, 4 proven, 15 edges; got '$en_counts'"; fi
+
+exq() { python3 - "$EN_OUT/traceability.json" "$1" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(eval(sys.argv[2], {"d": d, "sorted": sorted, "len": len, "any": any,
+                         "all": all, "sum": sum}))
+PY
+}
+
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["code"]=="export-unresolved-requirement" for f in d["findings"])')" = "True" ]; then
+  ok x; else fail "an identifier that exists nowhere must be reported"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq '"REQ-EXP-900" in d["requirements"]')" = "False" ]; then ok x; else
+  fail "a requirement row quoted inside a code fence must not enter the graph"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'd["requirements"]["REQ-EXP-002"]["text"]')" = "value a | b in one cell" ]; then
+  ok x; else fail "an escaped pipe must stay inside one cell"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'sorted(d["reverse"]["REQ-EXP-001"]["verifies_back"])')" = "['TAE:TAE_Export']" ]; then
+  ok x; else fail "the reverse direction must be computed for a verified requirement"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'd["coverage"]["REQ-EXP-002"]["proven"]')" = "False" ]; then ok x; else
+  fail "a qualified status must not count as proven"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(a["status_reason"]=="Verified (Rebuild: Draft)" for a in d["coverage"]["REQ-EXP-002"]["allocations"])')" = "True" ]; then
+  ok x; else fail "a qualified status must carry its verbatim text as the reason"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'all(f"REQ-EXP-{n:03d}" in d["requirements"] and d["coverage"][f"REQ-EXP-{n:03d}"]["allocations"] for n in (3,4,5))')" = "True" ]; then
+  ok x; else fail "a range whose members all exist must be expanded"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any("008" in f["message"] for f in d["findings"] if f["code"]=="export-unresolved-requirement")')" = "True" ]; then
+  ok x; else fail "a range reaching past the last requirement must be refused, not invented"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(a["owner_text"].startswith("Tailnet") for a in d["coverage"]["REQ-EXP-002"]["allocations"])')" = "True" ]; then
+  ok x; else fail "a prose subject must survive as the owner"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(e["kind"]=="contains" for e in d["edges"])')" = "True" ]; then ok x; else
+  fail "the main-module submodule table must yield an ARC-to-ARC edge"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq '"no-evidence-note" in d["coverage"]["REQ-EXP-005"]["open_questions"]')" = "True" ]; then
+  ok x; else fail "a requirement no evidence note names must carry that open question"; fi
+
+# Safety of the two artifacts a human opens.
+TESTS=$((TESTS + 1))
+if contains "$(head -1 "$EN_OUT/traceability.html")" 'charset="utf-8"'; then ok x; else
+  fail "the report must declare its charset in the first line"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$(cat "$EN_OUT/traceability.html")" '<script>alert'; then ok x; else
+  fail "a script tag from the vault must not reach the report unescaped"; fi
+TESTS=$((TESTS + 1))
+if contains "$(cat "$EN_OUT/traceability.html")" '&lt;script&gt;alert'; then ok x; else
+  fail "a script tag must appear escaped, not dropped"; fi
+TESTS=$((TESTS + 1))
+if contains "$(head -c 3 "$EN_OUT/traceability_requirements.csv" | od -An -tx1)" "ef bb bf"; then
+  ok x; else fail "the CSV must carry a BOM so a spreadsheet reads it as UTF-8"; fi
+TESTS=$((TESTS + 1))
+if contains "$(cat "$EN_OUT/traceability_requirements.csv")" '"=1+1"'; then ok x; else
+  fail "a formula-shaped cell must be exported verbatim as a record"; fi
+
+# Determinism: the property, not just the timestamp.
+cp -r "$EN_OUT" "$EX_TMP/out-en-ref"
+python3 "$EXPORTER" "$EN_V" --output-dir "$EN_OUT" --no-timestamp >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if diff -r "$EX_TMP/out-en-ref" "$EN_OUT" >/dev/null 2>&1; then ok x; else
+  fail "two runs of the exporter must produce byte-identical artifacts"; fi
+
+# Refusals.
+python3 "$EXPORTER" "$EN_V" --output-dir "$EN_V/01_requirements_(REQ)" \
+  >/dev/null 2>&1; rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 2 ]; then ok x; else
+  fail "writing the export into the vault must be refused, got $rc"; fi
+python3 "$EXPORTER" "$EX_TMP" --output-dir "$EX_TMP/nope" >/dev/null 2>&1; rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 2 ]; then ok x; else fail "a non-vault path must exit 2, got $rc"; fi
+
+# A domain nobody declared is reported rather than quietly skipped.
+mkdir -p "$EN_V/06_unknown_(XYZ)"
+printf '## Context\n' > "$EN_V/06_unknown_(XYZ)/00_XYZ_file_template.md"
+python3 "$EXPORTER" "$EN_V" --output-dir "$EX_TMP/out-unknown" --no-timestamp \
+  >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if contains "$(cat "$EX_TMP/out-unknown/traceability.json")" "export-unknown-domain"; then
+  ok x; else fail "a domain abbreviation the alias map does not know must be reported"; fi
+rm -rf "$EN_V/06_unknown_(XYZ)"
+
+# The shipped template vault must export cleanly - the same guard the
+# validator has, for the artifact a visitor is most likely to look at.
+TESTS=$((TESTS + 1))
+if [ -d "$REAL_VAULT" ]; then
+  rout=$(python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$EX_TMP/out-real" \
+    --no-timestamp 2>&1)
+  if contains "$rout" "requirements: 3  proven: 3" && \
+     contains "$rout" "findings: 0"; then ok x; else
+    fail "template vault must export 3 of 3 requirements proven with no findings:"
+    printf '%s\n' "$rout" | sed 's/^/    /'
+  fi
+else
+  fail "real template vault not found at $REAL_VAULT"
+fi
+
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
       "/tmp/claude-mechdocs/blocks-$SID"
 
