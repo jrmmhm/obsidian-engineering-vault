@@ -258,7 +258,9 @@
       "domain": "ARC",
       "header_signature": ["Submodule (ARC/CMP/IFC)", "Allocated Requirements (REQ-IDs)", "Verification (TAE)", "Status"],
       "column_roles": ["subject", "objects:allocates", "objects:evidence", "qualifier:status"],
-      "qualifier_values": ["Draft", "Approved", "Verified", "Deprecated", "Blocked"]
+      "qualifier_values": ["Draft", "Approved", "Verified", "Deprecated", "Blocked"],
+      "qualifier_proven_value": "Verified",
+      "qualifier_proven_note": "The one value that lets a requirement count as proven. Named here rather than inferred, because 'the last value in the list' and 'the longest one' are both accidents of how the list was written. The German vaults write these five values in English too, so the vocabulary needs no alias."
     },
     "arc_interface_table": {
       "domain": "ARC",
