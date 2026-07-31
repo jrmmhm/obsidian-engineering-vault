@@ -737,6 +737,105 @@ cp "$W/07_testing_and_evidence_(TAE)/TAE_Dup.md" "$W/02_decisions_(DEC)/TAE_Dup.
   for i in $(seq 1 20); do printf 'echo "unclosed line %d"\n' "$i"; done
 } > "$W/06_implementation_(IMP)/IMP_Host_Tilde.md"
 
+# Headings the author DID write, under a title the template does not carry.
+# Before the near-miss classes these were reported exactly like a section
+# nobody ever wrote, naming a string that is not in the file (issue #10).
+cat > "$W/06_implementation_(IMP)/IMP_Case_Drift.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-01-08
+last-verified: 2026-07-01
+---
+## context
+Implementation note whose first heading differs from the template in case
+alone. The section exists by any reading, so it must not be reported as
+missing - and the case drift must still be visible.
+
+## References
+- none
+
+## Implementation
+- Seeded near miss above.
+EOF
+
+# Two headings extend the same required one: the finding must name a
+# reproducible pair, not whichever the set iteration happened to yield.
+cat > "$W/06_implementation_(IMP)/IMP_Qualifier.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-01-08
+last-verified: 2026-07-01
+---
+## Context
+Implementation note carrying a qualifier on a required heading, twice.
+
+## References
+- none
+
+## Implementation - Iteration 0
+- First scoped variant of the required section.
+
+## Implementation (Nachtrag)
+- Second scoped variant of the same required section.
+EOF
+
+# The negative control of the boundary rule: a longer WORD is not a
+# qualifier, so this stays a genuine absence.
+cat > "$W/06_implementation_(IMP)/IMP_Word_Extension.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-01-08
+last-verified: 2026-07-01
+---
+## Contexts
+Implementation note whose heading is a different word, not a scoped
+variant of the required one.
+
+## References
+- none
+
+## Implementation
+- Seeded absence above.
+EOF
+
+# The other direction: the file's title is SHORTER than the template's.
+# 'Allocation' is not 'Allocation and Verification', and reporting the
+# latter as never written is the same unusable diagnosis.
+cat > "$W/03_architecture_(ARC)/ARC_Reverse.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+Architecture note whose last heading is a shortened form of the one the
+template declares. Every other section is written exactly.
+
+## Requirements (Files)
+- None allocated in this seeded fixture.
+
+## Decisions (Files)
+- None recorded in this seeded fixture.
+
+## Components (Files)
+- None assigned in this seeded fixture.
+
+## Interfaces
+- None declared in this seeded fixture.
+
+## Implementation (Files)
+- None linked in this seeded fixture.
+
+## Allocation
+| Submodule | Allocated Requirements | Verification | Status |
+| --- | --- | --- | --- |
+| none | none | none | Draft |
+EOF
+
 echo "old inbox note" > "$W/99_inbox_(INB)/old_note.md"
 touch -t 202601010000 "$W/99_inbox_(INB)/old_note.md"
 
@@ -749,7 +848,7 @@ for code in filename-prefix frontmatter-missing frontmatter-malformed \
     req-duplicate req-criterion req-duplicate-global verifies-unknown-req \
     verifies-empty dec-status dec-superseded path-missing req-uncovered \
     inb-age duplicate-basename orphan id-duplicate id-scope-mismatch \
-    fence-host fence-record; do
+    fence-host fence-record section-near-miss section-mismatch; do
   TESTS=$((TESTS + 1))
   if contains "$out" "\[$code\]"; then ok x; else fail "violation vault: [$code] not detected"; fi
 done
@@ -821,6 +920,70 @@ TESTS=$((TESTS + 1))
 n=$(printf '%s' "$out" | grep -c "ARC_Leaky\.md.*\[code-fence\]") || true
 if [ "$n" -eq 2 ]; then ok x; else
   fail "every ARC fence must be ERROR, declared or not, got $n of 2"; fi
+
+# Near misses: a heading the author DID write under a title the template
+# does not carry. Every assertion is file-scoped and names the LINE, because
+# the defect being fixed is precisely that the old message named a string
+# the author could not find in the file.
+TESTS=$((TESTS + 1))
+if contains "$out" "^WARN .*IMP_Case_Drift\.md:7 \[section-near-miss\].*template 'Context' vs 'context' (line 7)"; then
+  ok x; else fail "a case-only heading must WARN [section-near-miss] naming both spellings and the line"; fi
+# ... and must NOT be reported as an unwritten section, which is the whole point
+TESTS=$((TESTS + 1))
+if ! contains "$out" "IMP_Case_Drift\.md.*\[template-sections\]"; then ok x; else
+  fail "a case-only heading must not be reported as a missing section"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "^ERROR .*\[section-near-miss\]"; then ok x; else
+  fail "section-near-miss must never be an ERROR - the section is present"; fi
+
+# A qualifier is a differently scoped section: still unmet, but diagnosable.
+TESTS=$((TESTS + 1))
+if contains "$out" "^ERROR .*IMP_Qualifier\.md:13 \[section-mismatch\].*template 'Implementation' vs 'Implementation - Iteration 0' (line 13)"; then
+  ok x; else fail "a qualifier heading must ERROR [section-mismatch] naming both spellings and the line"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "IMP_Qualifier\.md.*\[template-sections\]"; then ok x; else
+  fail "a heading present under a qualifier must not also be listed as never written"; fi
+# One grouped finding per file per class - the aggregation convention of
+# amendment 2026-07-27, and what keeps the per-file ratchet counts in {0,1}.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -c "IMP_Qualifier\.md.*\[section-mismatch\]") || true
+if [ "$n" -eq 1 ]; then ok x; else
+  fail "two qualifier headings must produce exactly ONE finding, got $n"; fi
+
+# The other direction: the file's title is shorter than the template's.
+TESTS=$((TESTS + 1))
+if contains "$out" "^ERROR .*ARC_Reverse\.md:26 \[section-mismatch\].*template 'Allocation and Verification' vs 'Allocation' (line 26)"; then
+  ok x; else fail "a shortened heading must ERROR [section-mismatch] naming both spellings and the line"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "ARC_Reverse\.md.*\[template-sections\]"; then ok x; else
+  fail "a heading present in shortened form must not be listed as never written"; fi
+
+# The boundary rule's negative control: a longer WORD is a different word,
+# not a scoped variant, and stays a genuine absence.
+TESTS=$((TESTS + 1))
+if contains "$out" "IMP_Word_Extension\.md.*\[template-sections\].*'Context'"; then ok x; else
+  fail "'Contexts' must stay a genuine absence of 'Context'"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "IMP_Word_Extension\.md.*section-mismatch" \
+   && ! contains "$out" "IMP_Word_Extension\.md.*section-near-miss"; then ok x; else
+  fail "'Contexts' must not be classified as a near miss of 'Context'"; fi
+
+# Which spelling and which line a near miss names must not depend on set
+# iteration order - two headings extend the same requirement here, and the
+# hash seed is what used to decide the winner.
+a=$(PYTHONHASHSEED=0 python3 "$VALIDATOR" "$W" 2>&1 | grep "IMP_Qualifier\.md.*section-mismatch")
+b=$(PYTHONHASHSEED=1 python3 "$VALIDATOR" "$W" 2>&1 | grep "IMP_Qualifier\.md.*section-mismatch")
+TESTS=$((TESTS + 1))
+if [ "$a" = "$b" ] && [ -n "$a" ]; then ok x; else
+  fail "the near-miss finding must be identical under different hash seeds"; fi
+
+# Near misses are counted separately in the run summary, so that formatting
+# drift across a domain does not read as a batch of unwritten sections.
+near_n=$(printf '%s' "$out" | grep -cE '\[(section-near-miss|section-mismatch)\]') || true
+sum_n=$(printf '%s' "$out" | sed -n 's/^-- .*, \([0-9][0-9]*\) near miss(es)$/\1/p')
+TESTS=$((TESTS + 1))
+if [ -n "$sum_n" ] && [ "$sum_n" = "$near_n" ] && [ "$near_n" -gt 0 ]; then ok x; else
+  fail "summary must count near misses separately, got '$sum_n' vs $near_n findings"; fi
 
 # undeclared frontmatter keys: reported, grouped into ONE line, and naming
 # every unknown key. WARN and never ERROR - the check cannot tell a typo from
@@ -1170,6 +1333,23 @@ Thermal module. Deleted from the worktree further below, after being
 committed, so that its identifier is the one that vanishes.
 EOF
 
+# Committed WITH its qualifier heading, so the near-miss ERROR is part of
+# this file's git HEAD state. The stop gate must therefore not treat it as
+# introduced this session - the ratchet is what keeps a new finding class
+# from blocking on legacy content.
+cat > "$I/03_architecture_(ARC)/ARC_Qualifier.md" <<'EOF'
+---
+domain: ARC
+id: ARC-THM-002
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context (draft)
+Architecture note whose required heading carries a qualifier, committed in
+that state. Its section-mismatch ERROR is pre-existing, not introduced.
+EOF
+
 # Unborn HEAD: a repository without a single commit must not crash the
 # validator. Exit 2 would make both hooks fail open - enforcement silently off.
 hgit init -q
@@ -1197,6 +1377,24 @@ out=$(python3 "$VALIDATOR" "$I" 2>&1); rc=$?
 TESTS=$((TESTS + 1))
 if [ $rc -ne 2 ] && ! contains "$out" "id-vanished"; then ok x; else
   fail "clean worktree must report no vanished identifier, got rc=$rc"; fi
+
+# A pre-existing near-miss ERROR must not block the stop gate. The baseline
+# is recomputed from git HEAD by the running validator, so a finding class
+# that did not exist when the file was committed still lands in the baseline
+# - this asserts that mechanism rather than assuming it.
+SIDR="testsession-ratchet-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
+      "/tmp/claude-mechdocs/blocks-$SIDR"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDR" \
+  "$I/03_architecture_(ARC)/ARC_Qualifier.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+rout=$(printf '{"session_id":"%s"}' "$SIDR" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$rout" '"decision": "block"'; then ok x; else
+  fail "a pre-existing section-mismatch must not block the stop gate:"
+  printf '%s\n' "$rout" | sed 's/^/    /'
+fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
+      "/tmp/claude-mechdocs/blocks-$SIDR"
 
 # The object disappears from the worktree while HEAD still carries it.
 rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md"
@@ -1355,6 +1553,47 @@ for abbr, entry in schema["domains"].items():
     assert not extra, f"{abbr} declares {extra} outside the shared vocabulary"
 PY
 then ok x; else fail "a domain-exclusive field breaks language symmetry of the undeclared check"; fi
+
+# ==========================================================================
+# Fixture 6: a template whose own required headings are prefixes of each
+# other. No vault has such a pair today (measured across all six), so only a
+# fixture can keep the classification deterministic and sane: writing the
+# longer section must not silently satisfy the shorter requirement.
+# ==========================================================================
+PF_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP" "$SC_TMP" "$PF_TMP"' EXIT
+
+PF="$PF_TMP/Prefixproj/00_documentation/01_projectvault"
+mkdir -p "$PF/03_architecture_(ARC)" "$PF/06_implementation_(IMP)" \
+         "$PF/09_references_(REF)"
+printf '## Kontext\n## Kontext und Ziel\n' > "$PF/03_architecture_(ARC)/00_ARC_file_template.md"
+printf '## Kontext\n' > "$PF/06_implementation_(IMP)/00_IMP_file_template.md"
+printf '## Kontext\n' > "$PF/09_references_(REF)/00_REF_file_template.md"
+
+cat > "$PF/03_architecture_(ARC)/ARC_Prefix.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Kontext und Ziel
+Architecture note carrying only the longer of two required headings whose
+shorter form is a prefix of it. The shorter one is genuinely not written.
+EOF
+
+out=$(python3 "$VALIDATOR" "$PF" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -ne 2 ]; then ok x; else
+  fail "a template with prefix-related required headings must not crash the validator"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "ARC_Prefix\.md.*\[section-mismatch\].*template 'Kontext' vs 'Kontext und Ziel' (line 7)"; then
+  ok x; else fail "the unwritten shorter requirement must be reported against the longer heading:"
+  printf '%s\n' "$out" | grep ARC_Prefix | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "ARC_Prefix\.md.*\[template-sections\]"; then ok x; else
+  fail "the longer heading is written exactly and must not be reported missing"; fi
 
 # ==========================================================================
 # Hook modes (violation vault, synthetic payloads)

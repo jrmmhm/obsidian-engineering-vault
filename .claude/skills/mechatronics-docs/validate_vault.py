@@ -27,6 +27,7 @@ import re
 import subprocess
 import sys
 import time
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -95,6 +96,18 @@ ARTIFACT_SEG_RE = re.compile(r"^\d{2}_")
 # Explicit open-item markers suppress the body-wide dead-path WARN only -
 # never the References/Sources ERROR (silent-bypass prevention).
 PENDING_RE = re.compile(r"\b(pending|planned|tbd|not\s+yet)\b", re.I)
+
+# Findings about a section the author DID write, under a title the template
+# does not carry. Counted separately in the run summary, because formatting
+# drift across a domain must not read as a batch of unwritten sections.
+NEAR_MISS_CODES = ("section-near-miss", "section-mismatch")
+# Characters that render as nothing and would otherwise make two identical
+# headings compare unequal.
+ZERO_WIDTH = dict.fromkeys(map(ord, "​‌‍⁠﻿"), None)
+# What may follow a required heading inside a longer one for the two to be
+# the same subject at a different scope: anything that is not a word
+# character. 'Ablauf (monatlich)' qualifies, 'Kontexte' does not.
+BOUNDARY_RE = re.compile(r"\W")
 
 _UNITS = (
     "mV|kV|V|mA|µA|uA|kΩ|MΩ|Ω|kOhm|MOhm|Ohm|mW|kW|W|kHz|MHz|GHz|Hz|Nm|mN|"
@@ -426,6 +439,60 @@ def extract_h2(text: str):
     return {l[3:].strip() for l in text.splitlines() if l.startswith("## ")}
 
 
+def h2_index(lines):
+    """H2 headings of a file -> the first line each sits on, in document order.
+
+    The set extract_h2 returns cannot say WHERE a heading is, and a finding
+    about a heading the author actually wrote is only usable if it names the
+    line. A heading written twice keeps its first occurrence: that is the one
+    the reader reaches first.
+    """
+    idx = {}
+    for i, line in enumerate(lines, 1):
+        if line.startswith("## "):
+            idx.setdefault(line[3:].strip(), i)
+    return idx
+
+
+def strict_key(s: str):
+    """Heading identity, ignoring what the author cannot see.
+
+    NFC/NFD spelling of an umlaut differs between macOS and Linux, a
+    zero-width character renders as nothing, and doubled or exotic
+    whitespace collapses in every Markdown renderer. Two headings differing
+    only there ARE the same heading, and reporting that difference would be
+    a finding nobody can act on.
+    """
+    s = unicodedata.normalize("NFC", s).translate(ZERO_WIDTH)
+    return unicodedata.normalize("NFC", " ".join(s.split()))
+
+
+def fold_key(s: str):
+    """Heading identity for caseless matching (Unicode 15.0 §3.13, D144).
+
+    str.casefold implements toCasefold, and normalising AFTER folding is
+    what D145 asks for: casefold('İ') yields 'i' plus a combining dot.
+    Folding is not lowercasing - it also maps 'ß' to 'ss', so a near-miss
+    message quotes both spellings verbatim rather than claiming that only
+    the case differs.
+    """
+    return unicodedata.normalize("NFC", strict_key(s).casefold())
+
+
+def prefix_related(a: str, b: str):
+    """True when one folded heading extends the other at a word boundary.
+
+    'Ablauf' vs 'Ablauf (monatlich)' and 'Zuordnung' vs 'Zuordnung und
+    Verifikation' - the same subject at a different scope, in either
+    direction. 'Kontext' vs 'Kontexte' is a different word and must not
+    qualify, which is what the boundary test buys. Equal length is never
+    related: that case is equality, and it is handled before this is asked.
+    """
+    short, long = (a, b) if len(a) < len(b) else (b, a)
+    return (len(short) < len(long) and long.startswith(short)
+            and bool(BOUNDARY_RE.match(long[len(short):])))
+
+
 def fence_info(line: str):
     """Info string of a fence line, or None when the line is not a fence.
 
@@ -707,21 +774,90 @@ def check_undeclared(vault, fm, abbr, path, findings):
                                 "vault_schema.json if it is intended"))
 
 
+def classify_sections(template_h2, file_h2):
+    """One template's required H2s against one file's H2s.
+
+    -> (absent, mismatch, near_miss). Three outcomes rather than two,
+    because a heading the author wrote and a heading nobody wrote are
+    different defects and only one of them is fixable by writing a section:
+
+    - written identically up to invisible differences: met, reported nowhere
+    - written case-folding-equal ('allgemeine Übersicht'): met, near miss
+    - written as a longer or shorter variant sharing a prefix at a word
+      boundary ('Ablauf (monatlich)', 'Zuordnung'): NOT met, mismatch - a
+      differently scoped section is a different section, and the template's
+      title is the anchor the schema binds relations to
+    - anything else: absent
+
+    Iteration is sorted and the file side keeps first occurrences, so which
+    spelling and which line a finding names never depends on set order.
+    """
+    strict, folded = {}, {}
+    for h, line in file_h2.items():
+        strict.setdefault(strict_key(h), (h, line))
+        folded.setdefault(fold_key(h), (h, line))
+    absent, mismatch, near = [], [], []
+    for req in sorted(template_h2):
+        if not req.strip():
+            continue        # a bare '## ' in a template requires nothing
+        if strict_key(req) in strict:
+            continue
+        fold = fold_key(req)
+        if fold in folded:
+            h, line = folded[fold]
+            near.append((req, h, line))
+            continue
+        related = sorted((line, h) for k, (h, line) in folded.items()
+                         if prefix_related(fold, k))
+        if related:
+            line, h = related[0]
+            mismatch.append((req, h, line))
+        else:
+            absent.append(req)
+    return absent, mismatch, near
+
+
+def render_headings(pairs):
+    return "; ".join(f"template '{req}' vs '{h}' (line {line})"
+                     for req, h, line in pairs)
+
+
 def check_sections(vault, abbr, path, lines, findings):
     templates = vault.templates_for(abbr)
     if not templates:
         return  # domain without templates (e.g. ADM): nothing to enforce
-    file_h2 = extract_h2("\n".join(lines))
-    best_missing, best_name = None, None
+    file_h2 = h2_index(lines)
+    best = None
     for tname, th2 in templates:
-        missing = th2 - file_h2
-        if best_missing is None or len(missing) < len(best_missing):
-            best_missing, best_name = missing, tname
-        if not missing:
+        absent, mismatch, near = classify_sections(th2, file_h2)
+        # Unmet promises decide which template a file was written from;
+        # near misses only break a tie, so a file matching one template
+        # loosely never outranks one it satisfies.
+        score = (len(absent) + len(mismatch), len(near))
+        if best is None or score < best[0]:
+            best = (score, tname, absent, mismatch, near)
+        if score == (0, 0):
             return
-    findings.append(Finding("ERROR", "template-sections", str(path), None,
-                            f"missing required sections {sorted(best_missing)} "
-                            f"(closest template: {best_name})"))
+    _, tname, absent, mismatch, near = best
+    if absent:
+        findings.append(Finding("ERROR", "template-sections", str(path), None,
+                                f"missing required sections {sorted(absent)} "
+                                f"(closest template: {tname})"))
+    if mismatch:
+        findings.append(Finding("ERROR", "section-mismatch", str(path),
+                                min(e[2] for e in mismatch),
+                                "required section(s) written under a different title: "
+                                + render_headings(mismatch)
+                                + " - a qualifier makes it a differently scoped "
+                                  "section; keep the template's title and put the "
+                                  "qualifier in a '###' below it"))
+    if near:
+        findings.append(Finding("WARN", "section-near-miss", str(path),
+                                min(e[2] for e in near),
+                                "required section(s) spelled differently: "
+                                + render_headings(near)
+                                + " - counted as present; the template's spelling "
+                                  "is what a reader and a search look for"))
 
 
 def check_length(path, lines, findings):
@@ -1506,9 +1642,14 @@ def main(argv):
 
     errors = [f for f in findings if f.sev == "ERROR"]
     warns = [f for f in findings if f.sev == "WARN"]
+    # Counted separately, not subtracted: a near miss is still an ERROR or a
+    # WARN in its own right. The number answers "how much of this is drift
+    # against my own templates rather than unwritten sections?"
+    near = [f for f in findings if f.code in NEAR_MISS_CODES]
     for f in findings:
         print(f.render())
-    print(f"-- {len(errors)} error(s), {len(warns)} warning(s)")
+    print(f"-- {len(errors)} error(s), {len(warns)} warning(s), "
+          f"{len(near)} near miss(es)")
     return 1 if errors else 0
 
 
