@@ -121,10 +121,27 @@ The worked example under
 checks the identifiers it can see: the same value on two files is an
 error, and a value that was present in the last commit but is gone now is
 reported. It does not require an identifier — a file without one is not a
-finding — and it does not read the relations: the relation kinds are
-declared so that a reader and a future export know what an annotated link
-means, but nothing walks them into a graph yet. Every schema entry states
-which of the two it is, and that flag is what the validator acts on.
+finding — and it does not read the relations at all.
+
+The relations have a second reader instead. `export_traceability.py`,
+beside the validator, walks them into a graph and writes the vault out as
+a traceability report. Two consequences for the way you write:
+
+The **section title is the address**, not the table's header row. A
+relation table is found by the section its domain template declares, so
+retitling `## Allocation and Verification` removes every relation it
+carried, while reformatting the header row costs nothing but a note in
+the export. This is why a differently titled section is an error and a
+differently spelled one is only a warning.
+
+Everything the export cannot resolve **becomes a line in the report**
+rather than disappearing from it: a requirement ID nobody defined, a
+table in a section no template declares, a status the schema does not
+list, a range reaching past the last requirement. The export is allowed
+to say that a vault is incomplete; it is not allowed to look complete
+because something failed quietly. Schema entries flagged `export-driven`
+are read by it and produce no validator finding — the exporter reports,
+it never blocks.
 
 ### Self-containedness
 The first lines of the Context section must situate the file on their

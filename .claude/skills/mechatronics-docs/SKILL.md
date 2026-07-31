@@ -71,6 +71,23 @@ template does not carry is a different matter: `## Ablauf (monatlich)` and
 section, and the heading is the anchor other notes bind to. Keep the
 template's title and put the qualifier in an `###` below it.
 
+A second tool beside the validator reads the same schema for a different
+purpose. `export_traceability.py` walks the declared relations into a
+graph and writes the vault out as a traceability artifact:
+
+```bash
+python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        <VAULT_ROOT> --output-dir <DIR outside the vault>
+```
+
+It produces a self-contained HTML report, two CSV views and a JSON graph.
+Every reverse relation in them is computed, never read from a file. Run
+it when the user asks for a traceability matrix, a coverage overview, or
+something to hand to a reviewer — and read its findings section as you
+would the validator's: an unbound table, an unresolved requirement ID or
+an unknown domain abbreviation each mean the export understood less of
+the vault than it looks like it did. The exporter never blocks a turn.
+
 Two further tiers run the same validator without Claude Code, so a change
 authored in Obsidian or by hand is covered too: a pre-commit hook
 (`hooks/pre_commit_vault.sh`, install by symlinking it to
