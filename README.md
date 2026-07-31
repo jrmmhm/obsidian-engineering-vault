@@ -147,6 +147,10 @@ logistics and `99_inbox_(INB)` for unclassified raw material.
 - **A validator** that checks naming, required sections, frontmatter,
   wikilink and artifact-path integrity, requirement-table format, REQ↔TAE
   coverage, and implementation details leaking into architecture files.
+- **A traceability exporter** that reads the vault into a graph and writes it
+  out as a report, two CSV views and a JSON graph — both directions of the
+  requirement-to-evidence matrix, with what is unproven stated rather than left
+  as an empty cell.
 - **A Claude Code skill** that writes into the vault under those rules, gated
   by hooks that run the validator after every write.
 - **The surrounding project structure** — hardware, software, test data,
@@ -252,6 +256,58 @@ bash .claude/skills/mechatronics-docs/tests/run.sh
 
 ---
 
+## Handing it to someone else
+
+The vault is readable in Obsidian or as raw Markdown, which is no help to a
+reviewer, an examiner or an auditor who has not been taught the method. One
+command turns it into something that is:
+
+```bash
+python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        00_documentation/01_projectvault --output-dir ../traceability
+```
+
+It writes four files: a self-contained `traceability.html` report, a
+requirement-centric `traceability_requirements.csv`, an edge-list
+`traceability_edges.csv` that pivots into either direction, and
+`traceability.json` carrying the whole graph. Standard library only, like the
+validator.
+
+Three things make it worth reading rather than filing.
+
+**Both directions, and only one of them is written down.** Requirement to
+evidence comes from the allocation table; evidence to requirement is computed
+from the same edges in one pass. No note in the vault stores a back-link, so
+nothing can drift, and the JSON marks which fields were authored and which
+were derived.
+
+**What is unproven is stated, not left as an empty cell.** A requirement that
+nothing allocates, an allocation that never reached `Verified`, a status
+carrying a qualifier, an evidence note that does not name the requirement it
+is linked from — each is a row with a reason, in its own section at the top of
+the report. ISO 26262-8 asks for the reasons of verification steps not
+executed, and ECSS-E-ST-10-02C for a close-out status with its justification;
+an empty cell answers neither.
+
+**It does not quietly understand less than it claims.** A table in a section no
+template declares, an identifier that exists nowhere, a domain folder the alias
+map does not know: all reported. A range like `REQ-BAT-001 bis REQ-BAT-009` is
+expanded only when every identifier it yields actually exists.
+
+The export is not Markdown, so it does not belong in the vault — the exporter
+refuses to write there. `00_documentation/02_documents/` is its home when you
+want to keep a dated revision; anywhere outside the project works for a
+throwaway one.
+
+> **A note on the CSV.** Values are written exactly as the vault spells them,
+> including a cell that begins with `=`. OWASP records that the usual
+> formula-injection prefixes may not survive a spreadsheet round-trip, so a
+> prefix would corrupt the record without closing the hole. Open the CSV
+> through your spreadsheet's text-import path rather than by double-clicking
+> it.
+
+---
+
 ## Repository layout
 
 ```
@@ -267,7 +323,7 @@ bash .claude/skills/mechatronics-docs/tests/run.sh
 ├── 90_administration/      non-engineering project material
 ├── 99_archive/             superseded content, kept not deleted
 └── .claude/skills/mechatronics-docs/
-                            the documentation skill, validator and tests
+                            the documentation skill, validator, exporter and tests
 ```
 
 Full rules for what belongs where — including the two distinctions that trip
