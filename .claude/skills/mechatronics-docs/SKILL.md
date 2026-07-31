@@ -59,6 +59,18 @@ deliberate plugin field — but a mistyped one is the single frontmatter
 defect that fails completely silently, so do not wave it through: either
 fix the spelling or declare the field in the schema.
 
+Which H2 sections a file must carry is derived from that domain's own
+`00_*template*` file. The comparison ignores case and invisible differences
+(umlaut encoding, zero-width characters, collapsed whitespace), so a section
+written `## allgemeine Übersicht` counts as present — it is reported as
+`section-near-miss` (WARN) naming both spellings and the line, because the
+template's spelling is what a reader and a search look for. A title the
+template does not carry is a different matter: `## Ablauf (monatlich)` and
+`## Zuordnung` for a required `## Zuordnung und Verifikation` are
+`section-mismatch` (ERROR) — a differently scoped section is a different
+section, and the heading is the anchor other notes bind to. Keep the
+template's title and put the qualifier in an `###` below it.
+
 Two further tiers run the same validator without Claude Code, so a change
 authored in Obsidian or by hand is covered too: a pre-commit hook
 (`hooks/pre_commit_vault.sh`, install by symlinking it to
