@@ -72,6 +72,32 @@ field — Obsidian's own `tags`, `aliases`, `cssclasses` and the
 effect nowhere. Adding a field to the vault's vocabulary is an edit to
 the schema file, not a change to the validator.
 
+### Section headings
+The H2 headings a file must carry are the ones its domain template
+declares. Write them as the template spells them: the heading is the
+address other notes, searches and the relation bindings use, so its
+spelling is part of the contract, not decoration.
+
+The validator compares forgivingly where the difference is invisible or
+cosmetic and strictly where it changes meaning. Case, umlaut encoding,
+zero-width characters and collapsed whitespace do not make a section
+missing — a file writing `## allgemeine Übersicht` for a template's
+`## Allgemeine Übersicht` has the section, and gets a `section-near-miss`
+WARN naming both spellings and the line. A title the template does not
+carry is a different section: `## Ablauf (Monatlich empfohlen)` for a
+required `## Ablauf`, or `## Zuordnung` for a required
+`## Zuordnung und Verifikation`, is a `section-mismatch` ERROR. Keep the
+template's title and put the qualifier one level down:
+
+```markdown
+## Ablauf
+### Monatlich empfohlen
+```
+
+Only H2 headings are compared, and only against the template of the file's
+own domain. A required section written as `###` is reported as missing,
+because the level is what makes it a section rather than a subsection.
+
 ### Identifiers and typed relations
 Every domain file also carries `id`, of the form `DOMAIN-SCOPE-NNN` — the
 folder abbreviation, the subsystem token the matching REQ file carries in
