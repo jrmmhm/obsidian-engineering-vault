@@ -568,6 +568,28 @@ Requirement file carrying one stray, never closed fence marker.
 | Q | 007 | stray fence must not hide this | Pass if measured | none |
 EOF
 
+# A pipe inside a cell, escaped the way Obsidian requires inside a table.
+# Splitting on it shifts every column behind it, which is how the empty
+# acceptance criterion below used to disappear: the next column moved into
+# it and req-criterion - a blocking code - stopped firing (issue #22). The
+# second row carries the escape inside a code span, where GFM keeps it just
+# as much, and must stay free of findings.
+cat > "$W/01_requirements_(REQ)/REQ_Escaped (ESC).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file whose rows carry a pipe inside a cell.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| M | 001 | value a \| b in one cell | | none |
+| M | 002 | `ss -tlnp \| grep :8097` | Pass if the port listens | none |
+EOF
+
 cat > "$W/02_decisions_(DEC)/DEC_Bad.md" <<'EOF'
 ---
 domain: DEC
@@ -1008,6 +1030,23 @@ done
 TESTS=$((TESTS + 1))
 if contains "$out" "REQ_Stray (STR)\.md.*\[req-class\]"; then ok x; else
   fail "an unclosed fence must not silence req-class below it"; fi
+
+# An escaped pipe must not shift the columns behind it (issue #22). The row
+# with the empty acceptance criterion is the assertion that carries the
+# change: while the split moved the next column into it, the criterion was
+# never empty and this blocking finding did not exist.
+TESTS=$((TESTS + 1))
+if contains "$out" "REQ_Escaped (ESC)\.md:12 \[req-criterion\]"; then ok x; else
+  fail "an escaped pipe must not fill an empty acceptance criterion:"
+  printf '%s\n' "$out" | grep "REQ_Escaped" | sed 's/^/    /'
+fi
+# ... and the row whose criterion IS written must stay free of row findings,
+# escape inside a code span included. Otherwise the assertion above is also
+# satisfied by a splitter that reports every row.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -cE "REQ_Escaped \(ESC\)\.md:13 \[(req-class|req-nnn|req-criterion|req-duplicate)\]") || true
+if [ "$n" -eq 0 ]; then ok x; else
+  fail "a complete row carrying an escaped pipe must produce no row finding, got $n"; fi
 # The row the quoted block declares must not exist as a requirement at all -
 # not as a finding, and not in the index every TAE 'verifies:' is checked
 # against. Indexing it would let a quoted example prove a real requirement.
@@ -1983,6 +2022,74 @@ TESTS=$((TESTS + 1))
 if contains "$(cat "$EX_TMP/out-unknown/traceability.json")" "export-unknown-domain"; then
   ok x; else fail "a domain abbreviation the alias map does not know must be reported"; fi
 rm -rf "$EN_V/06_unknown_(XYZ)"
+
+# ==========================================================================
+# The cell splitter against the GFM tables extension, which is the only
+# authority either tool has for what a row is made of. Examples 200 and 204
+# are quoted verbatim from the spec; the rest are the shapes the seven
+# vaults on this machine actually contain. Sharing is asserted by identity,
+# not by comparison: a re-added local copy in the exporter would pass every
+# behavioural assertion below and still be the defect this fixes.
+# ==========================================================================
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv, export_traceability as ex
+
+assert vv.split_cells is ex.split_cells, "the exporter re-declared split_cells"
+assert vv.is_separator is ex.is_separator, "the exporter re-declared is_separator"
+
+sc, row, un = vv.split_cells, vv.parse_table_row, ex.unescape
+
+# GFM example 200: an escaped pipe divides nothing, inside an inline span
+# or outside one, and resolves to a literal pipe in the cell's text.
+assert sc(r'| f\|oo  |') == [r'f\|oo']
+assert sc(r'| b `\|` az |') == [r'b `\|` az']
+assert sc(r'| b **\|** im |') == [r'b **\|** im']
+assert un(sc(r'| f\|oo  |')[0]) == 'f|oo'
+# ... and the other half of the same sentence: an UNESCAPED pipe divides
+# even inside a code span. A splitter that merely skipped backticks would
+# pass every line above and fail this one.
+assert sc('| a `x|y` b |') == ['a `x', 'y` b']
+
+# GFM example 204: a short body row is padded to the header's width, a long
+# one is cut to it. ncols never turns a non-row into a row.
+assert sc('| bar |', 2) == ['bar', '']
+assert sc('| bar | baz | boo |', 2) == ['bar', 'baz']
+assert sc('prose', 4) is None
+
+# An escaped backslash no longer escapes the pipe, so the pipe divides.
+# cmark-gfm renders this the other way (github/cmark-gfm#277, unanswered);
+# the spec is what both tools follow.
+assert sc(r'| a \\| b |') == [r'a \\', 'b']
+
+# The closing delimiter is recognised, not cut off the raw text: a row
+# ending in a deliberate escaped pipe keeps it.
+assert sc(r'| a | b \|') == ['a', r'b \|']
+# ... while a genuinely empty last column survives.
+assert sc('| a | b |  |') == ['a', 'b', '']
+
+# Obsidian requires the pipe of an aliased wikilink to be escaped inside a
+# table (obsidian.md/help/advanced-syntax). The alias must stay in its cell.
+assert un(sc(r'| [[TAE_X\|proof]] | REQ-BAT-001 | a | Verified |')[0]) \
+    == '[[TAE_X|proof]]'
+
+# A code span holding a lone backslash directly before a delimiter - a real
+# row from the homelab vault, and the shape that decides whether the escape
+# scan swallows the delimiter behind it.
+assert sc(r'| Zeichen | `(` | `\` | `\|` | `~` |') == \
+    ['Zeichen', '`(`', r'`\`', r'`\|`', '`~`']
+
+# The row predicate is shared with the exporter. GFM leaves the trailing
+# pipe optional, a separator row is no row, and a line whose only interior
+# pipes are escaped has one column - which neither tool has ever read.
+assert row('| a | b') == ['a', 'b']
+assert row('| --- | --- |') is None and row('| :--- | ---: |') is None
+assert row('|-- huart == &huart3?') is None
+assert row(r'| f\|oo  |') is None
+PY
+then ok x; else fail "the shared cell splitter must follow the GFM tables extension"; fi
 
 # ==========================================================================
 # The two tools must agree about where a fenced block starts. Amendment
