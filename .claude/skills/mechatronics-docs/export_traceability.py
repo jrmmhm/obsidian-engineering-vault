@@ -49,8 +49,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from validate_vault import (  # noqa: E402
-    DOMAIN_DIR_RE, Vault, _dict, _strlist, fold_key, is_vault_root,
-    load_schema, parse_frontmatter, template_files,
+    DOMAIN_DIR_RE, Vault, _dict, _strlist, fold_key, is_separator,
+    is_vault_root, load_schema, parse_frontmatter, split_cells,
+    template_files,
 )
 
 EXPORT_SCHEMA_VERSION = "1.0"
@@ -122,40 +123,6 @@ def fenced_mask(lines):
         elif open_char is not None:
             mask[i] = True
     return mask
-
-
-def split_cells(line):
-    """Cells of a Markdown table row, or None when the line is not one.
-
-    GFM: 'Include a pipe in a cell's content by escaping it, including
-    inside other inline spans.' An unescaped pipe therefore splits even
-    inside a code span, and \\| does not split - which is the opposite of
-    what a plain split('|') does in both directions.
-    """
-    s = line.strip()
-    if not s.startswith("|"):
-        return None
-    cells, buf, i = [], [], 0
-    body = s[1:-1] if s.endswith("|") and len(s) > 1 else s[1:]
-    while i < len(body):
-        c = body[i]
-        if c == "\\" and i + 1 < len(body):
-            buf.append(body[i:i + 2])
-            i += 2
-            continue
-        if c == "|":
-            cells.append("".join(buf).strip())
-            buf = []
-            i += 1
-            continue
-        buf.append(c)
-        i += 1
-    cells.append("".join(buf).strip())
-    return cells
-
-
-def is_separator(cells):
-    return bool(cells) and all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c)
 
 
 def unescape(cell):
@@ -370,9 +337,11 @@ def bound_tables(lines, section_title, ncols):
             taking = True
             rows.append(("header", cells, i + 1))
             continue
-        if ncols and len(cells) < ncols:
-            cells = cells + [""] * (ncols - len(cells))
-        rows.append(("row", cells[:ncols] if ncols else cells, i + 1))
+        # Body rows are read to the header's width: GFM inserts empty cells
+        # for a short row and drops the excess of a long one (example 204).
+        # The header above is matched unpadded on purpose - its raw column
+        # count is what tells two same-titled tables apart.
+        rows.append(("row", split_cells(line, ncols), i + 1))
     return rows
 
 
