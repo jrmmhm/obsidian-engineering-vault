@@ -28,6 +28,23 @@ jobs:
       - name: Template vault audit
         run: python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault
 
+      # An export is evidence only if it is reproducible. Running it twice and
+      # diffing is the property itself, not a proxy for it: unsorted iteration
+      # is what made Sphinx-Needs' needs.json undiffable until they fixed it.
+      - name: Traceability export is deterministic
+        run: |
+          # The same output directory twice, with the first run copied aside.
+          # Two different directories would differ in the provenance block's
+          # command line, which is a true record and not a determinism defect.
+          python3 .claude/skills/mechatronics-docs/export_traceability.py \
+            00_documentation/01_projectvault --output-dir "$RUNNER_TEMP/tr" \
+            --no-timestamp
+          cp -r "$RUNNER_TEMP/tr" "$RUNNER_TEMP/tr-ref"
+          python3 .claude/skills/mechatronics-docs/export_traceability.py \
+            00_documentation/01_projectvault --output-dir "$RUNNER_TEMP/tr" \
+            --no-timestamp
+          diff -r "$RUNNER_TEMP/tr-ref" "$RUNNER_TEMP/tr"
+
       # The worked example claims its evidence is the real output of a command.
       # Running that command here is what keeps the claim from decaying: both
       # the log and the evaluator are committed, so the check is reproducible

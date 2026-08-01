@@ -1,6 +1,6 @@
 {
-  "schema_version": "0.2",
-  "decision": "DECISIONS.md, amendments 2026-07-28b and 2026-07-28d",
+  "schema_version": "0.3",
+  "decision": "DECISIONS.md, amendments 2026-07-28b, 2026-07-28d and 2026-07-31b",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",
     "which named relations exist between objects. validate_vault.py READS this",
@@ -8,13 +8,40 @@
     "taken from here, not from Python literals. Adding a field is an edit to",
     "this file, not a code change - which is what issue #4 asked for.",
     "Every entry carries an 'enforced' flag, and the flag is the switch, not a",
-    "comment: see enforcement_levels."
+    "comment: see enforcement_levels.",
+    "Since amendment 2026-07-31b this file has TWO readers. validate_vault.py",
+    "reads the field vocabulary and the value lists; export_traceability.py",
+    "reads the relations, the table bindings and the domain aliases. An entry",
+    "flagged 'export-driven' is read by the exporter and by nothing else: it",
+    "shapes a report, never a finding that blocks a turn."
   ],
 
   "enforcement_levels": {
     "schema-driven": "The validator reads this entry from this file. Changing the entry changes what is enforced, with no code change.",
     "validator-internal": "The rule lives in validate_vault.py and this file only describes it. Every occurrence names why it was not moved.",
+    "export-driven": "export_traceability.py reads this entry. It shapes the exported graph and the report, and it never produces a validator finding - the exporter reports, it does not block.",
     "declared-only": "Nothing enforces this. It is declared so that readers - and the undeclared-field check - know the name exists."
+  },
+
+  "domain_aliases": {
+    "note": "A vault written in another language spells its domain folders differently, and every role in this file is written with the English token. This map is the translation, and it is the reason the exporter finds a graph in a German vault at all: without it, 'the requirements domain' resolves to nothing, which is exactly what Vault.req_index() does today when it asks for the folder abbreviation REQ.",
+    "decision": "Follow-up 4 of amendment 2026-07-28, unbundled from the convention rollout that blocked it there. It was deliberately not shipped with the validator because requiring 'verifies' in a German evidence domain would have raised 38 ERRORs on a vault that never had the convention. The exporter has no such problem: it reports and never blocks.",
+    "map": {
+      "ANF": "REQ",
+      "ENT": "DEC",
+      "KMP": "CMP",
+      "SST": "IFC",
+      "TUE": "TAE",
+      "BUN": "OAU"
+    },
+    "not_an_alias": "TST appears in six homelab and two verdantia allocation-table headers as 'Verifikation (TST)', but no vault has ever had a TST folder - it is a stale column label, not a domain. It is deliberately absent here so the map cannot be read as evidence that such a domain exists.",
+    "identity": ["REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"],
+    "requirement_id_prefix": {
+      "rule": "The prefix of a requirement row identifier is the abbreviation of THAT vault's requirements domain, not the constant 'REQ'. homelab writes ANF-BAK-001 in its allocation tables and its rows must be indexed under the same string.",
+      "source": "the folder abbreviation whose alias resolves to REQ"
+    },
+    "unknown_abbreviation": "Reported as export-unknown-domain and excluded from the graph. Never guessed: a silent guess is how an export starts describing a vault it did not understand.",
+    "enforced": "export-driven"
   },
 
   "discovery": {
@@ -216,26 +243,46 @@
   },
 
   "table_bindings": {
-    "note": "A relation table is recognised by its header row, not by the heading above it. Files whose name starts with 00_ are excluded: templates and READMEs carry the same header signature with illustrative rows pointing at objects that do not exist.",
+    "note": "A relation table is recognised by the SECTION it sits in, and the section title comes from the project's own 00_*template* file. Files whose name starts with 00_ are excluded from ingestion: templates and READMEs carry the same tables with illustrative rows pointing at objects that do not exist. They are read for one purpose only - to learn what this project's sections are called.",
+    "binding_discovery": {
+      "step_1": "Read the domain's own template files. For every H2 section that contains a table, record the section title and the table's header cells.",
+      "step_2": "Classify each template table by column count, and for the two four-column ARC tables by whether the last header cell case-folds to the status token: that cell is the one word which is spelled identically in every corpus measured (English 'Status', German 'Status'). The other four-column table is the interface table.",
+      "step_3": "In a real file, find the section whose title matches the template's, comparing with the same fold-insensitive rule check_sections uses, and take the first table inside it. Column roles are positional.",
+      "why_not_the_header": "Nothing enforces a header row, and the drift is already in the corpus: homelab's ARC template writes 'Verifikation (TUE)' while six of its fourteen ARC files write 'Verifikation (TST)'. A recognizer keyed on the header accepts 8 of 14 files and 73 of 148 allocation rows. The section title is enforced - check_sections reports a missing or retitled section as a blocking ERROR - and is present in 14 of 14. Measured 2026-07-31.",
+      "header_signature_role": "The declared header_signature below is no longer the binding. It is kept as corroboration: a bound table whose header does not match is still ingested, and the divergence is reported as export-header-drift so the vault can be tidied without any row being lost meanwhile.",
+      "unbound_table": "A table in a domain file that sits in no bound section is reported as export-unbound-table. An empty graph is never silent."
+    },
+    "status_token": "status",
     "exclude_filename_prefix": "00_",
     "arc_allocation_table": {
       "domain": "ARC",
       "header_signature": ["Submodule (ARC/CMP/IFC)", "Allocated Requirements (REQ-IDs)", "Verification (TAE)", "Status"],
       "column_roles": ["subject", "objects:allocates", "objects:evidence", "qualifier:status"],
-      "qualifier_values": ["Draft", "Approved", "Verified", "Deprecated", "Blocked"]
+      "qualifier_values": ["Draft", "Approved", "Verified", "Deprecated", "Blocked"],
+      "qualifier_proven_value": "Verified",
+      "qualifier_proven_note": "The one value that lets a requirement count as proven. Named here rather than inferred, because 'the last value in the list' and 'the longest one' are both accidents of how the list was written. The German vaults write these five values in English too, so the vocabulary needs no alias."
     },
     "arc_interface_table": {
       "domain": "ARC",
       "header_signature": ["Interface (IFC)", "Endpoint A", "Endpoint B", "Context"],
       "column_roles": ["subject", "object:connects", "object:connects", "note"]
     },
+    "arc_main_module_table": {
+      "domain": "ARC",
+      "columns": 2,
+      "header_signature": ["Submodule (ARC)", "Brief Description"],
+      "column_roles": ["object:contains", "note"],
+      "note": "The main-module template's submodule table. It is where an ARC-to-ARC edge is authored, and without it a requirement chain cannot roll up to its top-level module - PMDE nests 26 ARC files five levels deep this way."
+    },
     "req_table": {
       "domain": "REQ",
+      "columns": 5,
       "header_signature": ["Class (M/S/O)", "NNN", "Content", "Acceptance Criterion", "Source / Justification (REF/DEC)"],
-      "column_roles": ["qualifier:class", "subject", "text", "text", "objects:justified-by"]
+      "column_roles": ["qualifier:class", "subject", "text", "text", "objects:justified-by"],
+      "note": "Links are read from the justification column alone, never from the row. Two homelab requirement rows carry a wikilink inside the acceptance criterion, and a row-wide scan would turn those into justified-by edges that nobody authored."
     },
-    "enforced": "declared-only",
-    "enforced_detail": "Nothing reads these signatures yet, and no rule asserts that a vault's own tables still match them. Both belong with the consumer: the traceability export (issue #2) is what turns a signature into a graph, and a check reporting that extraction failed is meaningless while no extraction exists. The signatures remain language-dependent - a vault in another language matches none of them - which is why the fallback recorded in amendment 2026-07-28b is binding relations to the section position declared by the project's own 00_*template* file, the mechanism Vault.templates_for already uses."
+    "enforced": "export-driven",
+    "enforced_detail": "export_traceability.py reads these bindings; validate_vault.py still does not, and no rule asserts that a vault's own tables match the declared header signatures. That asymmetry is deliberate: the exporter produces a report, so a mis-bound table costs a finding in a document, whereas the same rule in the validator would block a turn on formatting drift the author may not own. Residual 4 of amendment 2026-07-28b - reformatting a header row silently removes every relation it carried - is closed by the section binding rather than by a validator rule."
   },
 
   "relations": {
@@ -247,7 +294,7 @@
       "reverse_key": "allocates_back",
       "outgoing": "allocates",
       "incoming": "is allocated to",
-      "enforced": "declared-only"
+      "enforced": "export-driven"
     },
     "evidence": {
       "subject_domains": ["ARC", "CMP", "IFC"],
@@ -258,7 +305,8 @@
       "outgoing": "is verified by",
       "incoming": "verifies the allocation of",
       "semantics": "A row with several requirements and several evidence notes states that the listed notes together cover the allocation. Which note proves which requirement is answered by 'verifies', not by this relation.",
-      "enforced": "declared-only"
+      "qualifier_matching": "A status counts as the declared value only on an exact match. A cell that begins with a declared value and carries more text - homelab has 19 such rows across 17 distinct spellings, 'Verified (Rebuild: Draft)' among them - is reported as qualified, is NOT counted as proven, and its verbatim text becomes the close-out reason. Neither equality nor prefix matching alone is honest here: equality calls 'Verified (Rebuild: Draft)' unproven without saying why, and prefix matching calls 'Verified (bis 2026-07-25 verletzt)' proven.",
+      "enforced": "export-driven"
     },
     "verifies": {
       "subject_domains": ["TAE"],
@@ -278,7 +326,7 @@
       "outgoing": "is justified by",
       "incoming": "justifies",
       "note": "Issue #4 calls this kind 'references'. Named justified-by here after the REQ table column it is authored in ('Source / Justification'), because a bare 'references' would name the mechanism rather than the meaning - every relation in this file is a reference.",
-      "enforced": "declared-only"
+      "enforced": "export-driven"
     },
     "connects": {
       "subject_domains": ["IFC"],
@@ -288,7 +336,7 @@
       "reverse_key": "connects_back",
       "outgoing": "connects",
       "incoming": "is connected by",
-      "enforced": "declared-only"
+      "enforced": "export-driven"
     },
     "contains": {
       "subject_domains": ["ARC"],
@@ -298,7 +346,8 @@
       "reverse_key": "contains_back",
       "outgoing": "contains",
       "incoming": "belongs to",
-      "enforced": "declared-only"
+      "authored_in_secondary": "arc_main_module_table",
+      "enforced": "export-driven"
     },
     "test-object": {
       "subject_domains": ["TAE"],
@@ -307,7 +356,7 @@
       "reverse_key": "test-object_back",
       "outgoing": "was tested on",
       "incoming": "was the test object of",
-      "enforced": "declared-only"
+      "enforced": "export-driven"
     },
     "superseded-by": {
       "subject_domains": ["DEC"],
@@ -327,16 +376,16 @@
       "id": "evidence-covers-allocation",
       "statement": "For every allocation row, the requirements in the 'verifies' frontmatter of the referenced evidence notes should together cover the requirements allocated in that row.",
       "why": "'verifies' and 'evidence' are separate relations with separate subjects and can disagree without either being wrong on its own.",
-      "enforced": "declared-only",
+      "enforced": "export-driven",
       "owed_to_issue": 2,
-      "note": "Reassigned from issue #4 to issue #2: the rule compares two relations, and neither is extracted until something reads the allocation table into a graph. Issue #4 declares the relations; #2 builds the graph that makes this checkable."
+      "note": "Reported by the exporter as evidence-covers-allocation, never by the validator. The rule compares two relations, and neither is extracted until something reads the allocation table into a graph."
     },
     {
       "id": "verified-needs-evidence",
       "statement": "An allocation row with status 'Verified' must carry at least one evidence link.",
-      "enforced": "declared-only",
+      "enforced": "export-driven",
       "owed_to_issue": 2,
-      "note": "Reassigned from issue #4 for the same reason: it reads a parsed allocation row."
+      "note": "Reported by the exporter as an informational class, deliberately not as a defect. Measured 2026-07-31 across all six production vaults: 21 findings on homelab and zero everywhere else, and all 21 are rows whose verification is documented as prose ('Preflight in jedem Lauf', 'Vollstaendiger Backup-Lauf 2026-03-23') rather than as a link. Prose verification is thin, but it is not the same defect as an unverified allocation claiming to be verified, and a check that cannot tell them apart is the false-positive class this project refuses in anything that blocks."
     },
     {
       "id": "identifier-uniqueness",

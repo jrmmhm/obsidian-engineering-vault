@@ -59,6 +59,22 @@ The classification follows the same logic as in the vault: Measurement results â
 | `export` | Exports from tools (KiCad, CAD etc.) | `export__measurement_board_schematic__2025-01-18__rev-3.pdf` |
 | `log` | Protocols, log files | `log__mcu_commissioning__2025-01-22__rev-1.pdf` |
 
+### Traceability export
+
+The artifacts written by `export_traceability.py` are `export` documents and
+belong under `03_architecture_(ARC)/`, because allocation is authored there:
+
+```
+export__traceability__2026-07-31__rev-1.html
+export__traceability__2026-07-31__rev-1.json
+```
+
+The exporter writes only into a directory you name and refuses any path inside
+a vault, because the vault is Markdown only. Copy the generated files here and
+rename them when you want to keep a revision â€” the generator assigns no
+`rev-N` itself, since an artifact that numbers itself up on every run would no
+longer be reproducible.
+
 ### Examples
 
 **07_testing_and_evidence_(TAE)/**
