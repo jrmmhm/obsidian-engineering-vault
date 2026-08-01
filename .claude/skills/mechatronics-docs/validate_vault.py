@@ -68,12 +68,18 @@ ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 PATH_TOKEN_RE = re.compile(r"(?<![\w(])((?:[\w.-]+/)+[\w.-]+\.\w{1,12})\b")
 PIN_RE = re.compile(r"\b(?:GPIO\d+|P[A-K]\d{1,2}|0x[0-9A-Fa-f]{2,})\b")
-# Fenced blocks. Both CommonMark markers count ("a code fence is a sequence of
-# at least three consecutive backtick characters or tildes"): a tilde fence
-# renders identically, and recognising only backticks made it the cheaper way
-# out of every rule that keys on fences - including two WRONG findings, since
-# check_links and check_paths then read the block's content as prose.
-FENCE_RE = re.compile(r"^(?:```|~~~)")
+# Fenced blocks, CommonMark 0.31.2: at least three consecutive backticks or
+# tildes, indented by up to three spaces, closed only by the same character,
+# at least as long, and carrying no info string of its own. Recognising only
+# backticks made '~~~' the cheaper way out of every rule that keys on fences
+# (amendment 2026-07-28, two WRONG findings). Tracking neither character nor
+# length made the next two: a four-backtick block - the ordinary way to quote
+# a fenced example - and a '```' inside a '~~~' block both moved the boundary,
+# which is also what kept the validator disagreeing with the exporter about
+# how many requirement rows a vault has (amendment 2026-07-31b, residual 1).
+# This is export_traceability.fenced_mask's rule verbatim: one definition for
+# both tools, asserted against it in tests/run.sh.
+FENCE_RE = re.compile(r"^( {0,3})(`{3,}|~{3,})(.*)$")
 # The machine a block is true on, declared in the info string at ANY token
 # position. CommonMark: the first word is typically the language, but "this
 # spec does not mandate any particular treatment of the info string". Position
@@ -399,9 +405,8 @@ class Vault:
                     dom = req_scope(f, lines)
                     if not dom:
                         continue
-                    for i, line in enumerate(lines, 1):
-                        row = parse_table_row(line)
-                        if row and len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
+                    for i, row in req_rows(lines):
+                        if len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
                             self._req_index.setdefault(f"REQ-{dom}-{row[1]}", (f, i))
         return self._req_index
 
@@ -493,18 +498,71 @@ def prefix_related(a: str, b: str):
             and bool(BOUNDARY_RE.match(long[len(short):])))
 
 
-def fence_info(line: str):
-    """Info string of a fence line, or None when the line is not a fence.
+def fence_blocks(lines):
+    """Fenced blocks of a file: (open_line, info, body_lines, close_line|None).
 
     One definition of a fence for every check that tracks fence state, so
-    check_leaks, check_links and check_paths can never disagree about where a
-    block starts. Returns '' for a bare fence, which is NOT None - callers
-    distinguish "no fence here" from "a fence declaring nothing".
+    check_leaks, check_links, check_paths and req_rows can never disagree
+    about where a block starts - and, because this is the rule the exporter
+    applies, neither can the two tools.
+
+    A block still open at EOF is returned with close_line None and a body
+    running to the end of the file. Dropping it instead would let one
+    unclosed marker switch a rule off for everything below it, which is the
+    cheapest bypass a fence rule can have; what that means is each caller's
+    decision, so the fact is reported rather than resolved here.
     """
-    s = line.lstrip()
-    if not FENCE_RE.match(s):
-        return None
-    return s.lstrip("`~").strip()
+    blocks = []
+    open_line, char, length, info = None, "", 0, ""
+    for i, line in enumerate(lines, 1):
+        m = FENCE_RE.match(line)
+        if not m:
+            continue
+        marker, rest = m.group(2), m.group(3)
+        if open_line is None:
+            open_line, char, length, info = i, marker[0], len(marker), rest.strip()
+        elif marker[0] == char and len(marker) >= length and not rest.strip():
+            blocks.append((open_line, info, i - open_line - 1, i))
+            open_line = None
+    if open_line is not None:
+        blocks.append((open_line, info, len(lines) - open_line, None))
+    return blocks
+
+
+def fence_mask(lines, blocks=None):
+    """1-based flags: True for every line inside or delimiting a fenced block."""
+    mask = [False] * (len(lines) + 1)
+    for open_line, _, _, close_line in (blocks if blocks is not None
+                                        else fence_blocks(lines)):
+        for i in range(open_line, (close_line or len(lines)) + 1):
+            mask[i] = True
+    return mask
+
+
+def req_rows(lines):
+    """(line number, cells) of every table row OUTSIDE a fenced block.
+
+    One reader for every place a requirement row is counted - check_req_table,
+    Vault.req_index and the global duplicate scan - so the validator cannot
+    disagree with itself about how many requirements a file has, and, since
+    fence_blocks is the exporter's rule, neither can the two tools
+    (amendment 2026-07-31b, residual 1).
+
+    A file left inside an open fence is read as if it carried no fence at
+    all. Here the stakes are higher than in check_leaks, which evaluates such
+    a block to EOF for the same reason: the rows below would not be reported
+    wrongly, they would silently stop existing - and req-class, req-nnn and
+    req-criterion all reach the stop gate's blocking set.
+    """
+    blocks = fence_blocks(lines)
+    mask = ([False] * (len(lines) + 1) if any(c is None for _, _, _, c in blocks)
+            else fence_mask(lines, blocks))
+    for i, line in enumerate(lines, 1):
+        if mask[i]:
+            continue
+        row = parse_table_row(line)
+        if row:
+            yield i, row
 
 
 def fence_host(info: str):
@@ -878,12 +936,9 @@ def check_links(vault, path, lines, findings, strict, hub=False):
     md_names, all_names = vault.md_names(), vault.all_names()
     targets = Counter()
     total = 0
-    in_fence = False
+    mask = fence_mask(lines)
     for i, line in enumerate(lines, 1):
-        if fence_info(line) is not None:
-            in_fence = not in_fence
-            continue
-        if in_fence:
+        if mask[i]:
             continue
         # Obsidian does not resolve links inside code spans
         line = re.sub(r"`[^`]*`", " ", line)
@@ -966,17 +1021,16 @@ def check_leaks(abbr, path, lines, fm_end, findings):
     IMP, OAU) are legitimate homes for numbers and are never flagged.
     Fenced blocks are restricted in IMP and ARC - see check_fence.
     """
-    fence_line, fence_str = 0, ""
+    blocks = fence_blocks(lines)
+    mask = fence_mask(lines, blocks)
+    # A block opened and never closed is judged on its body to EOF rather
+    # than dropped: one unclosed marker would otherwise switch the rule off
+    # for everything below it, which is the cheapest bypass a fence rule can
+    # have. fence_blocks reports it that way, so both cases land here.
+    for open_line, info, body_lines, _ in blocks:
+        check_fence(abbr, path, open_line, info, body_lines, findings)
     for i, line in enumerate(lines, 1):
-        info = fence_info(line)
-        if info is not None:
-            if fence_line:
-                check_fence(abbr, path, fence_line, fence_str, i - fence_line - 1, findings)
-                fence_line, fence_str = 0, ""
-            else:
-                fence_line, fence_str = i, info
-            continue
-        if fence_line or abbr not in ("ARC", "DEC") or i <= fm_end:
+        if mask[i] or abbr not in ("ARC", "DEC") or i <= fm_end:
             continue
         sec = section_of(lines, i - 1, fm_end)
         if abbr == "DEC" and "context" not in sec:
@@ -996,12 +1050,6 @@ def check_leaks(abbr, path, lines, fm_end, findings):
                                        if abbr == "ARC" else
                                        " - Context frames the problem; concrete numbers "
                                        "belong in Options or in IMP/CMP")))
-    if fence_line:
-        # Opened and never closed. Evaluated to EOF rather than dropped: one
-        # unclosed marker would otherwise switch the rule off for everything
-        # below it, which is the cheapest bypass a fence rule can have.
-        check_fence(abbr, path, fence_line, fence_str, len(lines) - fence_line, findings)
-
 
 def check_paths(vault, path, lines, fm_end, findings):
     """Dead-pointer check over the whole body.
@@ -1027,16 +1075,20 @@ def check_paths(vault, path, lines, fm_end, findings):
     this project cannot resolve it - the same ownership rule, now reachable
     because the block says so instead of the validator guessing.
     """
+    blocks = fence_blocks(lines)
+    mask = fence_mask(lines, blocks)
+    delims = {b[0] for b in blocks} | {b[3] for b in blocks if b[3]}
+    host_at = [None] * (len(lines) + 1)
+    for open_line, info, _, close_line in blocks:
+        h = fence_host(info)
+        for i in range(open_line, (close_line or len(lines)) + 1):
+            host_at[i] = h
     in_ref = False
-    in_fence = False
-    declared_host = None
     pending_scope = False
     for i, line in enumerate(lines, 1):
-        info = fence_info(line)
-        if info is not None:
-            in_fence = not in_fence
-            declared_host = fence_host(info) if in_fence else None
-            continue
+        in_fence = mask[i]
+        if i in delims:
+            continue        # the markers themselves carry no pointer
         if not in_fence:
             if line.startswith("## "):
                 h = line[3:].strip().lower()
@@ -1049,7 +1101,7 @@ def check_paths(vault, path, lines, fm_end, findings):
         if i <= fm_end:
             continue
         if in_ref:
-            if declared_host:
+            if host_at[i]:
                 # The block states which machine its content is true on, so its
                 # paths are not this project's to resolve - the same ownership
                 # rule the shape gate applies (amendment 2026-07-28e).
@@ -1091,10 +1143,7 @@ def check_req_table(vault, path, lines, findings):
                        "class_values") or ["M", "S", "O"]
     seen = {}
     header_ok = False
-    for i, line in enumerate(lines, 1):
-        row = parse_table_row(line)
-        if not row:
-            continue
+    for i, row in req_rows(lines):
         if "Class" in row[0] or "NNN" in " ".join(row[:2]):
             header_ok = True
             continue
@@ -1317,9 +1366,8 @@ def validate_vault_wide(vault: Vault):
             dom = req_scope(f, lines)
             if not dom:
                 continue
-            for i, line in enumerate(lines, 1):
-                row = parse_table_row(line)
-                if row and len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
+            for i, row in req_rows(lines):
+                if len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
                     rid = f"REQ-{dom}-{row[1]}"
                     if rid in ids and ids[rid][0] != f:
                         findings.append(Finding("ERROR", "req-duplicate-global", str(f), i,
