@@ -59,7 +59,9 @@ Every domain file starts with YAML frontmatter (templates contain it):
 deprecated`; DEC files keep their Status line in the body instead),
 `created` and `last-verified` (both `YYYY-MM-DD`). TAE files add
 `verifies: [REQ-DOM-NNN, ...]` naming the requirements they prove.
-`status: draft` does not relax any rule.
+`status: draft` does not relax any rule. A list may be written inline as
+`[a, b]` or as a block sequence with one `- item` per line — the form
+Obsidian's properties editor writes. Both mean the same list.
 
 These fields are not a habit the validator memorised: they are declared,
 with their types and their permitted values, in
