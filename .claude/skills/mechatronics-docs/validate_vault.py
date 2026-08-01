@@ -575,13 +575,88 @@ def fence_host(info: str):
     return m.group(1).strip("\"'") if m else None
 
 
-def parse_table_row(line: str):
+def split_cells(line, ncols=None):
+    """Cells of one Markdown table row, or None when the line is not one.
+
+    GFM tables extension: "Include a pipe in a cell's content by escaping
+    it, including inside other inline spans." Both halves of that sentence
+    carry weight and a plain split("|") gets both wrong - an escaped pipe
+    must NOT divide, and an unescaped one must divide even inside a code
+    span. The scan therefore consumes a backslash together with whatever
+    follows it before looking for a delimiter. That also makes '\\\\|'
+    divide: the backslash is itself escaped and no longer escapes the pipe.
+    cmark-gfm renders that one the other way (github/cmark-gfm#277, reported
+    and unanswered); the spec is followed rather than the implementation,
+    and no vault on this machine contains the shape either way.
+
+    The closing delimiter is recognised during the scan instead of being
+    cut off the raw text first. 's.endswith("|")' is also true of a row
+    ending in a deliberate '\\|', and removing that would delete the
+    author's pipe and leave a stray backslash nothing can undo.
+
+    A leading pipe stays mandatory, unlike in GFM, where it is optional:
+    without it every prose line containing a pipe would be a table row.
+
+    With ncols the row is padded with empty cells and truncated to that
+    width - what GFM prescribes for a body row narrower or wider than its
+    header (example 204). A line that is no table row stays None; ncols
+    never fabricates one.
+
+    Cells come back verbatim, escapes intact. Resolving them here would
+    unescape twice in every consumer that already calls unescape() on the
+    text it carries forward.
+    """
     s = line.strip()
-    if not (s.startswith("|") and s.endswith("|") and s.count("|") >= 3):
+    if not s.startswith("|"):
         return None
-    cells = [c.strip() for c in s[1:-1].split("|")]
-    if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
-        return None  # separator row
+    body = s[1:]
+    cells, buf, i, closed = [], [], 0, False
+    while i < len(body):
+        c = body[i]
+        if c == "\\" and i + 1 < len(body):
+            buf.append(body[i:i + 2])
+            i += 2
+            closed = False
+            continue
+        if c == "|":
+            cells.append("".join(buf).strip())
+            buf = []
+            closed = i == len(body) - 1
+            i += 1
+            continue
+        buf.append(c)
+        i += 1
+        closed = False
+    cells.append("".join(buf).strip())
+    if closed and len(cells) > 1:
+        cells.pop()     # the closing delimiter, not an empty last column
+    if ncols:
+        cells = (cells + [""] * ncols)[:ncols]
+    return cells
+
+
+def is_separator(cells):
+    """True for the '| --- | :--: |' row that declares a table's alignment."""
+    return bool(cells) and all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c)
+
+
+def parse_table_row(line: str):
+    """One table row of two or more cells, or None.
+
+    The predicate is the exporter's rather than a stricter local one. GFM
+    makes the trailing pipe optional, and while this validator demanded it,
+    a row written without it was a requirement row for the exporter and not
+    for the validator - the disagreement amendment 2026-08-01 removed for
+    fences, one layer further down. Measured across all seven vaults on
+    this machine: not one line is classified differently by the two
+    predicates, so sharing one costs nothing and leaves nothing to drift.
+
+    Two cells minimum: a single-column table is legal GFM, and neither tool
+    has ever read one - the exporter's section scan requires two as well.
+    """
+    cells = split_cells(line)
+    if cells is None or len(cells) < 2 or is_separator(cells):
+        return None
     return cells
 
 
