@@ -498,6 +498,76 @@ scope-mismatch check exists to surface.
 | M | 001 | scope mismatch row | Pass if measured | none |
 EOF
 
+# A REQ file that documents its own table format. The quoted row is a
+# defect by every rule the real table below is held to, and it must produce
+# nothing: it is documentation, not data. Before the fence tracker reached
+# check_req_table this cost three blocking ERRORs plus a req-duplicate
+# blaming the REAL row below for colliding with the quoted one (issue #20).
+cat > "$W/01_requirements_(REQ)/REQ_Quoted (QTD).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file whose Context quotes one malformed row as documentation.
+
+A malformed row looks like this:
+
+```markdown
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| Z | 9 | quoted class and id | | none |
+| M | 001 | quoted duplicate | quoted | none |
+```
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| M | 001 | the only real requirement here | Pass if measured | none |
+EOF
+
+# The positive control. Byte-identical rows, no fence: every finding the
+# quoted file must NOT produce, this file must. Without it the assertions
+# above are also satisfied by a check that stopped working.
+cat > "$W/01_requirements_(REQ)/REQ_Unquoted (UNQ).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+The same rows as the quoted file, with the fence removed.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| Z | 9 | quoted class and id | | none |
+| M | 001 | quoted duplicate | quoted | none |
+| M | 001 | the only real requirement here | Pass if measured | none |
+EOF
+
+# One unpaired marker must not switch a blocking check off for everything
+# below it - the cheapest bypass a fence rule can have, and the reason
+# check_leaks evaluates an unclosed block to EOF. A file left inside an open
+# fence is read as if it carried no fence at all.
+cat > "$W/01_requirements_(REQ)/REQ_Stray (STR).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file carrying one stray, never closed fence marker.
+
+```
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| Q | 007 | stray fence must not hide this | Pass if measured | none |
+EOF
+
 cat > "$W/02_decisions_(DEC)/DEC_Bad.md" <<'EOF'
 ---
 domain: DEC
@@ -920,6 +990,41 @@ TESTS=$((TESTS + 1))
 n=$(printf '%s' "$out" | grep -c "ARC_Leaky\.md.*\[code-fence\]") || true
 if [ "$n" -eq 2 ]; then ok x; else
   fail "every ARC fence must be ERROR, declared or not, got $n of 2"; fi
+
+# A requirement table quoted as documentation is not data (issue #20). Every
+# assertion here is file-scoped for the same reason the fence assertions above
+# are: the violation vault produces every one of these codes anyway.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -cE "REQ_Quoted \(QTD\)\.md.*\[(req-class|req-nnn|req-criterion|req-duplicate)\]") || true
+if [ "$n" -eq 0 ]; then ok x; else
+  fail "a quoted requirement table must produce no row finding, got $n"; fi
+# The positive control: the same rows without the fence must produce all four.
+for code in req-class req-nnn req-criterion req-duplicate; do
+  TESTS=$((TESTS + 1))
+  if contains "$out" "REQ_Unquoted (UNQ)\.md.*\[$code\]"; then ok x; else
+    fail "positive control: unfenced rows must still produce [$code]"; fi
+done
+# One stray marker must not buy an exemption from a blocking check.
+TESTS=$((TESTS + 1))
+if contains "$out" "REQ_Stray (STR)\.md.*\[req-class\]"; then ok x; else
+  fail "an unclosed fence must not silence req-class below it"; fi
+# The row the quoted block declares must not exist as a requirement at all -
+# not as a finding, and not in the index every TAE 'verifies:' is checked
+# against. Indexing it would let a quoted example prove a real requirement.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$W" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+idx = vv.Vault(Path(sys.argv[2])).req_index()
+assert "REQ-QTD-001" in idx, "the real row below the quoted block must be indexed"
+f, line = idx["REQ-QTD-001"]
+text = f.read_text(encoding="utf-8").splitlines()[line - 1]
+assert "the only real requirement here" in text, f"indexed the quoted row instead: {text!r}"
+assert "REQ-QTD-009" not in idx, "a quoted row must not enter the requirement index"
+PY
+then ok x; else fail "req_index must resolve the real row, not the quoted one"; fi
 
 # Near misses: a heading the author DID write under a title the template
 # does not carry. Every assertion is file-scoped and names the LINE, because
@@ -1878,6 +1983,48 @@ TESTS=$((TESTS + 1))
 if contains "$(cat "$EX_TMP/out-unknown/traceability.json")" "export-unknown-domain"; then
   ok x; else fail "a domain abbreviation the alias map does not know must be reported"; fi
 rm -rf "$EN_V/06_unknown_(XYZ)"
+
+# ==========================================================================
+# The two tools must agree about where a fenced block starts. Amendment
+# 2026-07-31b carried that disagreement as residual 1: the exporter skipped
+# fenced blocks and the validator did not, so they counted a vault's
+# requirement rows differently wherever one quoted a table as documentation.
+# The rule now lives in both, which is only worth anything if nothing lets
+# the two copies drift apart again - so it is asserted on every Markdown
+# file every fixture in this suite builds, plus the shipped vault.
+# ==========================================================================
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$TMP" "$DE_TMP" "$EN_TMP" "$EX_TMP" "$REAL_VAULT" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv, export_traceability as ex
+from pathlib import Path
+n = 0
+for root in sys.argv[2:]:
+    for f in Path(root).rglob("*.md"):
+        if ".obsidian" in f.parts:
+            continue
+        lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        assert vv.fence_mask(lines)[1:] == ex.fenced_mask(lines), f"fence masks differ: {f}"
+        n += 1
+assert n > 50, f"parity assertion covered only {n} files - fixtures moved?"
+PY
+then ok x; else fail "validator and exporter must mask the same lines as fenced"; fi
+
+# ... and the property that disagreement produced: the row fixture 7 quotes
+# inside a ```markdown block is invisible to the exporter (asserted above)
+# and must be invisible to the validator reading the very same vault.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$EN_V" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+idx = vv.Vault(Path(sys.argv[2])).req_index()
+assert "REQ-EXP-001" in idx, "the real rows of the export vault must be indexed"
+assert "REQ-EXP-900" not in idx, "the quoted row must not be a requirement"
+PY
+then ok x; else fail "the quoted row must be invisible to both tools on one vault"; fi
 
 # The shipped template vault must export cleanly - the same guard the
 # validator has, for the artifact a visitor is most likely to look at.
