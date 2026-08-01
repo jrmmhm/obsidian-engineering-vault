@@ -4,23 +4,30 @@
 # Only app.json and core-plugins.json ship with the template - they carry
 # settings the documentation method depends on (link auto-update, properties
 # view). Everything else below is per-machine taste or state.
+#
+# Every pattern is written **/.obsidian/... on purpose. A gitignore pattern
+# containing a slash is anchored to the directory holding this file, so a bare
+# ".obsidian/workspace.json" matches the repository root and nothing else -
+# while a project of this shape carries a second Obsidian folder inside
+# 00_documentation/01_projectvault/, whose workspace file was therefore never
+# ignored and showed up as untracked on every status.
 
 # User-specific workspace (open tabs, pane layout, etc.)
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.obsidian/workspace-*.json
+**/.obsidian/workspace.json
+**/.obsidian/workspace-mobile.json
+**/.obsidian/workspace-*.json
 
 # Graph view tuning and theme choice - personal
-.obsidian/graph.json
-.obsidian/appearance.json
+**/.obsidian/graph.json
+**/.obsidian/appearance.json
 
 # Community plugins are not shipped: listing them without installing only
 # produces load errors for template users.
-.obsidian/community-plugins.json
-.obsidian/plugins/
+**/.obsidian/community-plugins.json
+**/.obsidian/plugins/
 
 # Local caches
-.obsidian/cache
+**/.obsidian/cache
 .trash/
 
 # =============================================================================
