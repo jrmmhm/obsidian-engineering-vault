@@ -55,6 +55,16 @@ TEMPLATE_MARKERS = ("template",)
 TEMPLATE_NAME_RE = re.compile(
     r"^00_.*(?:" + "|".join(re.escape(m) for m in TEMPLATE_MARKERS) + r")", re.I)
 WIKILINK_RE = re.compile(r"(!?)\[\[([^\]|#\n]+)(#[^\]|\n]*)?(\|[^\]\n]*)?\]\]")
+# One item of a YAML block sequence: '-' followed by whitespace or by
+# nothing at all. Deliberately not '-' followed by anything, so '-- a'
+# stays malformed instead of quietly becoming the item 'a'.
+SEQ_ITEM_RE = re.compile(r"^-(?:\s+(.*))?$")
+# A mapping inside a sequence item ('- key: value'). YAML reads that as a
+# list of mappings; this reader models no nested structure, and folding it
+# into the string 'key: value' would be the silent misreading this project
+# refuses everywhere else. '- foo:bar' carries no space after the colon,
+# is a plain scalar in YAML too, and is not matched here.
+SEQ_NESTED_RE = re.compile(r"^[A-Za-z][\w-]*:(\s|$)")
 REQ_ID_RE = re.compile(r"REQ-[A-Z]{2,4}-\d{3}")
 DOM_IN_NAME_RE = re.compile(r"\(([A-Z]{2,4})\)")
 # Object identifiers (vault_schema.json, "identifier"): DOMAIN-SCOPE-NNN in
@@ -661,26 +671,98 @@ def parse_table_row(line: str):
 
 
 def parse_frontmatter(lines):
-    """Minimal flat YAML parser. Returns (dict|None, end_line, malformed_msg)."""
+    """Minimal flat YAML parser. Returns (dict|None, end_line, malformed_msg).
+
+    Two spellings of a list are accepted and fold into the same Python
+    list: the inline 'tags: [a, b]' and the block sequence Obsidian's own
+    properties editor writes -
+
+        tags:
+        - hardware
+
+    The block form is not a nicety: it is what the editor produces the
+    moment a property is edited through the UI rather than in the raw
+    text, and rejecting it made a file the editor had just written an
+    ERROR in the stop gate's blocking set (issue #24; residual 3 and
+    follow-up 7 of amendment 2026-07-28d).
+
+    Items may be indented or not. YAML 1.2 (8.2.1) permits a block
+    sequence at the indentation of its parent mapping key, and the
+    Obsidian documentation spells it without indentation - reading only
+    the indented form would have left the editor's own output rejected.
+    All items of one sequence must share the indentation of the first,
+    so a deeper '-' is reported instead of silently becoming a sibling:
+    PyYAML reads that shape as one continued scalar, and being stricter
+    than the reference is honest where agreeing with it is not cheap.
+
+    The closing '---' is located BEFORE anything is parsed, so the reader
+    can never walk past the frontmatter into the body. This matters more
+    now than it did: with block sequences accepted, a file missing its
+    closing marker would swallow the body's bullet lists into a value and
+    push end_line to EOF - which is exactly where check_leaks and
+    check_paths stop looking. Such a file is therefore reported AND given
+    end_line 0, so it is read as if it carried no frontmatter at all and
+    the body checks still run. That is req_rows' rule for an unclosed
+    fence one layer up: one stray marker must not switch a check off.
+    """
     if not lines or lines[0].strip() != "---":
         return None, 0, None
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        return None, 0, "frontmatter never closed with ---"
     data = {}
-    for i in range(1, len(lines)):
+    # The key a block sequence would belong to, and the indentation its
+    # items agreed on. Both are cleared by the next key line.
+    open_key, indent = None, None
+    for i in range(1, end):
         line = lines[i]
-        if line.strip() == "---":
-            return data, i + 1, None
-        if not line.strip() or line.strip().startswith("#"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue        # neither closes an open sequence, as in YAML
+        m = SEQ_ITEM_RE.match(stripped)
+        if m:
+            if open_key is None:
+                return None, i + 1, (f"list item {stripped!r} belongs to no key - "
+                                     "frontmatter is a mapping, not a sequence")
+            if "\t" in line:
+                return None, i + 1, (f"tab in list item {stripped!r} - YAML forbids "
+                                     "tabs here; use spaces")
+            ind = len(line) - len(line.lstrip())
+            if indent is None:
+                indent = ind
+            elif ind != indent:
+                return None, i + 1, (f"list item {stripped!r} is indented differently "
+                                     f"than the first item of '{open_key}'")
+            item = (m.group(1) or "").strip()
+            if SEQ_NESTED_RE.match(item):
+                return None, i + 1, (f"list item {stripped!r} carries a nested mapping - "
+                                     "this frontmatter reader is flat")
+            if not isinstance(data.get(open_key), list):
+                data[open_key] = []
+            if item:
+                data[open_key].append(item.strip("'\""))
             continue
-        m = re.match(r"^([A-Za-z][\w-]*):\s*(.*)$", line.strip())
+        m = re.match(r"^([A-Za-z][\w-]*):\s*(.*)$", stripped)
         if not m:
-            return None, i + 1, f"unparseable frontmatter line: {line.strip()!r}"
+            return None, i + 1, f"unparseable frontmatter line: {stripped!r}"
+        if line[:len(line) - len(line.lstrip())]:
+            return None, i + 1, (f"indented key {stripped!r} - a nested mapping is not "
+                                 "read by this frontmatter reader")
         key, val = m.group(1), m.group(2).strip()
+        open_key, indent = None, None
         if val.startswith("[") and val.endswith("]"):
             inner = val[1:-1].strip()
             data[key] = [v.strip().strip("'\"") for v in inner.split(",") if v.strip()]
+        elif not val:
+            # Provisional. A following '- item' turns it into a list; a key
+            # with nothing under it keeps the empty string it has always
+            # had, because '[]' here would newly fire verifies-empty on
+            # files nobody changed.
+            data[key] = ""
+            open_key = key
         else:
             data[key] = val.strip("'\"")
-    return None, len(lines), "frontmatter never closed with ---"
+    return data, end + 1, None
 
 
 def section_of(lines, idx, fm_end):

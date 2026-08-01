@@ -186,6 +186,11 @@ EOF
 # a defect. Seeded in the PRECISION fixture on purpose: this file must stay
 # at zero findings, so the tolerance is asserted by the zero-findings check
 # itself rather than by a pattern that could silently stop matching.
+#
+# Both list spellings sit in this one file: 'tags' inline and 'aliases' as
+# the unindented block sequence the Obsidian documentation shows and its
+# properties editor writes. Before issue #24 the second one alone made this
+# file frontmatter-malformed, so the zero-findings check is what guards it.
 cat > "$V/04_components_(CMP)/CMP_MCU_Board.md" <<'EOF'
 ---
 domain: CMP
@@ -194,6 +199,9 @@ status: active
 created: 2026-01-06
 last-verified: 2026-07-01
 tags: [hardware, adc]
+aliases:
+- MCU Board
+- Main Board
 excalidraw-plugin: parsed
 ---
 ## Source(s)
@@ -724,13 +732,20 @@ print("code does not belong here")
 ```
 EOF
 
+# 'verifies' as a block sequence, on purpose. The precision fixture and the
+# identifier fixture both spell it inline, so this file is where the block
+# form has to reach check_tae_verifies as a LIST: if the parser folded it
+# into a string - or rejected the file as malformed - verifies-unknown-req
+# would disappear and the assertion below would fail. Absence of a finding
+# would prove nothing here, presence of the right one does.
 cat > "$W/07_testing_and_evidence_(TAE)/TAE_Bad.md" <<'EOF'
 ---
 domain: TAE
 status: banana
 created: 2026-01-10
 last-verified: 2026-07-01
-verifies: [REQ-XXX-999]
+verifies:
+  - REQ-XXX-999
 ---
 ## Context
 Test evidence referencing a requirement that does not exist.
@@ -944,6 +959,13 @@ for code in filename-prefix frontmatter-missing frontmatter-malformed \
   TESTS=$((TESTS + 1))
   if contains "$out" "\[$code\]"; then ok x; else fail "violation vault: [$code] not detected"; fi
 done
+# The block-form 'verifies' must name the very requirement its item carries.
+# Asserting the code alone would also pass if the parser produced a list of
+# something else entirely.
+TESTS=$((TESTS + 1))
+if contains "$out" "\[verifies-unknown-req\].*REQ-XXX-999"; then ok x; else
+  fail "a block-sequence 'verifies' must reach check_tae_verifies item by item"; fi
+
 # body-wide dead-path scan: WARN outside References, ERROR inside stays,
 # fenced content inside References stays covered
 TESTS=$((TESTS + 1))
@@ -1697,6 +1719,83 @@ for abbr, entry in schema["domains"].items():
     assert not extra, f"{abbr} declares {extra} outside the shared vocabulary"
 PY
 then ok x; else fail "a domain-exclusive field breaks language symmetry of the undeclared check"; fi
+
+# ==========================================================================
+# parse_frontmatter: the two list spellings, and the lines that stay broken
+# ==========================================================================
+# Asserted at the parser rather than through a fixture vault, because the
+# claim is an equality between two spellings and no finding can express it:
+# a vault-level test can only show that neither spelling produces a finding,
+# which is also true if both are parsed wrongly in the same way.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from validate_vault import parse_frontmatter as pf
+
+def fm(body):
+    return pf(("---\n" + body + "---\n").splitlines())
+
+inline = fm("tags: [a, b]\n")
+indented = fm("tags:\n  - a\n  - b\n")
+flush = fm("tags:\n- a\n- b\n")          # the Obsidian documentation's own spelling
+for name, got in (("indented", indented), ("unindented", flush)):
+    assert got[0] == inline[0], f"{name} block list != inline list: {got[0]} vs {inline[0]}"
+    assert got[2] is None, f"{name} block list reported malformed: {got[2]}"
+assert inline[0] == {"tags": ["a", "b"]}, inline[0]
+
+# quotes are stripped the way the inline path strips them, and neither a
+# blank line nor a comment ends a sequence - both are true of YAML
+assert fm('aliases:\n  - "Weekly review"\n')[0] == {"aliases": ["Weekly review"]}
+assert fm("tags:\n\n  - a\n")[0] == {"tags": ["a"]}
+assert fm("tags:\n  # a note\n  - a\n")[0] == {"tags": ["a"]}
+# a following key closes the sequence, and two sequences do not bleed
+assert fm("tags:\n  - a\nstatus: active\n")[0] == {"tags": ["a"], "status": "active"}
+assert fm("tags:\n- a\naliases:\n- b\n")[0] == {"tags": ["a"], "aliases": ["b"]}
+# a key with nothing under it keeps the empty string it has always had:
+# '[]' would newly fire verifies-empty on files nobody touched
+assert fm("verifies:\nstatus: active\n")[0] == {"verifies": "", "status": "active"}
+# 'verifies' is what actually has to survive the fold
+assert fm("verifies:\n  - REQ-MEG-001\n  - REQ-MEG-002\n")[0] == {
+    "verifies": ["REQ-MEG-001", "REQ-MEG-002"]}
+PY
+then ok x; else fail "the inline and block spellings of a list must fold into one list"; fi
+
+# Negative controls. Accepting one more spelling must not make the reader
+# permissive, so each of these stays a malformed-frontmatter message. They
+# are asserted as 'a message exists', never by its wording: freezing the
+# text here would make every future rewording a test failure.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from validate_vault import parse_frontmatter as pf
+
+def bad(body):
+    fm, _, msg = pf(("---\n" + body + "---\n").splitlines())
+    return fm is None and bool(msg)
+
+assert bad("- a\ndomain: REQ\n"),        "a sequence at the top level is not a mapping"
+assert bad("tags:\n-\ta\n"),             "a tab after the dash is not YAML"
+assert bad("tags:\n\t- a\n"),            "a tab as indentation is not YAML"
+assert bad("tags:\n  - key: value\n"),   "a mapping inside an item is not read by this reader"
+assert bad("tags:\n  - a\n    - b\n"),   "an item indented differently is not a sibling"
+assert bad("foo:\n  bar:\n  - x\n"),     "an indented key is a nested mapping"
+assert bad("tags: [a]\n- b\n"),          "a sequence cannot follow an inline list"
+assert bad("tags:\n-- a\n"),             "'--' does not open a list item"
+assert bad("domain: IMP\n: broken\n"),   "a line without a key stays broken"
+# a colon with no space after it is a plain scalar in YAML, and stays one here
+assert pf("---\ntags:\n  - foo:bar\n---\n".splitlines())[0] == {"tags": ["foo:bar"]}
+
+# Frontmatter without a closing marker is reported AND handed end_line 0, so
+# check_leaks and check_paths still see the body. Returning the end of file
+# instead would let one missing marker switch the body checks off - the same
+# trap req_rows closes for an unclosed fence.
+fm, end, msg = pf("---\ndomain: IMP\ntags:\n- hardware\n\n## Context\n\n- a bullet\n".splitlines())
+assert fm is None and msg, "an unclosed frontmatter must still be reported"
+assert end == 0, f"an unclosed frontmatter must not hide the body, got end_line {end}"
+PY
+then ok x; else fail "a genuinely malformed frontmatter line must still be reported"; fi
 
 # ==========================================================================
 # Fixture 6: a template whose own required headings are prefixes of each
