@@ -170,7 +170,11 @@ deleted outright — it moves here so history stays reconstructable.
 ## .claude/skills/mechatronics-docs
 
 The documentation skill that ships with this template: the agent instructions,
-the vault validator, its hooks and its test suite.
+the vault validator, the traceability exporter, its hooks and its test suite.
+
+The exporter (`export_traceability.py`) writes outside the vault by design and
+refuses any `--output-dir` inside one, because the vault is Markdown only. A
+revision worth keeping belongs in `00_documentation/02_documents/`.
 
 See the [README](README.md#the-ai-layer) for how to use it, with or without
 Claude Code.
