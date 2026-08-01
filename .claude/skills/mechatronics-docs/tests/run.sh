@@ -341,6 +341,10 @@ last-verified: 2026-07-01
 **Excludes:**
 - Power distribution and host-side data storage
 
+Allocation is recorded in [[#Allocation and Verification]] and the
+contracts in [[#Interfaces]]; this paragraph is the scope statement of
+the module and is referenced as [[#^module-scope]]. ^module-scope
+
 ## Requirements (Files)
 - [[REQ_Measurement (MEG)]]: Defines accuracy and rate targets for this module.
 
@@ -363,7 +367,7 @@ last-verified: 2026-07-01
 ## Allocation and Verification
 | Submodule (ARC/CMP/IFC) | Allocated Requirements (REQ-IDs) | Verification (TAE) | Status |
 | ----------------------- | -------------------------------- | ------------------ | ------ |
-| [[CMP_AD7175-2]] | REQ-MEG-001 | [[TAE_ADC_Linearity]] | Verified |
+| [[CMP_AD7175-2]] | REQ-MEG-001 | [[TAE_ADC_Linearity\|linearity proof]] | Verified |
 | [[IFC_SPI_ADC]] | REQ-MEG-002 | [[TAE_ADC_Linearity]] | Verified |
 EOF
 
@@ -673,6 +677,10 @@ uptime
 
 - [[Nonexistent_File]]: dead link target.
 - [[Another_Missing]]: second dead link target.
+- [[#Context]]: same-file anchor naming a heading this file carries.
+- [[#^leaky-scope]]: same-file anchor naming a block this file carries. ^leaky-scope
+- [[#No Such Heading]]: same-file anchor naming nothing.
+- [[#^no-such-block]]: same-file block anchor naming nothing.
 EOF
 
 {
@@ -965,6 +973,21 @@ done
 TESTS=$((TESTS + 1))
 if contains "$out" "\[verifies-unknown-req\].*REQ-XXX-999"; then ok x; else
   fail "a block-sequence 'verifies' must reach check_tae_verifies item by item"; fi
+
+# A link into the file itself is resolved against that file, not against the
+# name index (issue #23). Asserting only that it produces nothing would also
+# pass for a check that exempts every anchor instead of reading it, so both
+# directions are asserted on one file: the two anchors that name something
+# stay silent, the two that name nothing are reported by name.
+TESTS=$((TESTS + 1))
+if contains "$out" "\[link-unresolved\] \[\[#No Such Heading\]\]"; then ok x; else
+  fail "a same-file anchor naming no heading must be reported"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "\[link-unresolved\] \[\[#\^no-such-block\]\]"; then ok x; else
+  fail "a same-file anchor naming no block identifier must be reported"; fi
+TESTS=$((TESTS + 1))
+if contains "$out" "\[\[#Context\]\]" || contains "$out" "\[\[#\^leaky-scope\]\]"; then
+  fail "a same-file anchor that resolves must produce nothing"; else ok x; fi
 
 # body-wide dead-path scan: WARN outside References, ERROR inside stays,
 # fenced content inside References stays covered
@@ -1852,8 +1875,14 @@ TESTS=$((TESTS + 1))
 if contains "$hout" "impl-leak" && contains "$hout" "additionalContext"; then ok x; else
   fail "post hook must feed impl-leak back as additionalContext"; fi
 TESTS=$((TESTS + 1))
-if contains "$hout" "2 unresolved link target"; then ok x; else
+if contains "$hout" "4 unresolved link target"; then ok x; else
   fail "post hook must aggregate unresolved links into one summary"; fi
+# A same-file anchor reaches the aggregation by the same path as a file
+# link: hook_post re-extracts the target out of the message text, and an
+# anchor is the one target shape that carries a '#'.
+TESTS=$((TESTS + 1))
+if contains "$hout" "\[\[#No Such Heading\]\]"; then ok x; else
+  fail "an unresolved same-file anchor must survive the aggregation by name"; fi
 TESTS=$((TESTS + 1))
 n=$(printf '%s' "$hout" | grep -o 'link-unresolved' | wc -l)
 if [ "$n" -eq 1 ]; then ok x; else
@@ -2189,6 +2218,84 @@ assert row('|-- huart == &huart3?') is None
 assert row(r'| f\|oo  |') is None
 PY
 then ok x; else fail "the shared cell splitter must follow the GFM tables extension"; fi
+
+# ==========================================================================
+# The wikilink matcher (issue #23). Nine vaults on this machine contain zero
+# same-file links and zero table-escaped aliases, so NO corpus check can
+# catch a regression here - dropping the two lazy quantifiers agrees with
+# the old regex on all 81028 lines and silently breaks the escaped alias
+# again. These assertions are the only guard, and every one of them was
+# verified to fail against the previous WIKILINK_RE.
+# ==========================================================================
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$V" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+import validate_vault as vv
+
+def parts(s):
+    m = vv.WIKILINK_RE.search(s)
+    return None if not m else (m.group(1), m.group(2), m.group(3), m.group(4))
+
+# Same-file links, both documented spellings (obsidian.md/help/links).
+# The old target group required a character before the '#' and matched none.
+assert parts('[[#Heading]]') == ('', '', '#Heading', None)
+assert parts('[[#^abc123]]') == ('', '', '#^abc123', None)
+assert parts('![[#Heading]]') == ('!', '', '#Heading', None)
+# The alias pipe escaped the way Obsidian requires inside a table, for a
+# link and for an embed size (obsidian.md/help/advanced-syntax). The target
+# used to keep the backslash and was reported as unresolved.
+assert parts(r'[[Note\|alias]]') == ('', 'Note', None, r'\|alias')
+assert parts(r'![[Engelbart.jpg\|200]]') == ('!', 'Engelbart.jpg', None, r'\|200')
+# ... and the anchor, one field over, carried the same defect.
+assert parts(r'[[Note#Head\|alias]]') == ('', 'Note', '#Head', r'\|alias')
+# Everything else must read exactly as it did before.
+assert parts('[[A]]') == ('', 'A', None, None)
+assert parts('[[A|b]]') == ('', 'A', None, '|b')
+assert parts('[[A#B|c]]') == ('', 'A', '#B', '|c')
+assert parts('[[A#B#C]]') == ('', 'A', '#B#C', None)   # chained subheadings
+assert parts('[[REQ_Measurement (MEG)]]') == ('', 'REQ_Measurement (MEG)', None, None)
+assert parts(r'[[a\b]]') == ('', r'a\b', None, None)
+assert parts(r'[[a\]b]]') is None
+
+# The anchor index reads headings of every level, and a fenced block is not
+# a source of headings: a shell comment must not resolve anybody's anchor.
+doc = ["## Context", "scope sentence ^blk-one", "```bash",
+       "# not a heading", "echo hi ^not-a-block", "```", "### Deep Sub"]
+heads, blocks = vv.anchor_index(doc, vv.fence_mask(doc))
+assert heads == {vv.fold_key("Context"), vv.fold_key("Deep Sub")}, heads
+assert blocks == {"blk-one"}, blocks
+assert vv.anchor_resolves("#context", heads, blocks)          # folded, as elsewhere
+assert vv.anchor_resolves("#Context#Deep Sub", heads, blocks) # every segment names one
+assert vv.anchor_resolves("#^blk-one", heads, blocks)
+assert not vv.anchor_resolves("#not a heading", heads, blocks)
+assert not vv.anchor_resolves("#^not-a-block", heads, blocks)
+assert not vv.anchor_resolves("#", heads, blocks)
+
+# check_links itself, on primitives rather than on run output. A vault whose
+# zero findings are the whole assertion cannot tell "resolved" from
+# "exempted", which is what these four cases separate.
+V = Path(sys.argv[2])
+vault = vv.Vault(V)
+p = V / "03_architecture_(ARC)" / "ARC_Data_Acquisition.md"
+def links(lines, **kw):
+    out = []
+    vv.check_links(vault, p, lines, out, kw.pop("strict", True), **kw)
+    return sorted({f.code for f in out})
+
+# A link written the way a table requires resolves to the file it names.
+assert links(["## Context", r"| [[CMP_AD7175-2\|the converter]] | x |"]) == []
+# 60 same-file anchors trip neither counter: both are about OUTGOING links.
+assert links(["## Context"] + ["see [[#Context]]"] * 60) == []
+# ... and the positive control that says those counters still work at all.
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 60) == \
+    ["link-budget", "link-repeat"]
+# A link naming nothing is no link - the shape a REF template writes as a
+# placeholder, and the one line in nine vaults where old and new disagree.
+assert links(["## Context", "- [[]] -", "- [[#]]", "- [[|alias]]"]) == []
+PY
+then ok x; else fail "the wikilink matcher must read same-file links and the table escape"; fi
 
 # ==========================================================================
 # The two tools must agree about where a fenced block starts. Amendment
