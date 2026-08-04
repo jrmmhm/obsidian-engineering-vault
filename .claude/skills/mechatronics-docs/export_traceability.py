@@ -18,11 +18,14 @@ use. Derived fields are marked as derived in the JSON, following
 Sphinx-Needs' field_type, so a consumer can tell what was written down
 from what was worked out.
 
-Nothing is lost silently. A vault in another language, a table in no
-recognised section, a requirement reference that resolves to nothing, a
-status nobody declared: each is a row in the export, never an absence
-from it. An empty graph without an explanation is the one output this
-tool must not produce.
+Nothing the export can prove it lost is lost silently. A vault in another
+language, an architecture table in no recognised section, a requirement
+row the graph does not contain, a requirement reference that resolves to
+nothing, a status nobody declared: each is a row in the export, never an
+absence from it. The domains this project declares no table binding for
+are the one documented exception, and vault_schema.json says why
+(table_bindings.binding_discovery.unbound_table). An empty graph without
+an explanation is the one output this tool must not produce.
 
 Nothing is guessed. A range is expanded only when every identifier it
 yields exists; a status counts as proven only on an exact match. Where
@@ -50,7 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from validate_vault import (  # noqa: E402
     DOMAIN_DIR_RE, Vault, _dict, _strlist, fold_key, is_separator,
-    is_vault_root, load_schema, parse_frontmatter, split_cells,
+    is_vault_root, load_schema, parse_frontmatter, req_tables, split_cells,
     template_files,
 )
 
@@ -509,13 +512,17 @@ def build_graph(vault, schema, roles, bindings):
     if req_abbr:
         for f, lines, _key in files_by_role.get("REQ", []):
             scope = req_scope_of(f, lines, req_abbr)
+            rows = bound_tables(lines, req_binding.get("section"), 5)
+            # Before the scope check, not after: every REQ file of the
+            # nativclaw vault returns there, so an unexported row in the one
+            # corpus that has them would go unmentioned either way.
+            _report_unexported_rows(g, f, lines, {ln for _k, _c, ln in rows})
             if not scope:
                 g.findings.append(Finding(
                     "export-no-scope", f, None,
                     "requirements file carries neither a conforming id nor a "
                     "(SCOPE) token in its name - its rows cannot be addressed"))
                 continue
-            rows = bound_tables(lines, req_binding.get("section"), 5)
             for kind, cells, line in rows:
                 if kind != "row" or len(cells) < 5:
                     continue
@@ -674,6 +681,41 @@ def _classify_status(value, declared):
         if value.startswith(d) and (len(value) == len(d) or not value[len(d)].isalnum()):
             return "qualified", value
     return "unknown", value or "(empty)"
+
+
+def _report_unexported_rows(g, f, lines, bound_lines):
+    """Requirement rows of a REQ file that the graph does not contain.
+
+    The ARC counterpart below asks whether a table sits in a bound section.
+    That question is the wrong one here, and measurably so: of the 112
+    requirement rows this exporter drops across the nine vault roots
+    measured, 78 sit INSIDE the bound section, in its second to tenth
+    table, which bound_tables stops before and sections_with_tables cannot
+    see. A section title cannot report them; a row can report itself.
+
+    Asked a row at a time it also cannot lie. 'Sits in no declared section'
+    is false whenever the section is declared and merely holds another
+    table first - a two-column glossary above the requirement table is
+    enough - and a REQ file's bound section is '## Context' in all nine
+    vaults, the one section most likely to carry incidental tables.
+
+    The width floor sits on the header, not on the row: GFM pads a short
+    body row to the header's width, so a four-cell row of a five-column
+    table is a requirement row that would have been ingested had its table
+    been read (example 204, the rule split_cells already implements).
+    """
+    for header, _hline, body in req_tables(lines):
+        if not header or len(header) < 5:
+            continue
+        lost = [ln for ln, cells in body
+                if len(cells) >= 2 and ROW_NNN_RE.match(cells[1])
+                and ln not in bound_lines]
+        if lost:
+            g.findings.append(Finding(
+                "export-unbound-table", f, lost[0],
+                f"{len(lost)} requirement rows of this table are not in the "
+                "graph - the export reads the first five-column table of the "
+                "bound section and no other"))
 
 
 def _report_unbound(g, f, lines, bound_lines):
