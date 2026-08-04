@@ -252,7 +252,11 @@ def _read_schema(path):
         return FALLBACK_SCHEMA, f"{path.name} exceeds {SCHEMA_MAX_BYTES} bytes"
     try:
         # RecursionError, not ValueError, is what deeply nested JSON raises.
-        data = json.loads(raw.decode("utf-8", "replace"))
+        # utf-8-sig for the same reason read_text uses it: json.loads
+        # rejects a leading BOM outright, and the schema would fall back
+        # to the built-in field set behind a single WARN - declared
+        # values and editor fields silently out of force (issue #21).
+        data = json.loads(raw.decode("utf-8-sig", "replace"))
     except (ValueError, RecursionError):
         return FALLBACK_SCHEMA, f"{path.name} is not valid JSON"
     if not isinstance(data, dict):
@@ -397,7 +401,7 @@ class Vault:
                 sets = []
                 for tf in template_files(ddir):
                     try:
-                        h2s = extract_h2(tf.read_text(encoding="utf-8", errors="replace"))
+                        h2s = extract_h2(read_text(tf))
                     except OSError:
                         continue
                     if h2s:
@@ -472,8 +476,27 @@ class Vault:
 # Parsing helpers
 # --------------------------------------------------------------------------
 
+def read_text(path: Path):
+    """Text of a file, BOM-safe. Every read of vault content goes here.
+
+    utf-8-sig strips a leading byte-order mark and is byte-identical to
+    utf-8 without one, so the option costs nothing where no mark exists.
+    With utf-8 the first line of a BOM-carrying file compares unequal to
+    '---', parse_frontmatter returns (None, 0, None) - the malformed slot
+    empty, so nothing is reported anywhere - and the file is handed
+    frontmatter-missing, an ERROR naming the wrong cause, while
+    frontmatter_id drops it out of the identifier checks entirely
+    (issue #21). A BOM is never typed on purpose: it arrives from an
+    editor, a redirect or an export tool.
+
+    The exporter has read this way since amendment 2026-07-31b. One rule
+    for both tools, asserted per fixture file in tests/run.sh.
+    """
+    return path.read_text(encoding="utf-8-sig", errors="replace")
+
+
 def read_lines(path: Path):
-    return path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return read_text(path).splitlines()
 
 
 def extract_h2(text: str):
@@ -1624,7 +1647,7 @@ def validate_vault_wide(vault: Vault):
     corpus = {}
     for p in all_md:
         try:
-            corpus[p] = p.read_text(encoding="utf-8", errors="replace")
+            corpus[p] = read_text(p)
         except OSError:
             corpus[p] = ""
 
@@ -1713,9 +1736,14 @@ def git_head_content(vault: Vault, path: Path):
     try:
         # errors="replace": a non-UTF-8 byte in a tracked file would other-
         # wise raise UnicodeDecodeError inside subprocess.run itself.
+        # encoding: the same BOM rule read_text applies to the working
+        # tree, so a mark cannot make a pre-existing file look newly
+        # broken. git show hands out the stored blob unfiltered, so what
+        # arrives here is what was committed. Passing encoding implies
+        # text mode and keeps the newline translation text=True had.
         r = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{rel}"],
-                           capture_output=True, text=True, errors="replace",
-                           timeout=10)
+                           capture_output=True, encoding="utf-8-sig",
+                           errors="replace", timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout if r.returncode == 0 else None
