@@ -428,11 +428,30 @@ for d in "01_requirements_(REQ)" "02_decisions_(DEC)" "03_architecture_(ARC)" \
   cp "$V/$d/"00_*file_template*.md "$W/$d/" 2>/dev/null || true
 done
 
+# The IMP template, byte-identical to the copy above except for a leading
+# byte-order mark. Its FIRST line is a heading, so this isolates the OTHER
+# reader: extract_h2 tests l.startswith("## "), and '﻿## Context' fails
+# that test. 'Context' then drops out of the required set of the whole
+# domain, and both IMP near-miss assertions below - which exist precisely
+# because 'Context' is required - stop firing. A template whose sections
+# quietly shrink is the silent switch-off one layer above the file checks.
+{ printf '\xef\xbb\xbf'; cat "$V/06_implementation_(IMP)/00_IMP_file_template.md"; } \
+  > "$W/06_implementation_(IMP)/00_IMP_file_template.md"
+
 # A template is the file every new file is copied from, so an undeclared key
 # in it propagates silently. Same H2 set as the copy it replaces, so section
 # checks are unaffected. Its VALUES are placeholders and must stay unchecked -
 # 'created: YYYY-MM-DD' may not become a frontmatter-date ERROR.
-cat > "$W/01_requirements_(REQ)/00_REQ_file_template.md" <<'EOF'
+#
+# Written WITH a byte-order mark (issue #21), which makes the 'squad'
+# assertion below the positive control for read_lines in the infra branch:
+# with a utf-8 reader parse_frontmatter returns (None, 0, None) there, and
+# validate_file reports NEITHER template-unreadable (the malformed slot is
+# empty) NOR the undeclared key (that branch needs fm) - the check stops
+# checking without saying so. The mark sits in front of '---', so the H2 set
+# of this template is unaffected and only the frontmatter path is isolated.
+printf '\xef\xbb\xbf' > "$W/01_requirements_(REQ)/00_REQ_file_template.md"
+cat >> "$W/01_requirements_(REQ)/00_REQ_file_template.md" <<'EOF'
 ---
 domain: REQ
 created: YYYY-MM-DD
@@ -711,6 +730,32 @@ rather than crashing the validator.
 
 ## Requirements (Files)
 - None allocated in this seeded fixture.
+EOF
+
+# A domain file carrying a byte-order mark, and a twin without one claiming
+# the same identity (issue #21). The collision is the positive control for
+# the THIRD reader: check_identifiers compares nothing but the corpus that
+# validate_vault_wide builds, so with a utf-8 corpus the marked file has no
+# identifier, the collision does not exist and the check reports nothing at
+# all. Naming the marked file as the first declarer is what says its
+# frontmatter was actually read - the sort order makes that deterministic.
+{ printf '\xef\xbb\xbf'
+  printf -- '---\ndomain: ARC\nid: ARC-BOM-001\nstatus: active\ncreated: 2026-01-09\nlast-verified: 2026-07-01\n---\n'
+  printf '## Context\nArchitecture note saved by an editor that writes a byte-order mark.\n'
+  printf 'Its frontmatter is here to be read, not to be reported as absent.\n'
+} > "$W/03_architecture_(ARC)/ARC_Byte_Order_Mark.md"
+
+cat > "$W/03_architecture_(ARC)/ARC_Byte_Order_Twin.md" <<'EOF'
+---
+domain: ARC
+id: ARC-BOM-001
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+The same identity without a byte-order mark. Two files claiming one
+identifier is never legitimate, so this pair must be reported.
 EOF
 
 cat > "$W/06_implementation_(IMP)/IMP_Bad.md" <<'EOF'
@@ -1219,6 +1264,32 @@ TESTS=$((TESTS + 1))
 if contains "$out" "REQ_Thermal.*\[id-scope-mismatch\].*'XYZ'.*'THM'"; then ok x; else
   fail "id-scope-mismatch must name both the id scope and the filename token"; fi
 
+# Byte-order marks (issue #21). Every assertion that follows is silently
+# satisfied by a fixture that lost its mark - a zero-findings vault cannot
+# tell "read correctly" from "never marked" - so the bytes themselves are
+# asserted first, the way the CSV export's BOM already is further below.
+for f in "$W/01_requirements_(REQ)/00_REQ_file_template.md" \
+         "$W/06_implementation_(IMP)/00_IMP_file_template.md" \
+         "$W/03_architecture_(ARC)/ARC_Byte_Order_Mark.md"; do
+  TESTS=$((TESTS + 1))
+  if contains "$(head -c 3 "$f" | od -An -tx1)" "ef bb bf"; then ok x; else
+    fail "fixture lost its byte-order mark: $f"; fi
+done
+
+# The marked domain file takes part in the identifier checks, which reach
+# them through the corpus and not through read_lines. Naming it as the file
+# that declared the identifier first is the assertion: without a BOM-safe
+# corpus it has no identifier, and the collision below does not exist.
+TESTS=$((TESTS + 1))
+if contains "$out" "ARC_Byte_Order_Twin\.md.*\[id-duplicate\].*ARC-BOM-001.*already declared in ARC_Byte_Order_Mark\.md"; then
+  ok x; else fail "a marked file must reach the identifier checks like any other:"
+  printf '%s\n' "$out" | grep -E "ARC_Byte_Order" | sed 's/^/    /'
+fi
+# ... and it must not be accused of the defect the mark used to fake.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "ARC_Byte_Order_Mark\.md.*frontmatter-missing"; then ok x; else
+  fail "a byte-order mark must not be reported as missing frontmatter"; fi
+
 # ==========================================================================
 # Fixture 3: German/English twin vaults - byte-identical content, differing
 # only in domain folder names and template FILE names. Everything the
@@ -1539,6 +1610,22 @@ Architecture note whose required heading carries a qualifier, committed in
 that state. Its section-mismatch ERROR is pre-existing, not introduced.
 EOF
 
+# The git half of issue #21. Committed WITH a byte-order mark, so its
+# identifier can only be recovered from git HEAD - which git_head_content
+# decodes, not read_lines. Deleted from the worktree further below together
+# with ARC_Thermal.md: the identifier of a marked file must vanish exactly
+# like anyone else's. While it is still present, the clean-worktree
+# assertion above covers the other direction - an unmarked corpus would
+# report it as vanished although the file is lying right there.
+{ printf '\xef\xbb\xbf'
+  printf -- '---\ndomain: ARC\nid: ARC-BOM-001\nstatus: active\ncreated: 2026-01-09\nlast-verified: 2026-07-01\n---\n'
+  printf '## Context\nArchitecture note committed with a byte-order mark, so that HEAD and\n'
+  printf 'the working tree have to be read under one rule.\n'
+} > "$I/03_architecture_(ARC)/ARC_Byte_Order_Mark.md"
+TESTS=$((TESTS + 1))
+if contains "$(head -c 3 "$I/03_architecture_(ARC)/ARC_Byte_Order_Mark.md" | od -An -tx1)" "ef bb bf"; then
+  ok x; else fail "identity fixture lost its byte-order mark"; fi
+
 # Unborn HEAD: a repository without a single commit must not crash the
 # validator. Exit 2 would make both hooks fail open - enforcement silently off.
 hgit init -q
@@ -1586,12 +1673,23 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR"
       "/tmp/claude-mechdocs/blocks-$SIDR"
 
 # The object disappears from the worktree while HEAD still carries it.
-rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md"
+rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md" \
+      "$I/03_architecture_(ARC)/ARC_Byte_Order_Mark.md"
 out=$(python3 "$VALIDATOR" "$I" 2>&1); rc=$?
 TESTS=$((TESTS + 1))
 if contains "$out" "^WARN .*\[id-vanished\].*ARC-THM-001"; then ok x; else
   fail "deleted object must report its identifier as vanished:"
   printf '%s\n' "$out" | sed 's/^/    /'
+fi
+# The same, for the file that carried a byte-order mark. This is the only
+# assertion in the suite that reads a marked file through git rather than
+# from disk: head_identifiers decodes git show's output, and with the old
+# text=True the mark survived, frontmatter_id returned None and the
+# identifier was never in the HEAD set to begin with (issue #21).
+TESTS=$((TESTS + 1))
+if contains "$out" "^WARN .*\[id-vanished\].*ARC-BOM-001"; then ok x; else
+  fail "a marked file's identifier must be read from git HEAD too:"
+  printf '%s\n' "$out" | grep -E "id-vanished|ARC-BOM" | sed 's/^/    /'
 fi
 # WARN and never ERROR: retirement, rename and accidental loss cannot be told
 # apart, and a gate that blocks on all three teaches its user to ignore it.
@@ -1649,6 +1747,12 @@ if contains "$out" "\[frontmatter-status\]" && contains "$out" "\[req-class\]" \
 # (b) a schema that DECLARES the stray key: the very same vault, the very same
 # Python, one datum changed - and the finding disappears. This is the whole
 # claim of issue #4 in one assertion.
+#
+# Written WITH a byte-order mark (issue #21), which makes every assertion in
+# this block the positive control for the schema reader as well: json.loads
+# rejects a leading BOM outright, so an unmarked-only reader drops to
+# FALLBACK_SCHEMA behind one WARN - 'owner' becomes undeclared again and the
+# vault is validated against a vocabulary nobody chose.
 mkdir -p "$SC_TMP/declared"
 cp "$VALIDATOR" "$SC_TMP/declared/validate_vault.py"
 python3 - "$SKILL_DIR/vault_schema.json" "$SC_TMP/declared/vault_schema.json" <<'PY'
@@ -1657,9 +1761,15 @@ s = json.load(open(sys.argv[1]))
 s["domain_defaults"]["fields"]["owner"] = {
     "type": "enum", "values": ["nobody"], "required": False,
     "code": "frontmatter-owner", "enforced": "schema-driven"}
-json.dump(s, open(sys.argv[2], "w"))
+json.dump(s, open(sys.argv[2], "w", encoding="utf-8-sig"))
 PY
+TESTS=$((TESTS + 1))
+if contains "$(head -c 3 "$SC_TMP/declared/vault_schema.json" | od -An -tx1)" "ef bb bf"; then
+  ok x; else fail "the declared schema fixture lost its byte-order mark"; fi
 out2=$(python3 "$SC_TMP/declared/validate_vault.py" "$W" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$out2" "\[schema-unreadable\]"; then ok x; else
+  fail "a byte-order mark must not make the schema unreadable"; fi
 TESTS=$((TESTS + 1))
 if ! contains "$out2" "\[frontmatter-undeclared\].*'owner'"; then ok x; else
   fail "declaring a field in the schema must stop it being undeclared"; fi
@@ -1819,6 +1929,47 @@ assert fm is None and msg, "an unclosed frontmatter must still be reported"
 assert end == 0, f"an unclosed frontmatter must not hide the body, got end_line {end}"
 PY
 then ok x; else fail "a genuinely malformed frontmatter line must still be reported"; fi
+
+# ==========================================================================
+# read_lines and the byte-order mark (issue #21)
+# ==========================================================================
+# Asserted at the reader, because no vault-level finding can express the
+# claim: what has to hold is that a marked file and an unmarked one yield
+# the SAME lines. A fixture can only show that neither produces a finding,
+# which is equally true of two files read wrongly in the same way. The
+# probes are written into $TMP, outside every vault root, so they reach the
+# reader assertions here and the reader-parity assertion at the end of this
+# file without adding a finding anywhere.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$TMP" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+import validate_vault as vv
+
+tmp = Path(sys.argv[2])
+body = "---\ndomain: ARC\nid: ARC-PRB-001\n---\n## Context\nprobe file\n"
+marked, plain = tmp / "bom_probe.md", tmp / "plain_probe.md"
+marked.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
+plain.write_text(body, encoding="utf-8")
+assert marked.read_bytes()[:3] == b"\xef\xbb\xbf", "the probe lost its mark"
+
+# The comparison parse_frontmatter makes, and the two consumers that used
+# to fail silently behind it.
+assert vv.read_lines(marked)[0] == "---", repr(vv.read_lines(marked)[0])
+assert vv.read_lines(marked) == vv.read_lines(plain), "a mark must be the only difference"
+assert vv.parse_frontmatter(vv.read_lines(marked))[0] == {
+    "domain": "ARC", "id": "ARC-PRB-001"}
+assert vv.frontmatter_id(vv.read_lines(marked)) == "ARC-PRB-001"
+
+# Only a LEADING mark is a signature. One inside the text is an ordinary
+# character (Unicode FAQ) and must survive, or the reader would be editing
+# content rather than decoding it.
+mid = tmp / "mid_probe.md"
+mid.write_text("---\ndomain: ARC\ntags: [a﻿b]\n---\n", encoding="utf-8")
+assert vv.parse_frontmatter(vv.read_lines(mid))[0]["tags"] == ["a﻿b"]
+PY
+then ok x; else fail "read_lines must strip a leading byte-order mark and nothing else"; fi
 
 # ==========================================================================
 # Fixture 6: a template whose own required headings are prefixes of each
@@ -2319,6 +2470,14 @@ for root in sys.argv[2:]:
             continue
         lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
         assert vv.fence_mask(lines)[1:] == ex.fenced_mask(lines), f"fence masks differ: {f}"
+        # The masks can only agree about a file the two tools read alike.
+        # Until issue #21 they did not: the exporter read BOM-safe and the
+        # validator did not, so line 1 of a marked file was '---' in one
+        # tool and '﻿---' in the other - and this harness, reading by
+        # a third rule of its own, could not see it.
+        a, b = vv.read_lines(f), ex.read_lines(f)
+        assert (a[0] if a else "") == (b[0] if b else ""), \
+            f"the two readers disagree about line 1 of {f}"
         n += 1
 assert n > 50, f"parity assertion covered only {n} files - fixtures moved?"
 PY
