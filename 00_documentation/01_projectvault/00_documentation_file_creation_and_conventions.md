@@ -153,6 +153,17 @@ order, names the other in the report and writes every identifier with the
 prefix of the one it kept. Finish the translation or remove the folder
 you no longer write to; do not leave both.
 
+Two folders can also share **one** abbreviation, because German and
+English spell ARC, IMP and REF identically: `03_architecture_(ARC)`
+beside `03_Architektur_(ARC)`. The vault's folder is then the first in
+sorted order among those that actually hold `ARC_*` files, so a leftover
+folder carrying nothing but its template never takes the domain, and both
+tools name the pair — the validator as `domain-duplicate-folder`, the
+export as `export-duplicate-role`. Files below the other folder are still
+checked one by one; what only the chosen folder feeds is everything that
+reads the folder itself, the requirement index and the architecture
+overview among them.
+
 Everything the export cannot resolve **becomes a line in the report**
 rather than disappearing from it: a requirement ID nobody defined, a
 table in a section no template declares, a status the schema does not
