@@ -54,7 +54,33 @@ DOMAIN_DIR_RE = re.compile(r"^\d\d_.+_\(([A-Z]{2,4})\)$")
 TEMPLATE_MARKERS = ("template",)
 TEMPLATE_NAME_RE = re.compile(
     r"^00_.*(?:" + "|".join(re.escape(m) for m in TEMPLATE_MARKERS) + r")", re.I)
-WIKILINK_RE = re.compile(r"(!?)\[\[([^\]|#\n]+)(#[^\]|\n]*)?(\|[^\]\n]*)?\]\]")
+# One internal link, split into embed marker, target, anchor and alias.
+# Every quantifier below is load-bearing, and NO vault on this machine can
+# catch its removal - the shapes they exist for occur zero times in nine
+# vaults (issue #23), so the parser assertions in tests/run.sh are the only
+# guard there is:
+#   '*' on the target, not '+': an empty target is a link into the file
+#     itself, '[[#Heading]]' and '[[#^blockid]]', both documented Obsidian
+#     syntax (obsidian.md/help/links).
+#   LAZY target and anchor: inside a table Obsidian requires the alias pipe
+#     to be escaped, '[[Note\|alias]]' (obsidian.md/help/advanced-syntax).
+#     A greedy group swallows that backslash and yields the target 'Note\',
+#     which resolves against nothing and was reported as link-unresolved on
+#     a link that works. Lazy, the backslash stays with the alias where it
+#     belongs. The two only ever differ there: the target class excludes
+#     '|' and '#', so it can give back nothing else.
+#   '\\?' before the alias pipe: the escape itself. The same applies to an
+#     embed size, '![[Engelbart.jpg\|200]]'.
+# A legal target can carry no escape at all - Obsidian forbids [ ] # ^ | in
+# file names outright and \ on Linux and macOS - so the escape is handled
+# where it occurs, at the alias boundary, and nowhere else.
+WIKILINK_RE = re.compile(r"(!?)\[\[([^\]|#\n]*?)(#[^\]|\n]*?)?(\\?\|[^\]\n]*)?\]\]")
+# A heading of any level, and a block identifier at the end of a line.
+# Obsidian links headings H1-H6, not just the H2s the section checks care
+# about, and states the block-id vocabulary as "Latin letters, numbers, and
+# dashes".
+HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$")
+BLOCK_ID_RE = re.compile(r"(?:^|\s)\^([A-Za-z0-9-]+)\s*$")
 # One item of a YAML block sequence: '-' followed by whitespace or by
 # nothing at all. Deliberately not '-' followed by anything, so '-- a'
 # stays malformed instead of quietly becoming the item 'a'.
@@ -1089,11 +1115,51 @@ def check_length(path, lines, findings):
                                 f"{n} lines without any subheading - add structure."))
 
 
+def anchor_index(lines, mask):
+    """(folded headings, block identifiers) of one file, outside fenced blocks.
+
+    The mask is what keeps a shell comment from becoming a heading: a
+    '```bash' block full of '# rebuild the image' lines would otherwise
+    resolve every anchor anyone cares to write.
+    """
+    heads, blocks = set(), set()
+    for i, line in enumerate(lines, 1):
+        if mask[i]:
+            continue
+        m = HEADING_RE.match(line)
+        if m:
+            heads.add(fold_key(m.group(1)))
+            continue
+        m = BLOCK_ID_RE.search(line)
+        if m:
+            blocks.add(m.group(1))
+    return heads, blocks
+
+
+def anchor_resolves(anchor, heads, blocks):
+    """Does '#Heading', '#A#B' or '#^blockid' name something in this file?
+
+    Headings compare folded, which is the tolerance classify_sections
+    already grants: a heading differing only in case or in an invisible
+    character IS that heading, and reporting the difference as a broken
+    link would be a finding nobody can act on. Obsidian chains subheadings
+    with further hashes ('[[Note#Chapter#Section]]'), and every segment of
+    such a chain has to name a heading; the order between them is not
+    checked, which is stated as a residual rather than implied.
+    """
+    body = anchor.lstrip("#")
+    if body.startswith("^"):
+        return body[1:] in blocks
+    segs = [s.strip() for s in anchor.split("#") if s.strip()]
+    return bool(segs) and all(fold_key(s) in heads for s in segs)
+
+
 def check_links(vault, path, lines, findings, strict, hub=False):
     md_names, all_names = vault.md_names(), vault.all_names()
     targets = Counter()
     total = 0
     mask = fence_mask(lines)
+    anchors = None      # built on the first same-file link, never for a file without one
     for i, line in enumerate(lines, 1):
         if mask[i]:
             continue
@@ -1101,6 +1167,28 @@ def check_links(vault, path, lines, findings, strict, hub=False):
         line = re.sub(r"`[^`]*`", " ", line)
         for m in WIKILINK_RE.finditer(line):
             target = m.group(2).strip()
+            anchor = (m.group(3) or "").strip()
+            if not target:
+                # A link into this file. It names no other file, so it is
+                # resolved against this one - and it is deliberately kept
+                # out of the budget and the repeat counter below, both of
+                # which are about OUTGOING links: "link the responsible
+                # file once" has no addressee when the target is the file
+                # the reader is already in.
+                if not anchor.strip("#^"):
+                    # '[[]]', '[[#]]', '[[|alias]]' - a link naming nothing
+                    # at all. Skipped rather than reported, which is what
+                    # the old regex did by not matching it; a finding for
+                    # the empty placeholder is a rollout of its own.
+                    continue
+                if anchors is None:
+                    anchors = anchor_index(lines, mask)
+                if not anchor_resolves(anchor, *anchors):
+                    sev = "ERROR" if strict else "WARN"
+                    findings.append(Finding(sev, "link-unresolved", str(path), i,
+                                            f"[[{anchor}]] names no heading and no "
+                                            "block identifier in this file"))
+                continue
             total += 1
             targets[target] += 1
             resolved = (target in md_names or target in all_names
