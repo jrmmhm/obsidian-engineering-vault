@@ -2686,8 +2686,8 @@ TESTS=$((TESTS + 1))
 if [ "$en_counts" = "$de_counts" ]; then ok x; else
   fail "German and English twin must export the same graph: '$en_counts' vs '$de_counts'"; fi
 TESTS=$((TESTS + 1))
-if [ "$en_counts" = "5 4 15" ]; then ok x; else
-  fail "expected 5 requirements, 4 proven, 15 edges; got '$en_counts'"; fi
+if [ "$en_counts" = "6 4 15" ]; then ok x; else
+  fail "expected 6 requirements, 4 proven, 15 edges; got '$en_counts'"; fi
 
 exq() { python3 - "$EN_OUT/traceability.json" "$1" <<'PY'
 import json, sys
@@ -2741,18 +2741,20 @@ if [ "$(exq 'any(f["code"]=="export-unbound-table" and "Loose" in (f["file"] or 
 TESTS=$((TESTS + 1))
 if [ "$(exq 'sorted(f["code"] for f in d["findings"] if "Unscoped" in (f["file"] or ""))')" = "['export-no-scope', 'export-unbound-table']" ]; then
   ok x; else fail "a file whose rows cannot be addressed must report BOTH its scope and its lost rows"; fi
-# The shape a section-title check cannot see: bound section, lost anyway.
+# Issue #37 turns this fixture around: the table behind the revision history
+# is now read, so the rows arrive and there is nothing left to report. Both
+# assertions fail on the code that shipped before the ingestion change.
 TESTS=$((TESTS + 1))
-if [ "$(exq 'sum(1 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "1" ]; then
-  ok x; else fail "a requirement table behind another table in the bound section must be reported exactly once"; fi
+if [ "$(exq 'sum(1 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "0" ]; then
+  ok x; else fail "a requirement table behind another table in the bound section must be read, not reported"; fi
 TESTS=$((TESTS + 1))
-if [ "$(exq 'any(r.startswith("REQ-SHD") for r in d["requirements"])')" = "False" ]; then
-  ok x; else fail "the shadowed fixture must lose its row - otherwise it asserts nothing"; fi
-# ... and the revision history in front of it is not a requirement table: a
-# row whose second cell is a date must not be reported as a lost requirement.
+if [ "$(exq '"REQ-SHD-001" in d["requirements"]')" = "True" ]; then
+  ok x; else fail "the shadowed fixture must gain its row"; fi
+# ... and the five-column revision history in front of it must NOT: its second
+# cell carries a date, which is the predicate that keeps the two apart.
 TESTS=$((TESTS + 1))
-if [ "$(exq 'any(f["line"]==15 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "True" ]; then
-  ok x; else fail "the finding must name the requirement row (line 15), not the revision row above it (line 11)"; fi
+if [ "$(exq 'sum(1 for r in d["requirements"] if r.startswith("REQ-SHD"))')" = "1" ]; then
+  ok x; else fail "the revision history above the requirement table must contribute no requirement"; fi
 # The counter-assertion: a table that IS bound stays unreported.
 TESTS=$((TESTS + 1))
 if [ "$(exq 'any(f["code"]=="export-unbound-table" and (f["file"] or "").endswith("REQ_Export (EXP).md") for f in d["findings"])')" = "False" ]; then
