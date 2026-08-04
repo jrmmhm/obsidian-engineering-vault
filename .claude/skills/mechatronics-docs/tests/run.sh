@@ -121,6 +121,8 @@ requirements. Sources are listed per row.
 | ------------- | --: | ------- | -------------------- | -------------------------------- |
 | M | 001 | ADC linearity error stays within 0.1 percent FSR | Pass if max INL over full range is below 0.1 percent FSR | [[REF_AD7175_Datasheet]] |
 | M | 002 | Sampling rate reaches at least 1 kS per second per channel | Pass if sustained logging shows 1000 samples per second | [[DEC_ADC_Selection]] |
+|               |     |         |                      |                                  |
+|               |     |         |                      |                                  |
 EOF
 
 cat > "$V/02_decisions_(DEC)/DEC_ADC_Selection.md" <<'EOF'
@@ -621,6 +623,106 @@ Requirement file whose rows carry a pipe inside a cell.
 | M | 002 | `ss -tlnp \| grep :8097` | Pass if the port listens | none |
 EOF
 
+# Issue #25: the header latch could only be set by the template's own English
+# wording, so a file whose real table drifted - translated here, which is what
+# every German vault on this machine writes - and whose only canonical header
+# sits inside a quoted example was read and then not checked at all. The
+# broken row below is the assertion that carries the change; before it, this
+# whole file produced zero row findings.
+cat > "$W/01_requirements_(REQ)/REQ_Drift (DRF).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file documenting the canonical header while its own table
+carries a translated one.
+
+```markdown
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| M | 001 | quoted example row | quoted | none |
+```
+
+| Klasse | Nr. | Inhalt | Kriterium | Quelle |
+| ------ | --: | ------ | --------- | ------ |
+| Z | 9 | drifted header, broken row | | keine |
+| M | 002 | drifted header, sound row | Pass if measured | keine |
+EOF
+
+# A quoted example BETWEEN two tables. Reading a fenced line as absent rather
+# than as a break merges them, and the second table's header becomes a body
+# row: two blocking findings on a line the author wrote correctly.
+cat > "$W/01_requirements_(REQ)/REQ_Split (SPL).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file whose two tables are separated by a quoted example.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| M | 001 | first table | Pass if measured | none |
+
+```markdown
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| Z | 9 | quoted between the tables | | none |
+```
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| M | 002 | second table | Pass if measured | none |
+EOF
+
+# A second table that gained a column. The five positional roles are intact,
+# so its rows stay requirement rows - otherwise one '| Comment |' in a header
+# would buy an exemption from four blocking codes, which is the bypass
+# amendment 2026-08-01 refused to sell for three backticks.
+cat > "$W/01_requirements_(REQ)/REQ_Wide (WID).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file whose second table carries an extra column.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| ------------- | --: | ------- | -------------------- | ------ |
+| M | 001 | narrow table | Pass if measured | none |
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source | Comment |
+| ------------- | --: | ------- | -------------------- | ------ | ------- |
+| Z | 002 | widened table, broken row | | none | tbd |
+EOF
+
+# The other direction: a five-column table that is not a requirement table at
+# all. Nothing here may be an ERROR - the check cannot tell a revision log
+# from a drifted requirement table - but the file carries no readable
+# requirement table, and saying nothing is what issue #25 is about.
+cat > "$W/01_requirements_(REQ)/REQ_Log (LOG).md" <<'EOF'
+---
+domain: REQ
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Context
+Requirement file whose only wide table is a revision history.
+
+| Revision | Date | Author | Change | Review |
+| -------- | ---- | ------ | ------ | ------ |
+| r1 | 2026-01-05 | jm | initial | pending |
+| r2 | 2026-02-05 | jm | reworded | pending |
+EOF
+
 cat > "$W/02_decisions_(DEC)/DEC_Bad.md" <<'EOF'
 ---
 domain: DEC
@@ -1005,7 +1107,8 @@ if [ $rc -eq 1 ]; then ok x; else fail "violation vault must exit 1, got $rc"; f
 for code in filename-prefix frontmatter-missing frontmatter-malformed \
     frontmatter-domain frontmatter-date frontmatter-status template-sections \
     length code-fence impl-leak link-unresolved req-class req-nnn \
-    req-duplicate req-criterion req-duplicate-global verifies-unknown-req \
+    req-duplicate req-criterion req-duplicate-global req-table-unrecognized \
+    verifies-unknown-req \
     verifies-empty dec-status dec-superseded path-missing req-uncovered \
     inb-age duplicate-basename orphan id-duplicate id-scope-mismatch \
     fence-host fence-record section-near-miss section-mismatch; do
@@ -1154,6 +1257,78 @@ assert "the only real requirement here" in text, f"indexed the quoted row instea
 assert "REQ-QTD-009" not in idx, "a quoted row must not enter the requirement index"
 PY
 then ok x; else fail "req_index must resolve the real row, not the quoted one"; fi
+
+# Issue #25: a table whose header drifted is still a requirement table. All
+# three assertions name the line, because the defect was that this row - the
+# only broken one in the file - produced nothing at all.
+for code in req-class req-nnn req-criterion; do
+  TESTS=$((TESTS + 1))
+  if contains "$out" "REQ_Drift (DRF)\.md:19 \[$code\]"; then ok x; else
+    fail "a drifted header must not switch the row check off: [$code] missing"
+    printf '%s\n' "$out" | grep "REQ_Drift" | sed 's/^/    /'
+  fi
+done
+# ... and the header the file only QUOTES must still be invisible, in the
+# finding stream and in the index alike. Otherwise the assertions above are
+# also satisfied by a check that stopped skipping fenced blocks.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "REQ_Drift (DRF)\.md:14"; then ok x; else
+  fail "the quoted example row must produce nothing"; fi
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$W" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+idx = vv.Vault(Path(sys.argv[2])).req_index()
+assert "REQ-DRF-002" in idx, "the sound row under the drifted header must be indexed"
+assert "REQ-DRF-001" not in idx, "the quoted row must not enter the requirement index"
+PY
+then ok x; else fail "the drifted table's rows must reach the requirement index"; fi
+
+# A quoted example BETWEEN two tables must not merge them. The second table's
+# header is the line that pays: merged, it is read as a body row and produces
+# two blocking findings on correct content.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -cE "REQ_Split \(SPL\)\.md.*\[(req-class|req-nnn|req-criterion|req-duplicate|req-table-unrecognized)\]") || true
+if [ "$n" -eq 0 ]; then ok x; else
+  fail "a fence between two tables must not merge them, got $n finding(s)"
+  printf '%s\n' "$out" | grep "REQ_Split" | sed 's/^/    /'
+fi
+
+# A table one column wider is still a requirement table: the five positional
+# roles are intact, and treating it as unrecognised would sell an exemption
+# from four blocking codes for one header cell.
+for code in req-class req-criterion; do
+  TESTS=$((TESTS + 1))
+  if contains "$out" "REQ_Wide (WID)\.md:16 \[$code\]"; then ok x; else
+    fail "a widened requirement table must still be checked: [$code] missing"; fi
+done
+TESTS=$((TESTS + 1))
+if ! contains "$out" "REQ_Wide (WID)\.md.*\[req-table-unrecognized\]"; then ok x; else
+  fail "a widened table that IS read must not also be reported as unread"; fi
+
+# The other half of issue #25: a REQ file whose only wide table is not a
+# requirement table says so - once, and never as an ERROR, because nothing
+# here can tell a revision log from a table that drifted out of readability.
+TESTS=$((TESTS + 1))
+if contains "$out" "^WARN .*REQ_Log (LOG)\.md:10 \[req-table-unrecognized\]"; then
+  ok x; else fail "a REQ file with no readable requirement table must WARN"
+  printf '%s\n' "$out" | grep "REQ_Log" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$out" | grep -c "REQ_Log (LOG)\.md.*\[req-table-unrecognized\]") || true
+if [ "$n" -eq 1 ]; then ok x; else
+  fail "req-table-unrecognized is one grouped finding per file, got $n"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$out" "^ERROR .*\[req-table-unrecognized\]"; then ok x; else
+  fail "req-table-unrecognized must never be an ERROR"; fi
+# The positive control the WARN needs: the revision log's own rows must NOT
+# be read as requirement rows. A check that reported nothing at all would
+# satisfy the assertion above just as well.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "REQ_Log (LOG)\.md.*\[req-class\]"; then ok x; else
+  fail "a revision-history table must not be checked as a requirement table"; fi
 
 # Near misses: a heading the author DID write under a title the template
 # does not carry. Every assertion is file-scoped and names the LINE, because
@@ -2367,6 +2542,37 @@ assert row('| a | b') == ['a', 'b']
 assert row('| --- | --- |') is None and row('| :--- | ---: |') is None
 assert row('|-- huart == &huart3?') is None
 assert row(r'| f\|oo  |') is None
+
+# req_tables against the same spec. The header is the row above a delimiter
+# row of the SAME width - "if the header row does not match the delimiter row
+# in the number of cells ... a table will not be recognized" - which is what
+# makes a header identifiable without reading its words (issue #25).
+t = vv.req_tables(['| a | b | c |', '| --- | --- | --- |', '| 1 | 2 | 3 |'])
+assert len(t) == 1 and t[0][0] == ['a', 'b', 'c'] and t[0][1] == 1
+assert t[0][2] == [(3, ['1', '2', '3'])]
+# Widths disagree: no table at all, so the first row stays a row and no
+# caller may read it as a header.
+t = vv.req_tables(['| a | b | c |', '| --- | --- |', '| 1 | 2 | 3 |'])
+assert len(t) == 1 and t[0][0] is None, t
+assert [line for line, _ in t[0][2]] == [1, 3]
+# A fenced line ENDS a group. Merged, the second header becomes a body row.
+t = vv.req_tables(['| a | b |', '| --- | --- |', '| 1 | 2 |',
+                   '```', '| x | y |', '```',
+                   '| a | b |', '| --- | --- |', '| 3 | 4 |'])
+assert len(t) == 2 and t[0][1] == 1 and t[1][1] == 7, t
+assert t[1][2] == [(9, ['3', '4'])]
+# The empty placeholder rows this project's own REQ template ships are
+# is_separator-shaped. Only the row directly after a group's first row can
+# become the delimiter, so they promote nothing and stay out of the rows.
+t = vv.req_tables(['| Class (M/S/O) | NNN |', '| --- | --- |',
+                   '|      |     |', '| M | 001 |'])
+assert len(t) == 1 and t[0][0] == ['Class (M/S/O)', 'NNN']
+assert t[0][2] == [(4, ['M', '001'])], t[0][2]
+# req_rows is the flat view of it, and every row it yields is a row by the
+# shared predicate above - the two must not drift into disagreeing.
+lines = ['| a | b |', '| --- | --- |', '| 1 | 2 |', 'prose', '| c | d |']
+assert list(vv.req_rows(lines)) == [(3, ['1', '2']), (5, ['c', 'd'])]
+assert all(row(lines[i - 1]) == cells for i, cells in vv.req_rows(lines))
 PY
 then ok x; else fail "the shared cell splitter must follow the GFM tables extension"; fi
 

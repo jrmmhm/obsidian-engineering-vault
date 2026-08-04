@@ -92,6 +92,18 @@ SEQ_ITEM_RE = re.compile(r"^-(?:\s+(.*))?$")
 # is a plain scalar in YAML too, and is not matched here.
 SEQ_NESTED_RE = re.compile(r"^[A-Za-z][\w-]*:(\s|$)")
 REQ_ID_RE = re.compile(r"REQ-[A-Z]{2,4}-\d{3}")
+# The number of the requirement row a table's second cell carries. One
+# constant for the three places that ask the question - check_req_table,
+# Vault.req_index and the global duplicate scan - because the unrecognised-
+# table WARN states that the index reads a row no check reads, and that
+# claim is only true while both sides ask it the same way.
+ROW_NNN_RE = re.compile(r"\d{3}")
+# Columns a requirement table carries. A table may be wider - a project that
+# appends a column keeps the five positional roles the row checks read - and
+# a narrower one is not a requirement table. Python rather than the schema,
+# for ID_RE's reason: it decides what is checked at all, and the schema's own
+# domains.REQ.rows entry states that the row grammar stays here.
+REQ_ROW_COLUMNS = 5
 DOM_IN_NAME_RE = re.compile(r"\(([A-Z]{2,4})\)")
 # Object identifiers (vault_schema.json, "identifier"): DOMAIN-SCOPE-NNN in
 # frontmatter. Identity lives in the file, not in its name, so a rename does
@@ -446,7 +458,7 @@ class Vault:
                     if not dom:
                         continue
                     for i, row in req_rows(lines):
-                        if len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
+                        if len(row) >= 2 and ROW_NNN_RE.fullmatch(row[1]):
                             self._req_index.setdefault(f"REQ-{dom}-{row[1]}", (f, i))
         return self._req_index
 
@@ -598,14 +610,34 @@ def fence_mask(lines, blocks=None):
     return mask
 
 
-def req_rows(lines):
-    """(line number, cells) of every table row OUTSIDE a fenced block.
+def req_tables(lines):
+    """Tables OUTSIDE a fenced block: (header cells|None, header line|None, rows).
 
     One reader for every place a requirement row is counted - check_req_table,
-    Vault.req_index and the global duplicate scan - so the validator cannot
-    disagree with itself about how many requirements a file has, and, since
-    fence_blocks is the exporter's rule, neither can the two tools
-    (amendment 2026-07-31b, residual 1).
+    Vault.req_index and the global duplicate scan, the latter two through the
+    req_rows view below - so the validator cannot disagree with itself about
+    how many requirements a file has, and, since fence_blocks is the
+    exporter's rule, neither can the two tools (amendment 2026-07-31b,
+    residual 1).
+
+    Structure is the GFM tables extension's, not this project's: a table is a
+    delimiter row with a header row of the same cell count directly above it,
+    and "if the header row does not match the delimiter row in the number of
+    cells ... a table will not be recognized". That is what makes the header
+    identifiable WITHOUT reading its words - the recognition issue #25 is
+    about. A group of rows carrying no delimiter row is returned with header
+    None: it is no table, and saying so is what lets the caller report it
+    instead of quietly reading its first row as data.
+
+    A fenced line ENDS the current group rather than being skipped over. Two
+    tables separated by a quoted example are two tables; merging them makes
+    the second one's header a body row, which is a blocking finding on a line
+    the author wrote correctly.
+
+    Only the row directly after a group's first row can become the delimiter,
+    which is what keeps the empty placeholder rows of this project's own REQ
+    template - '|   |   |   |   |   |', which is_separator accepts - from
+    promoting a later row to a header.
 
     A file left inside an open fence is read as if it carried no fence at
     all. Here the stakes are higher than in check_leaks, which evaluates such
@@ -616,12 +648,40 @@ def req_rows(lines):
     blocks = fence_blocks(lines)
     mask = ([False] * (len(lines) + 1) if any(c is None for _, _, _, c in blocks)
             else fence_mask(lines, blocks))
+    tables, cur = [], None
     for i, line in enumerate(lines, 1):
         if mask[i]:
+            cur = None
             continue
-        row = parse_table_row(line)
-        if row:
-            yield i, row
+        cells = split_cells(line)
+        if cells is None or len(cells) < 2:
+            cur = None
+            continue
+        if is_separator(cells):
+            if (cur is not None and cur[0] is None and len(cur[2]) == 1
+                    and len(cells) == len(cur[2][0][1])):
+                cur[0], cur[1] = cur[2][0][1], cur[2][0][0]
+                cur[2].clear()
+            continue
+        if cur is None:
+            cur = [None, None, []]
+            tables.append(cur)
+        cur[2].append((i, cells))
+    return [(header, line, rows) for header, line, rows in tables]
+
+
+def req_rows(lines):
+    """(line number, cells) of every table body row OUTSIDE a fenced block.
+
+    The flat view of req_tables, for the two consumers that ask about rows
+    and not about tables: the requirement index and the global duplicate
+    scan. Both stay deliberately more tolerant than check_req_table - they
+    answer "does this identifier exist anywhere", and a row they stop seeing
+    turns into verifies-unknown-req on some evidence note, which is a
+    blocking finding on the wrong file.
+    """
+    for _, _, rows in req_tables(lines):
+        yield from rows
 
 
 def fence_host(info: str):
@@ -1404,37 +1464,114 @@ def check_paths(vault, path, lines, fm_end, findings):
                 findings.append(Finding(sev, "path-missing", str(path), i, msg))
 
 
+def canonical_req_header(cells):
+    """The header row this project's own REQ template writes.
+
+    One of two signals that a table is a requirement table, and the weaker
+    one: nothing enforces a header row's wording, and a translated or
+    reworded header is not a defect. It is kept because it recognises a
+    table whose rows are ALL malformed, where the second signal - a row
+    carrying a requirement number - has nothing left to read.
+    """
+    return "Class" in cells[0] or "NNN" in " ".join(cells[:2])
+
+
 def check_req_table(vault, path, lines, findings):
+    """Requirement rows, in every table of a REQ file that is one.
+
+    A requirement table is recognised by its shape rather than by the words
+    in its header (issue #25): a GFM table of at least REQ_ROW_COLUMNS
+    columns whose header carries the template's tokens OR whose rows carry a
+    requirement number in the second cell - the very predicate Vault.req_index
+    uses to decide that a row DEFINES a requirement. The two signals are a
+    union with the rule this check used before, so no row that was checked
+    stops being checked, and neither the header's wording nor a section title
+    has to survive translation for the check to stay on.
+
+    What the header latch cost is measured: a REQ file whose real table
+    header drifted and whose only canonical header sat inside a quoted
+    example was read and then not checked at all, silently, on four codes
+    that all reach the stop gate's blocking set.
+
+    Width is a floor, not an equality. A project that appends a column keeps
+    the five positional roles the row checks read, and treating that table as
+    unrecognised would sell an exemption from four blocking codes for one
+    '| Comment |' in the header.
+    """
     # The class vocabulary is data; the table structure below is not - it is
     # row grammar rather than a value list (vault_schema.json, domains.REQ.rows).
     classes = _strlist(_dict(_dict(_dict(vault.schema(), "domains"), "REQ"), "rows"),
                        "class_values") or ["M", "S", "O"]
     seen = {}
-    header_ok = False
-    for i, row in req_rows(lines):
-        if "Class" in row[0] or "NNN" in " ".join(row[:2]):
-            header_ok = True
+    recognized, unread = False, []
+    for header, header_line, rows in req_tables(lines):
+        width = len(header) if header else (len(rows[0][1]) if rows else 0)
+        indexed = any(len(r) >= 2 and ROW_NNN_RE.fullmatch(r[1]) for _, r in rows)
+        if (header is None or width < REQ_ROW_COLUMNS
+                or not (canonical_req_header(header) or indexed)):
+            unread.append((header_line or rows[0][0], width, indexed))
             continue
-        if not header_ok or len(row) < 5:
-            continue
-        cls, nnn, content, crit = row[0], row[1], row[2], row[3]
-        if not (cls or nnn or content):
-            continue  # empty template row
-        if cls not in classes:
-            findings.append(Finding("ERROR", "req-class", str(path), i,
-                                    f"class '{cls}' must be one of {', '.join(classes)}"))
-        if not re.fullmatch(r"\d{3}", nnn):
-            findings.append(Finding("ERROR", "req-nnn", str(path), i,
-                                    f"NNN '{nnn}' must be 3 digits"))
-        elif nnn in seen:
-            findings.append(Finding("ERROR", "req-duplicate", str(path), i,
-                                    f"NNN {nnn} already used in line {seen[nnn]} - "
-                                    "IDs are never reused"))
-        else:
-            seen[nnn] = i
-        if not crit:
-            findings.append(Finding("ERROR", "req-criterion", str(path), i,
-                                    "empty acceptance criterion - untestable requirement"))
+        recognized = True
+        for i, row in rows:
+            if len(row) < REQ_ROW_COLUMNS:
+                continue
+            cls, nnn, content, crit = row[0], row[1], row[2], row[3]
+            if not (cls or nnn or content):
+                continue  # empty template row
+            if cls not in classes:
+                findings.append(Finding("ERROR", "req-class", str(path), i,
+                                        f"class '{cls}' must be one of {', '.join(classes)}"))
+            if not ROW_NNN_RE.fullmatch(nnn):
+                findings.append(Finding("ERROR", "req-nnn", str(path), i,
+                                        f"NNN '{nnn}' must be 3 digits"))
+            elif nnn in seen:
+                findings.append(Finding("ERROR", "req-duplicate", str(path), i,
+                                        f"NNN {nnn} already used in line {seen[nnn]} - "
+                                        "IDs are never reused"))
+            else:
+                seen[nnn] = i
+            if not crit:
+                findings.append(Finding("ERROR", "req-criterion", str(path), i,
+                                        "empty acceptance criterion - untestable "
+                                        "requirement"))
+    check_req_table_silence(path, unread, recognized, findings)
+
+
+def check_req_table_silence(path, unread, recognized, findings):
+    """The rows no row check reads - the second half of issue #25.
+
+    A check that stops checking without saying so is the failure mode this
+    layer exists to prevent, so the two cases the validator can prove from
+    its own state are reported rather than guessed at:
+
+    - a table the requirement index reads rows out of while no row check
+      reads them. That is the validator disagreeing with itself, and it is
+      the shape a drifted table has when only some of its rows are broken.
+    - a REQ file carrying a table wide enough to be a requirement table and
+      not one readable table. The file looks like it defines requirements
+      and defines none any check can see.
+
+    Neither fires on a table that is simply something else - a source map, a
+    rubric, a revision history - which is why a REQ file may carry those
+    without a word. WARN, not ERROR: the check cannot tell a table nobody
+    meant as a requirement table from one that drifted into being unreadable,
+    and that is this project's line for anything that blocks. One grouped
+    finding per file, as every per-file class here is aggregated.
+    """
+    hits = [(line, width) for line, width, indexed in unread
+            if indexed or (width >= REQ_ROW_COLUMNS and not recognized)]
+    if not hits:
+        return
+    where = ", ".join(f"line {line} ({width} columns)" for line, width in hits)
+    findings.append(Finding(
+        "WARN", "req-table-unrecognized", str(path), min(line for line, _ in hits),
+        f"{where}: not readable as a requirement table, so no row check reads "
+        f"it - one is a GFM table (a header row above a delimiter row of the "
+        f"same width) of at least {REQ_ROW_COLUMNS} columns whose header "
+        "carries the template's tokens or whose rows carry a three-digit "
+        "number in the second cell. Rows here are addressed as requirements "
+        "elsewhere in the vault, or this file carries no readable requirement "
+        "table at all"))
 
 
 def check_tae_verifies(vault, fm, path, findings):
@@ -1635,7 +1772,7 @@ def validate_vault_wide(vault: Vault):
             if not dom:
                 continue
             for i, row in req_rows(lines):
-                if len(row) >= 2 and re.fullmatch(r"\d{3}", row[1]):
+                if len(row) >= 2 and ROW_NNN_RE.fullmatch(row[1]):
                     rid = f"REQ-{dom}-{row[1]}"
                     if rid in ids and ids[rid][0] != f:
                         findings.append(Finding("ERROR", "req-duplicate-global", str(f), i,
