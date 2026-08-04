@@ -193,8 +193,10 @@
         "id_pattern": "^REQ-[A-Z]{2,4}-[0-9]{3}$",
         "columns": ["class", "number", "content", "acceptance_criterion", "source"],
         "class_values": ["M", "S", "O"],
+        "recognition": "A requirement table is recognised by its shape, never by the wording of its header (issue #25, amendment 2026-08-04b): a GFM table - a delimiter row with a header row of the same width directly above it - of at least five columns, whose header carries the template's tokens OR whose rows carry a three-digit number in the second cell, which is the predicate the requirement index uses to decide that a row defines a requirement. A header row is not enforced anywhere and does not survive translation, so keying on its text let one quoted example switch four blocking checks off. The section-title binding table_bindings uses for the exporter was measured and rejected for this: it would leave 34 of the 121 requirement rows on this machine unchecked.",
+        "unrecognized": "req-table-unrecognized (WARN, one grouped finding per file) reports the rows no row check reads: a table the requirement index takes rows from while check_req_table does not, or a REQ file carrying a table wide enough to be a requirement table and not one readable table. WARN and not ERROR because the check cannot tell a revision log or a rubric - both legitimate in a REQ file - from a table that drifted out of readability.",
         "enforced": "validator-internal",
-        "enforced_detail": "class_values IS read from here (req-class). The rest - req-nnn, req-duplicate, req-criterion, req-duplicate-global - stays in Python because it is table structure rather than a value vocabulary. id_pattern is compared against the validator's REQ_ID_RE by the test suite instead of being compiled at runtime."
+        "enforced_detail": "class_values IS read from here (req-class). The rest - req-nnn, req-duplicate, req-criterion, req-duplicate-global, req-table-unrecognized - stays in Python because it is table structure rather than a value vocabulary. The column count in particular: as data it would be an uncommitted off-switch for four blocking codes, which is what discovery.rejected_override refuses. id_pattern is compared against the validator's REQ_ID_RE by the test suite instead of being compiled at runtime."
       }
     },
     "DEC": {
