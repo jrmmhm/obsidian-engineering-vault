@@ -155,9 +155,17 @@ Search finds exact names, not implicit references.
 ### Wikilinks
 Link with the exact filename, e.g. `[[REQ_Measurement_(MEG)]]`. Aliases
 (pipe syntax with display text) are allowed for readability, but the
-target must be the exact filename. Link the responsible file once where it matters —
+target must be the exact filename. Inside a table the alias pipe has to be
+escaped — `[[TAE_ADC_Linearity\|linearity proof]]` — otherwise it is read
+as a column separator; the same applies to an embed size. Link the
+responsible file once where it matters —
 do not link every mention (guideline: under ~20 outgoing links per
 file; hub files like ARC and system_overview may carry more).
+
+A link into the same file (`[[#Heading]]`, `[[#^blockid]]`) is checked
+against that file's own headings and block identifiers and must name one
+of them. It is not an outgoing link and does not count towards the
+guideline above.
 
 ### Paths and artifacts on other machines
 Artifacts of this project — testdata, source code, CAD files, documents,
