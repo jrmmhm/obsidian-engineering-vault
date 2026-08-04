@@ -136,6 +136,16 @@ carried, while reformatting the header row costs nothing but a note in
 the export. This is why a differently titled section is an error and a
 differently spelled one is only a warning.
 
+A requirements section may hold **several tables**, and all of them are
+read. Write your requirements a layer at a time, under `###` subheadings
+if that helps — a subheading is not a new section and does not end the
+binding. A table in that section is read as requirements only when it has
+the template's five columns and a row of it defines a requirement only
+when its second cell is the three-digit number; a revision history or a
+glossary standing beside them contributes nothing. Every other domain
+keeps the first table of its section, so do not layer an allocation
+table.
+
 Everything the export cannot resolve **becomes a line in the report**
 rather than disappearing from it: a requirement ID nobody defined, a
 table in a section no template declares, a status the schema does not
