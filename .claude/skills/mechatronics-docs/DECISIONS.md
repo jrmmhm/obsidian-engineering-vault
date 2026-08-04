@@ -2606,7 +2606,9 @@ exporter is not touched, and the row checks themselves are unchanged.
    `table_bindings.binding_discovery.unbound_table` ("an empty graph is
    never silent") and the exporter's own docstring. Found by the
    adversarial review of this issue, measured, and left alone: it is an
-   exporter defect and belongs in its own issue.
+   exporter defect and belongs in its own issue. Filed as issue #34,
+   which also names the second gap it hides behind — that file returns at
+   `export-no-scope` before any table is looked at.
 5. **`parse_table_row` has no production caller left.** `req_tables`
    needs the delimiter row distinguishable from "not a row", which that
    predicate deliberately conflates. It stays because it is what the
