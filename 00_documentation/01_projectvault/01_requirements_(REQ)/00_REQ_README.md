@@ -42,6 +42,8 @@ Describes which topic of requirements the module covers and what it does not, in
 ### Table
 The requirements are listed as rows in a table with fixed columns. Each column has exactly one task.
 
+A file may hold **several such tables** in its Context section, grouped under `###` subheadings, and together they are one requirement list — NNN stays unique across the whole file. A table counts as a requirement table only if it carries these five columns, and a row defines a requirement only if its NNN cell holds the three-digit number, so a revision history or a glossary standing beside them is left alone. The conventions file states the same rule for every domain: [[00_documentation_file_creation_and_conventions]].
+
 | Class (M/S/O) | NNN | Content | Acceptance Criterion | Source / Justification (REF/DEC) |
 | ------------- | --: | ------- | -------------------- | -------------------------------- |
 
