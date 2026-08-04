@@ -2600,6 +2600,49 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
     printf 'verifies: [%s-EXP-001, %s-EXP-002]\n---\n' "$P" "$P"
     printf '## %s\n\nEvidence for the export example.\n' "$CTX"
   } > "$V/$TA/${EV}_Export.md"
+
+  # The three shapes in which a requirement row leaves no trace in the graph
+  # (issue #34). None of them contributes a row to it, so the counts asserted
+  # below stay what they were; what they must contribute is a finding.
+
+  # 1. A table under a section no template declares - the shape the issue was
+  #    filed for, and the one nativclaw carries seven times.
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n' "$P"
+    printf '## %s\n\nRequirements under a heading of this file own making.\n\n' "$CTX"
+    printf '## Detached layer\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | detached requirement | pass if reported | none |\n'
+  } > "$V/$RQ/${P}_Loose (LSE).md"
+
+  # 2. The same, in a file whose rows cannot be addressed at all. Every REQ
+  #    file of the nativclaw vault is this file: if the check runs after the
+  #    export-no-scope return, it never sees one of them.
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n' "$P"
+    printf '## %s\n\nNeither a conforming id nor a scope token in the name.\n\n' "$CTX"
+    printf '## Detached layer\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | unaddressable requirement | pass if reported | none |\n'
+  } > "$V/$RQ/${P}_Unscoped.md"
+
+  # 3. The requirement table sits in the bound section and is still lost,
+  #    because a five-column revision history stands in front of it and
+  #    bound_tables reads the first table only. 78 of homelab's requirement
+  #    rows are this shape; a section-title check cannot see any of them.
+  #    The revision row must stay unreported: its second cell is a date.
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n' "$P"
+    printf '## %s\n\n' "$CTX"
+    printf '| Version | Date | Author | Change | Review |\n'
+    printf '| --- | --- | --- | --- | --- |\n'
+    printf '| 1.0 | 2026-08-04 | jm | initial | ok |\n\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | shadowed requirement | pass if reported | none |\n'
+  } > "$V/$RQ/${P}_Shadowed (SHD).md"
 }
 
 EN_V="$EX_TMP/En/00_documentation/01_projectvault"
@@ -2688,6 +2731,46 @@ TESTS=$((TESTS + 1))
 if [ "$(exq '"no-evidence-note" in d["coverage"]["REQ-EXP-005"]["open_questions"]')" = "True" ]; then
   ok x; else fail "a requirement no evidence note names must carry that open question"; fi
 
+# Issue #34: a requirement row the graph does not contain is a finding, not an
+# absence. Each assertion below fails on the code that shipped before it.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["code"]=="export-unbound-table" and "Loose" in (f["file"] or "") for f in d["findings"])')" = "True" ]; then
+  ok x; else fail "a requirement table under an undeclared section must be reported"; fi
+# The ordering with export-no-scope, which is the whole of the fix's effect on
+# the corpus that motivated it: after the return this assertion fails alone.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'sorted(f["code"] for f in d["findings"] if "Unscoped" in (f["file"] or ""))')" = "['export-no-scope', 'export-unbound-table']" ]; then
+  ok x; else fail "a file whose rows cannot be addressed must report BOTH its scope and its lost rows"; fi
+# The shape a section-title check cannot see: bound section, lost anyway.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'sum(1 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "1" ]; then
+  ok x; else fail "a requirement table behind another table in the bound section must be reported exactly once"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(r.startswith("REQ-SHD") for r in d["requirements"])')" = "False" ]; then
+  ok x; else fail "the shadowed fixture must lose its row - otherwise it asserts nothing"; fi
+# ... and the revision history in front of it is not a requirement table: a
+# row whose second cell is a date must not be reported as a lost requirement.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["line"]==15 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "True" ]; then
+  ok x; else fail "the finding must name the requirement row (line 15), not the revision row above it (line 11)"; fi
+# The counter-assertion: a table that IS bound stays unreported.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["code"]=="export-unbound-table" and (f["file"] or "").endswith("REQ_Export (EXP).md") for f in d["findings"])')" = "False" ]; then
+  ok x; else fail "the bound requirement table must not be reported as lost"; fi
+# The German twin sees the same defects. en_counts=de_counts covers the graph
+# and not the findings, so without this the DE half of the fixture asserts
+# nothing at all.
+de_codes=$(python3 - "$DE_OUT/traceability.json" <<'PY'
+import json, sys
+print(sorted(f["code"] for f in json.load(open(sys.argv[1]))["findings"]))
+PY
+)
+en_codes=$(exq 'sorted(f["code"] for f in d["findings"])')
+TESTS=$((TESTS + 1))
+if [ "$de_codes" = "$en_codes" ]; then ok x; else
+  fail "German and English twin must report the same finding codes:"
+  printf '    en: %s\n    de: %s\n' "$en_codes" "$de_codes"; fi
+
 # Safety of the two artifacts a human opens.
 TESTS=$((TESTS + 1))
 if contains "$(head -1 "$EN_OUT/traceability.html")" 'charset="utf-8"'; then ok x; else
@@ -2748,6 +2831,10 @@ import validate_vault as vv, export_traceability as ex
 
 assert vv.split_cells is ex.split_cells, "the exporter re-declared split_cells"
 assert vv.is_separator is ex.is_separator, "the exporter re-declared is_separator"
+# Since issue #34 the exporter groups a REQ file's rows into tables with the
+# validator's own reader, so the two tools cannot disagree about how many
+# requirement rows a file has - only about which of them reached the graph.
+assert vv.req_tables is ex.req_tables, "the exporter re-declared req_tables"
 
 sc, row, un = vv.split_cells, vv.parse_table_row, ex.unescape
 
