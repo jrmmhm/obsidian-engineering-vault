@@ -389,7 +389,7 @@ def discover_bindings(vault, schema, findings):
 ROLE_CACHE = {}
 
 
-def bound_tables(lines, section_title, ncols):
+def bound_tables(lines, section_title, ncols, every=False):
     """Rows of the table under this section whose header has ncols columns.
 
     Matching folds case and invisible differences, the same rule
@@ -402,6 +402,18 @@ def bound_tables(lines, section_title, ncols):
     bindings resolve to one section name; reading the first table in the
     section would then feed a submodule row to the allocation parser and
     invent an allocation with no requirement.
+
+    'every' reads all tables of the section rather than the first, which is
+    what the REQ binding asks for and what no ARC binding may (issue #37).
+    Requirements are written a layer at a time - homelab's
+    ANF_Backup_System_(BAK).md holds ten tables under one '## Kontext',
+    separated by '###' subheadings - and the first-table rule dropped 78 of
+    that vault's 162 requirement rows. It is safe here and not for ARC
+    because a REQ row still has to carry a requirement number in its second
+    cell to mean anything, so a five-column revision history in the same
+    section contributes nothing; an allocation row has no such predicate.
+    The blank line below a table therefore ends that table (GFM: "the table
+    is broken at the first empty line") instead of ending the search.
     """
     if not section_title:
         return []
@@ -412,7 +424,7 @@ def bound_tables(lines, section_title, ncols):
         if mask[i]:
             continue
         if line.startswith("## "):
-            if rows:
+            if rows and not every:
                 break
             current = fold_key(line[3:].strip())
             taking = False
@@ -422,7 +434,9 @@ def bound_tables(lines, section_title, ncols):
         cells = split_cells(line)
         if cells is None:
             if taking:
-                break  # a blank line or prose ends the table
+                if not every:
+                    break  # a blank line or prose ends the table
+                taking = False  # ... and the next one may still follow
             continue
         if is_separator(cells):
             continue
@@ -604,7 +618,7 @@ def build_graph(vault, schema, roles, bindings):
     if req_abbr:
         for f, lines, _key in files_by_role.get("REQ", []):
             scope = req_scope_of(f, lines, req_abbr)
-            rows = bound_tables(lines, req_binding.get("section"), 5)
+            rows = bound_tables(lines, req_binding.get("section"), 5, every=True)
             # Before the scope check, not after: every REQ file of the
             # nativclaw vault returns there, so an unexported row in the one
             # corpus that has them would go unmentioned either way.
@@ -795,6 +809,13 @@ def _report_unexported_rows(g, f, lines, bound_lines):
     body row to the header's width, so a four-cell row of a five-column
     table is a requirement row that would have been ingested had its table
     been read (example 204, the rule split_cells already implements).
+
+    Since issue #37 the bound section contributes every one of its
+    five-column tables, so what remains to report is a table outside that
+    section and a table inside it whose header is not the bound width -
+    bound_lines holds the exactly-five-column tables and nothing else. The
+    message names the rule rather than one of the two, which is what keeps
+    it true in both.
     """
     for header, _hline, body in req_tables(lines):
         if not header or len(header) < 5:
@@ -806,8 +827,8 @@ def _report_unexported_rows(g, f, lines, bound_lines):
             g.findings.append(Finding(
                 "export-unbound-table", f, lost[0],
                 f"{len(lost)} requirement rows of this table are not in the "
-                "graph - the export reads the first five-column table of the "
-                "bound section and no other"))
+                "graph - only the five-column tables of the bound section "
+                "are exported"))
 
 
 def _report_unbound(g, f, lines, bound_lines):

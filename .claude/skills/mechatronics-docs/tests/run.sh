@@ -2628,11 +2628,12 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
     printf '| M | 001 | unaddressable requirement | pass if reported | none |\n'
   } > "$V/$RQ/${P}_Unscoped.md"
 
-  # 3. The requirement table sits in the bound section and is still lost,
-  #    because a five-column revision history stands in front of it and
-  #    bound_tables reads the first table only. 78 of homelab's requirement
-  #    rows are this shape; a section-title check cannot see any of them.
-  #    The revision row must stay unreported: its second cell is a date.
+  # 3. Requirements written a layer at a time in the bound section, behind a
+  #    five-column revision history. This is homelab's shape - 78 of its
+  #    requirement rows sit in the second to tenth table of one '## Kontext',
+  #    separated by '###' subheadings. Since issue #37 all of them are read,
+  #    and the revision row is what proves the row predicate still holds: its
+  #    second cell carries a date, so it defines no requirement.
   {
     printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n' "$P"
     printf '## %s\n\n' "$CTX"
@@ -2641,7 +2642,11 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
     printf '| 1.0 | 2026-08-04 | jm | initial | ok |\n\n'
     printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
     printf '| --- | --: | --- | --- | --- |\n'
-    printf '| M | 001 | shadowed requirement | pass if reported | none |\n'
+    printf '| M | 001 | shadowed requirement | pass if exported | none |\n\n'
+    printf '### Second layer\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 002 | requirement behind a subheading | pass if exported | none |\n'
   } > "$V/$RQ/${P}_Shadowed (SHD).md"
 }
 
@@ -2686,8 +2691,8 @@ TESTS=$((TESTS + 1))
 if [ "$en_counts" = "$de_counts" ]; then ok x; else
   fail "German and English twin must export the same graph: '$en_counts' vs '$de_counts'"; fi
 TESTS=$((TESTS + 1))
-if [ "$en_counts" = "5 4 15" ]; then ok x; else
-  fail "expected 5 requirements, 4 proven, 15 edges; got '$en_counts'"; fi
+if [ "$en_counts" = "7 4 15" ]; then ok x; else
+  fail "expected 7 requirements, 4 proven, 15 edges; got '$en_counts'"; fi
 
 exq() { python3 - "$EN_OUT/traceability.json" "$1" <<'PY'
 import json, sys
@@ -2741,18 +2746,25 @@ if [ "$(exq 'any(f["code"]=="export-unbound-table" and "Loose" in (f["file"] or 
 TESTS=$((TESTS + 1))
 if [ "$(exq 'sorted(f["code"] for f in d["findings"] if "Unscoped" in (f["file"] or ""))')" = "['export-no-scope', 'export-unbound-table']" ]; then
   ok x; else fail "a file whose rows cannot be addressed must report BOTH its scope and its lost rows"; fi
-# The shape a section-title check cannot see: bound section, lost anyway.
+# Issue #37 turns this fixture around: the table behind the revision history
+# is now read, so the rows arrive and there is nothing left to report. Both
+# assertions fail on the code that shipped before the ingestion change.
 TESTS=$((TESTS + 1))
-if [ "$(exq 'sum(1 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "1" ]; then
-  ok x; else fail "a requirement table behind another table in the bound section must be reported exactly once"; fi
+if [ "$(exq 'sum(1 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "0" ]; then
+  ok x; else fail "a requirement table behind another table in the bound section must be read, not reported"; fi
 TESTS=$((TESTS + 1))
-if [ "$(exq 'any(r.startswith("REQ-SHD") for r in d["requirements"])')" = "False" ]; then
-  ok x; else fail "the shadowed fixture must lose its row - otherwise it asserts nothing"; fi
-# ... and the revision history in front of it is not a requirement table: a
-# row whose second cell is a date must not be reported as a lost requirement.
+if [ "$(exq '"REQ-SHD-001" in d["requirements"]')" = "True" ]; then
+  ok x; else fail "the shadowed fixture must gain its row"; fi
+# The third table sits behind a '###' subheading, which is homelab's shape and
+# not a section boundary - a heading of that depth must not end the binding.
 TESTS=$((TESTS + 1))
-if [ "$(exq 'any(f["line"]==15 for f in d["findings"] if "Shadowed" in (f["file"] or ""))')" = "True" ]; then
-  ok x; else fail "the finding must name the requirement row (line 15), not the revision row above it (line 11)"; fi
+if [ "$(exq '"REQ-SHD-002" in d["requirements"]')" = "True" ]; then
+  ok x; else fail "a requirement table behind a '###' subheading must still be read"; fi
+# ... and the five-column revision history in front of both must NOT contribute:
+# its second cell carries a date, which is the predicate that keeps them apart.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'sum(1 for r in d["requirements"] if r.startswith("REQ-SHD"))')" = "2" ]; then
+  ok x; else fail "the revision history above the requirement tables must contribute no requirement"; fi
 # The counter-assertion: a table that IS bound stays unreported.
 TESTS=$((TESTS + 1))
 if [ "$(exq 'any(f["code"]=="export-unbound-table" and (f["file"] or "").endswith("REQ_Export (EXP).md") for f in d["findings"])')" = "False" ]; then
