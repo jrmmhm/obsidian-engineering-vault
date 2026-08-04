@@ -22,6 +22,7 @@ HEAD baseline of pre-existing files), WARN reports. status: draft does
 NOT relax any check.
 """
 
+import codecs
 import json
 import re
 import subprocess
@@ -162,6 +163,21 @@ ZERO_WIDTH = dict.fromkeys(map(ord, "​‌‍⁠﻿"), None)
 # the same subject at a different scope: anything that is not a word
 # character. 'Ablauf (monatlich)' qualifies, 'Kontexte' does not.
 BOUNDARY_RE = re.compile(r"\W")
+
+# Byte-order marks that are a SIGNATURE of another encoding rather than a
+# character, LONGEST FIRST. FF FE 00 00 begins with the UTF-16LE mark, so a
+# table tested in any other order reports every UTF-32LE file as UTF-16LE.
+# The sequences and their byte orders are Microsoft's table
+# (learn.microsoft.com/globalization/encoding/byte-order-mark), which states
+# the Unicode standard's: FE FF and 00 00 FE FF are big-endian, FF FE and
+# FF FE 00 00 little-endian. The UTF-8 mark is deliberately NOT in here - it
+# is stripped and the file read on, which is what issue #21 settled.
+BOM_SIGNATURES = (
+    ("UTF-32LE", codecs.BOM_UTF32_LE),
+    ("UTF-32BE", codecs.BOM_UTF32_BE),
+    ("UTF-16LE", codecs.BOM_UTF16_LE),
+    ("UTF-16BE", codecs.BOM_UTF16_BE),
+)
 
 _UNITS = (
     "mV|kV|V|mA|µA|uA|kΩ|MΩ|Ω|kOhm|MOhm|Ohm|mW|kW|W|kHz|MHz|GHz|Hz|Nm|mN|"
@@ -488,6 +504,69 @@ class Vault:
 # Parsing helpers
 # --------------------------------------------------------------------------
 
+def _universal_newlines(s: str):
+    """'\\r\\n' and a lone '\\r' become '\\n', the way read_text did it.
+
+    Path.read_text opens in text mode, where the translation happens
+    inside the decoder; decoding bytes does not translate, and 16 of the
+    1091 files in the nine vaults on this machine carry CRLF. Every
+    consumer splits with splitlines(), which hides the difference - but
+    read_text is this module's public reader and its output must not
+    change under a fix that is about encodings.
+
+    The membership test is not premature: two rewrites of every string
+    the validator reads cost 20 percent of a full audit's runtime, and
+    1075 of the 1091 files skip them.
+    """
+    if "\r" not in s:
+        return s
+    return s.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def decode_source(raw):
+    """-> (text, problem|None). The one place bytes become vault content.
+
+    'problem' names an encoding the vault is not written in, and it is a
+    fact rather than a guess: a byte-order mark IS that encoding's own
+    signature, and none of the four can open a valid UTF-8 file, because
+    FF and FE are not legal UTF-8 bytes anywhere. Without a mark the only
+    honest statement left is that the bytes are not UTF-8 - a Latin-1
+    file and a corrupted UTF-8 file cannot be told apart, and this reader
+    does not pretend otherwise; it names the byte instead of the
+    encoding.
+
+    The text comes back decoded exactly as before, utf-8-sig with
+    replacement characters, because the encoding is named and not
+    honoured. Decoding a UTF-16 file correctly here would make the
+    validator understand a file Obsidian does not open, and would let the
+    exporter carry its rows into the traceability graph. The vault is
+    UTF-8; a file that is not gets a finding, not a second reader.
+
+    Never raises. This runs in both hook paths, where an exception exits
+    2 and fails the gate open, so a str - which has one producer today
+    and none tomorrow - is handed back unchanged rather than compared
+    against bytes.
+    """
+    if isinstance(raw, str):
+        return raw, None
+    for name, bom in BOM_SIGNATURES:
+        if raw.startswith(bom):
+            return (_universal_newlines(raw.decode("utf-8", "replace")),
+                    f"the file is {name}, not UTF-8")
+    if raw.startswith(codecs.BOM_UTF8):
+        raw = raw[len(codecs.BOM_UTF8):]     # what utf-8-sig does, done once
+    try:
+        return _universal_newlines(raw.decode("utf-8")), None
+    except UnicodeDecodeError as e:
+        return (_universal_newlines(raw.decode("utf-8", "replace")),
+                f"the file is not valid UTF-8 ({e.reason} at byte {e.start})")
+
+
+def read_source(path: Path):
+    """(text, problem) of a file on disk. Raises OSError, as read_text did."""
+    return decode_source(path.read_bytes())
+
+
 def read_text(path: Path):
     """Text of a file, BOM-safe. Every read of vault content goes here.
 
@@ -503,8 +582,12 @@ def read_text(path: Path):
 
     The exporter has read this way since amendment 2026-07-31b. One rule
     for both tools, asserted per fixture file in tests/run.sh.
+
+    A caller that has to know WHY a file reads like nonsense calls
+    read_source instead; this one keeps the text-only contract every
+    consumer of it was written against (issue #31).
     """
-    return path.read_text(encoding="utf-8-sig", errors="replace")
+    return read_source(path)[0]
 
 
 def read_lines(path: Path):
@@ -925,11 +1008,18 @@ def req_scope(path: Path, lines):
 # --------------------------------------------------------------------------
 
 def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
+    """File-local checks. 'content' is the raw BYTES of another revision of
+    this file - git_head_content's blob, for the per-file baseline - and
+    None for the file as it lies on disk. Bytes rather than text because
+    the encoding of a revision is part of what the baseline has to know.
+    """
     findings = []
     kind, abbr = vault.classify(path)
     if kind in ("outside", "skip"):
         return findings
-    lines = content.splitlines() if content is not None else read_lines(path)
+    text, encoding_problem = (decode_source(content) if content is not None
+                              else read_source(path))
+    lines = text.splitlines()
 
     # Reported once per vault, and never on a git-HEAD baseline pass (whose
     # WARNs are discarded, which would swallow this one silently).
@@ -939,6 +1029,22 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                                 vault.schema_error() + " - falling back to the built-in "
                                 "field set; declared values and editor fields are not "
                                 "in effect"))
+
+    # Reported for every kind that is read at all, templates included: a
+    # template nobody can decode empties the required-section set of its
+    # whole domain. The finding is added to the others rather than
+    # replacing them - a check that stops reporting is what this layer
+    # exists to prevent, and the per-file ratchet compares codes against
+    # the same file at HEAD, so a run that suddenly reports one code where
+    # it used to report three would block the very session that repaired
+    # the file (issue #31, adversarial review).
+    if encoding_problem:
+        findings.append(Finding("ERROR", "encoding-not-utf8", str(path), 1,
+                                f"{encoding_problem} - this vault is UTF-8. Every "
+                                "check below read replacement characters, so its "
+                                "findings are consequences of the encoding rather "
+                                "than defects of their own; re-save the file as "
+                                "UTF-8 and read them again."))
 
     if kind == "inbox":
         check_links(vault, path, lines, findings, strict_links, hub=False)
@@ -1683,10 +1789,10 @@ def head_identifiers(vault: Vault):
         kind, abbr = vault.classify(p)
         if kind != "domain" or abbr in ID_EXCLUDED_DOMAINS:
             continue
-        text = git_head_content(vault, p)
-        if text is None:
+        raw = git_head_content(vault, p)
+        if raw is None:
             continue
-        fid = frontmatter_id(text.splitlines())
+        fid = frontmatter_id(decode_source(raw)[0].splitlines())
         if fid:
             out.setdefault(fid, p)
     return out
@@ -1865,22 +1971,27 @@ def load_json(path, default):
 
 
 def git_head_content(vault: Vault, path: Path):
+    """The committed BYTES of a file at HEAD, or None when it has none.
+
+    Bytes, not text: decoded here, a file committed as UTF-16 would carry
+    encoding-not-utf8 in the current run and not in its own baseline, and
+    the stop gate would block a session on a file nobody touched - the
+    failure mode amendment 2026-07-28g named when section-mismatch became
+    the first ERROR to enter the blocking set. git show hands out the
+    stored blob unfiltered, so what arrives here is what was committed;
+    decode_source applies the BOM rule and the newline translation the
+    working tree gets, so both sides are still read under one rule.
+    """
     repo = vault.git_root() or vault.project_root
     try:
         rel = path.resolve().relative_to(repo)
     except ValueError:
         return None
     try:
-        # errors="replace": a non-UTF-8 byte in a tracked file would other-
-        # wise raise UnicodeDecodeError inside subprocess.run itself.
-        # encoding: the same BOM rule read_text applies to the working
-        # tree, so a mark cannot make a pre-existing file look newly
-        # broken. git show hands out the stored blob unfiltered, so what
-        # arrives here is what was committed. Passing encoding implies
-        # text mode and keeps the newline translation text=True had.
+        # No encoding= and no text=True: both would decode, and a non-UTF-8
+        # byte would raise UnicodeDecodeError inside subprocess.run itself.
         r = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{rel}"],
-                           capture_output=True, encoding="utf-8-sig",
-                           errors="replace", timeout=10)
+                           capture_output=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout if r.returncode == 0 else None
