@@ -323,6 +323,60 @@ def template_files(domain_dir: Path):
         return []
 
 
+def dir_sort_key(p: Path):
+    """A total order over folder names that two machines agree on.
+
+    Sorting by the raw name is not enough: macOS stores 'Prüfung'
+    decomposed and Linux composed (Apple's APFS FAQ; HFS+ normalised to
+    NFD outright), so the same folder can carry different bytes on two
+    hosts and sort into a different place. The raw name stays as the
+    tie-break, because two names CAN normalise equal while differing on
+    disk and the order must still be total.
+    """
+    return (unicodedata.normalize("NFC", p.name), p.name)
+
+
+def has_domain_files(ddir: Path, abbr: str) -> bool:
+    """Does this folder carry a file of its own domain?
+
+    build_graph's ingestion predicate - a name starting with the folder's
+    abbreviation, which no '00_' template does - asked as a yes/no. A
+    count would make the answer flip on any ordinary edit; whether a
+    folder holds the domain at all flips twice over a whole translation.
+    """
+    try:
+        return any(f.name.startswith(f"{abbr}_") for f in ddir.rglob("*.md"))
+    except OSError:
+        return False
+
+
+def pick_domain_dir(abbr, dirs):
+    """The one folder of an abbreviation every check of this vault reads.
+
+    German and English spell ARC, IMP and REF identically, so a vault
+    mid-translation carries two folders under one abbreviation and
+    something has to choose. Left to iterdir the choice is the file
+    system's, and two machines holding the same content index different
+    folders (issue #42).
+
+    The rule is the first in sorted order AMONG THE FOLDERS CARRYING
+    FILES OF THE DOMAIN, and the qualifier is what the measurement
+    bought: a capital letter sorts first, so plain sorted-first hands
+    'Architektur' the domain over 'architecture' - including when the
+    German folder is a leftover holding nothing but templates. Measured
+    on the shipped template vault with such a folder beside the real one,
+    the export drops from 3 requirements proven and 14 relations to 0 and
+    6. Choosing the empty folder deterministically is worse than choosing
+    arbitrarily (DECISIONS.md, amendment 2026-08-04g).
+
+    Every folder empty falls back to sorted-first: there is nothing to
+    prefer, and the answer still has to be the same on both machines.
+    """
+    if len(dirs) == 1:
+        return dirs[0]
+    return next((d for d in dirs if has_domain_files(d, abbr)), dirs[0])
+
+
 def is_vault_root(d: Path) -> bool:
     """A vault root has >=3 domain dirs AND template files below them.
 
@@ -352,11 +406,37 @@ class Vault:
         self.root = root.resolve()
         self.doc_root = self.root.parent
         self.project_root = self.doc_root.parent
-        self.domains = {}      # ABBR -> domain dir path
-        for s in self.root.iterdir():
+        # ABBR -> every folder of that abbreviation, in one sorted order on
+        # every machine. Keeping them all is what lets the choice below be a
+        # rule instead of readdir's, and what lets check_domain_folders name
+        # the pair; the exporter reads this index rather than the root a
+        # second time (DECISIONS.md, amendment 2026-08-04g).
+        self.domain_dirs = {}
+        seen = {}
+        for s in sorted(self.root.iterdir(), key=dir_sort_key):
             m = DOMAIN_DIR_RE.match(s.name) if s.is_dir() else None
-            if m:
-                self.domains[m.group(1)] = s
+            if not m:
+                continue
+            abbr = m.group(1)
+            # is_dir() follows a symlink, so a compatibility link left behind
+            # by a rename - '03_Architektur_(ARC)' -> '03_architecture_(ARC)' -
+            # would otherwise be indexed as a second folder and reported as a
+            # pair the author cannot resolve: there is only one directory, and
+            # rglob does not descend into the link either. Deduped per
+            # abbreviation, because two abbreviations sharing one directory
+            # are two domain names for one folder, which is the exporter's
+            # export-duplicate-role and stays visible.
+            try:
+                real = s.resolve()
+            except OSError:
+                real = s
+            if real in seen.setdefault(abbr, set()):
+                continue
+            seen[abbr].add(real)
+            self.domain_dirs.setdefault(abbr, []).append(s)
+        # ABBR -> the one folder every check reads
+        self.domains = {abbr: pick_domain_dir(abbr, dirs)
+                        for abbr, dirs in self.domain_dirs.items()}
         self._templates = None
         self._md_names = None
         self._all_names = None
@@ -422,24 +502,51 @@ class Vault:
         return self._git_root or None
 
     def templates_for(self, abbr):
-        """H2 heading sets of each template of a domain (empty sets excluded)."""
+        """H2 heading sets of each template of a domain (empty sets excluded).
+
+        Every folder of the abbreviation contributes, not just the one
+        pick_domain_dir chose. A vault mid-translation has its German
+        templates in one folder and its English files below the other,
+        and the German folder wins the index whenever both carry content
+        - a capital letter sorts first. Reading only its templates makes
+        template-sections fire on files whose sections are correct:
+        measured as 0 errors becoming 1 on the shipped template vault,
+        which would fail the CI audit and block the stop gate on a
+        correct file (DECISIONS.md, amendment 2026-08-04g).
+
+        The union cannot make the check stricter. check_sections already
+        scores a file against every template of its domain and keeps the
+        best, so one more candidate can only be met or ignored. The
+        folder name is carried into the template's label where an
+        abbreviation has more than one folder, because 'closest template:
+        00_ARC_file_template.md' names two files there.
+        """
         if self._templates is None:
             self._templates = {}
-            for dom, ddir in self.domains.items():
+            for dom, ddirs in self.domain_dirs.items():
                 sets = []
-                for tf in template_files(ddir):
-                    try:
-                        h2s = extract_h2(read_text(tf))
-                    except OSError:
-                        continue
-                    if h2s:
-                        sets.append((tf.name, h2s))
+                for ddir in ddirs:
+                    for tf in template_files(ddir):
+                        try:
+                            h2s = extract_h2(read_text(tf))
+                        except OSError:
+                            continue
+                        if h2s:
+                            label = (tf.name if len(ddirs) == 1
+                                     else f"{ddir.name}/{tf.name}")
+                            sets.append((label, h2s))
                 self._templates[dom] = sets
         return self._templates.get(abbr, [])
 
     def _build_name_index(self):
+        # sorted, for validate_vault_wide's reason one level down: the
+        # duplicate-basename finding names paths[0], and rglob's order is
+        # the file system's. Two machines - or one machine and a vault
+        # whose folders were created in the other order - otherwise report
+        # the same collision on different files, which is the very
+        # non-determinism issue #42 is about, one index further out.
         self._md_names, self._all_names = {}, {}
-        for p in self.doc_root.rglob("*"):
+        for p in sorted(self.doc_root.rglob("*")):
             if any(part in (".obsidian", ".git") for part in p.parts):
                 continue
             if p.is_file():
@@ -1855,8 +1962,53 @@ def check_identifiers(vault: Vault, all_md, corpus, findings):
                                 "lost; identifiers are never reused"))
 
 
+def check_domain_folders(vault: Vault, findings):
+    """Two folders of one vault carrying one domain abbreviation.
+
+    The index picks one by rule since amendment 2026-08-04g, and this is
+    the other half of that: a rule that is applied silently is a rule
+    nobody can act on, and the folder that lost still holds files the
+    author believes are being read as that domain.
+
+    WARN, not ERROR. A translation legitimately produces two folders for
+    a while - the conventions say so - and this check cannot tell that
+    state from a mistake, which is this project's line for anything that
+    blocks. It also runs vault-wide, so it never reaches the stop gate's
+    blocking set at all.
+
+    One finding per folder that is not the vault's, at that folder, so a
+    vault carrying three of them says so three times rather than once.
+    """
+    for abbr in sorted(vault.domain_dirs):
+        dirs = vault.domain_dirs[abbr]
+        if len(dirs) < 2:
+            continue
+        kept = vault.domains[abbr]
+        for d in dirs:
+            if d == kept:
+                continue
+            same_look = ("" if strict_key(d.name) != strict_key(kept.name) else
+                         " The two names differ only in characters that render "
+                         "identically, so the pair is invisible in a file listing.")
+            findings.append(Finding(
+                "WARN", "domain-duplicate-folder", str(d), None,
+                f"'{d.name}' and '{kept.name}' both carry the {abbr} domain of "
+                f"this vault. '{kept.name}' is the one this vault reads: the "
+                f"first in sorted order among the folders holding {abbr}_* "
+                "files. The files here are still checked file by file, but "
+                "every check that reads the domain FOLDER - the requirement "
+                "index, the architecture overview, the traceability export - "
+                f"reads only '{kept.name}'.{same_look} One domain, one folder: "
+                "finish the translation, or remove the folder this vault no "
+                "longer writes to"))
+
+
 def validate_vault_wide(vault: Vault):
+    # First, so it survives hook_stop's 15-line cut of the advisory block:
+    # this finding is the explanation for the duplicate-basename and
+    # orphan findings a second domain folder produces around it.
     findings = []
+    check_domain_folders(vault, findings)
     # sorted: which of two colliding files is reported and which is named as
     # the other one must not depend on filesystem iteration order.
     all_md = sorted(p for p in vault.root.rglob("*.md")
