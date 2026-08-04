@@ -19,10 +19,10 @@ Sphinx-Needs' field_type, so a consumer can tell what was written down
 from what was worked out.
 
 Nothing the export can prove it lost is lost silently. A vault in another
-language, an architecture table in no recognised section, a requirement
-row the graph does not contain, a requirement reference that resolves to
-nothing, a status nobody declared: each is a row in the export, never an
-absence from it. The domains this project declares no table binding for
+language, a second folder meaning a domain already taken, an architecture
+table in no recognised section, a requirement row the graph does not
+contain, a requirement reference that resolves to nothing, a status
+nobody declared: each is a row in the export, never an absence from it. The domains this project declares no table binding for
 are the one documented exception, and vault_schema.json says why
 (table_bindings.binding_discovery.unbound_table). An empty graph without
 an explanation is the one output this tool must not produce.
@@ -181,30 +181,122 @@ def rel(path, root):
         return str(path)
 
 
+def domain_dirs(vault):
+    """-> {abbreviation: [directory, ...]}, sorted, duplicates included.
+
+    Vault indexes one directory per abbreviation, so the second folder of
+    a vault mid-translation is already gone before any role is resolved:
+    German and English spell ARC, IMP and REF identically, and
+    '03_Architektur_(ARC)' and '03_architecture_(ARC)' overwrite each other
+    in readdir order. Reading the root a second time is the only way to
+    see both, and sorting by name is what makes the finding below say the
+    same thing on two machines.
+    """
+    out = {}
+    try:
+        entries = sorted(vault.root.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return {abbr: [d] for abbr, d in vault.domains.items()}
+    for s in entries:
+        m = DOMAIN_DIR_RE.match(s.name) if s.is_dir() else None
+        if m:
+            out.setdefault(m.group(1), []).append(s)
+    return out
+
+
+def ingestible_count(ddir, abbr):
+    """How many files of this folder build_graph would put in the graph.
+
+    Its predicate, not a file count: a name starting with the folder's own
+    abbreviation, which no '00_' template does. None when the folder
+    cannot be read - a finding without a number beats a crash that looks
+    like an export.
+    """
+    try:
+        return sum(1 for f in ddir.rglob("*.md") if f.name.startswith(f"{abbr}_"))
+    except OSError:
+        return None
+
+
+def _files(n):
+    if n is None:
+        return "an unreadable number of files"
+    return "1 file" if n == 1 else f"{n} files"
+
+
+def duplicate_role_finding(role, kept_abbr, kept_dir, dropped_abbr, dropped_dir):
+    """The finding for a second folder that means a role already taken.
+
+    One code for both spellings of the same defect, because a consumer
+    reads one situation: a vault carrying two folders for one domain. They
+    differ in what the reader can do about it, so only the closing clause
+    does. Two abbreviations - '01_requirements_(REQ)' beside
+    '01_Anforderungen_(ANF)' - move every identifier of the graph to the
+    kept prefix. One abbreviation twice leaves the identifiers alone and
+    makes the choice itself unpredictable, because Vault keys its index by
+    abbreviation and the last directory readdir returns wins.
+    """
+    if dropped_abbr == kept_abbr:
+        tail = ("which of the two the graph reads is the order the file system "
+                "returns them in, and no rule fixes it")
+    else:
+        tail = (f"an identifier spelled {dropped_abbr}-* therefore resolves to "
+                f"nothing, because the graph is written with {kept_abbr}-*")
+    return Finding(
+        "export-duplicate-role", dropped_dir, None,
+        f"'{dropped_dir.name}' ({_files(ingestible_count(dropped_dir, dropped_abbr))}) "
+        f"and '{kept_dir.name}' ({_files(ingestible_count(kept_dir, kept_abbr))}) are "
+        f"both the {role} domain of this vault - only '{kept_dir.name}' is in the "
+        f"graph; {tail}. One role, one folder: finish the translation, or remove "
+        "the folder this vault no longer writes to")
+
+
 def resolve_roles(vault, schema, findings):
     """-> {canonical role token: folder abbreviation present in this vault}.
 
     The alias map is the reason a German vault yields a graph at all. An
     abbreviation the map does not know is reported and excluded rather than
-    guessed at.
+    guessed at, and so is a folder whose role another folder already holds.
+
+    The kept one is the first in sorted order. It is a rule and not a
+    judgement: the alternatives - the fuller folder, or both - each decide
+    something only the author knows. The fuller one moves every identifier
+    of the export a second time, at whatever unrelated edit tips the count;
+    ingesting both writes every already-translated requirement into the
+    graph twice and reports its untranslated twin as unallocated. What the
+    export owes the reader is that the choice is visible, which is the
+    finding below.
     """
     aliases = _dict(schema, "domain_aliases")
     amap = _dict(aliases, "map")
     identity = _strlist(aliases, "identity") or [
         "REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"]
     roles = {}
-    for abbr in sorted(vault.domains):
+    for abbr, dirs in sorted(domain_dirs(vault).items()):
         if abbr in ID_EXCLUDED_DOMAINS:
             continue
         role = abbr if abbr in identity else amap.get(abbr)
         if role is None:
             findings.append(Finding(
-                "export-unknown-domain", vault.domains[abbr], None,
+                "export-unknown-domain", dirs[0], None,
                 f"domain folder '{abbr}' is neither an English domain token nor "
                 "listed in domain_aliases - its files are not part of the graph; "
                 "add the alias to vault_schema.json"))
             continue
-        roles.setdefault(role, abbr)
+        if role in roles:
+            kept = roles[role]
+            for d in dirs:
+                findings.append(duplicate_role_finding(
+                    role, kept, vault.domains[kept], abbr, d))
+            continue
+        roles[role] = abbr
+        # The one Vault indexed is the one build_graph reads; its namesakes
+        # are excluded by that indexing and not by anything decided here.
+        used = vault.domains.get(abbr, dirs[0])
+        for d in dirs:
+            if d != used:
+                findings.append(duplicate_role_finding(
+                    role, abbr, used, abbr, d))
     return roles
 
 

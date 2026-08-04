@@ -84,9 +84,9 @@ It produces a self-contained HTML report, two CSV views and a JSON graph.
 Every reverse relation in them is computed, never read from a file. Run
 it when the user asks for a traceability matrix, a coverage overview, or
 something to hand to a reviewer — and read its findings section as you
-would the validator's: an unbound table, an unresolved requirement ID or
-an unknown domain abbreviation each mean the export understood less of
-the vault than it looks like it did. The exporter never blocks a turn.
+would the validator's: an unbound table, an unresolved requirement ID, an
+unknown domain abbreviation or two folders meaning one domain each mean
+the export understood less of the vault than it looks like it did. The exporter never blocks a turn.
 
 Two further tiers run the same validator without Claude Code, so a change
 authored in Obsidian or by hand is covered too: a pre-commit hook

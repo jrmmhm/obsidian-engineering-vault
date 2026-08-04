@@ -127,7 +127,7 @@ finding — and it does not read the relations at all.
 
 The relations have a second reader instead. `export_traceability.py`,
 beside the validator, walks them into a graph and writes the vault out as
-a traceability report. Two consequences for the way you write:
+a traceability report. Four consequences for the way you write:
 
 The **section title is the address**, not the table's header row. A
 relation table is found by the section its domain template declares, so
@@ -146,10 +146,18 @@ glossary standing beside them contributes nothing. Every other domain
 keeps the first table of its section, so do not layer an allocation
 table.
 
+A domain has **exactly one folder** per vault. A translation produces two
+for a while — an English `01_requirements_(REQ)` beside a German
+`01_Anforderungen_(ANF)` — and then the export reads the first in sorted
+order, names the other in the report and writes every identifier with the
+prefix of the one it kept. Finish the translation or remove the folder
+you no longer write to; do not leave both.
+
 Everything the export cannot resolve **becomes a line in the report**
 rather than disappearing from it: a requirement ID nobody defined, a
 table in a section no template declares, a status the schema does not
-list, a range reaching past the last requirement. The export is allowed
+list, a range reaching past the last requirement, a second folder meaning
+a domain another folder already holds. The export is allowed
 to say that a vault is incomplete; it is not allowed to look complete
 because something failed quietly. Schema entries flagged `export-driven`
 are read by it and produce no validator finding — the exporter reports,

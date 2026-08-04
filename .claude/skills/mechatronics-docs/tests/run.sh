@@ -2827,6 +2827,90 @@ if contains "$(cat "$EX_TMP/out-unknown/traceability.json")" "export-unknown-dom
   ok x; else fail "a domain abbreviation the alias map does not know must be reported"; fi
 rm -rf "$EN_V/06_unknown_(XYZ)"
 
+# Issue #38: two folders of one vault meaning one domain. Which one the
+# graph keeps does not change - the sorted-first abbreviation, as before -
+# so what is asserted here is that the choice stops being silent. Both
+# spellings of the defect are built, because a vault mid-translation
+# carries both: two abbreviations for one role (ANF beside REQ), and one
+# abbreviation twice (German and English spell ARC identically, and that
+# pair is collapsed by Vault.domains before any role is resolved).
+#
+# The added folder carries the same five-column template as the vault's
+# own. A stub template would leave req_table bound to nothing, and the
+# row assertions below would then pass because NOTHING was exported.
+dup_req_folder() { # <vault> <folder> <abbr> <template suffix> <section>
+  mkdir -p "$1/$2"
+  printf '## %s\n\n| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n| --- | --: | --- | --- | --- |\n|  |  |  |  |  |\n' \
+    "$5" > "$1/$2/00_$3_$4.md"
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n' "$3"
+    printf '## %s\n\nThe translated twin of the requirements folder.\n\n' "$5"
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | translated requirement | pass if exported | none |\n'
+  } > "$1/$2/$3_Export (EXP).md"
+}
+dup_req_folder "$EN_V" "01_Anforderungen_(ANF)" "ANF" "file_template" "Context"
+dup_req_folder "$DE_V" "01_requirements_(REQ)" "REQ" "Dateitemplate" "Kontext"
+# The ARC twin gets the same templates as its namesake, so the bindings are
+# the same whichever of the two readdir hands to Vault - the export must be
+# deterministic here even though the folder it reads is not chosen by a rule.
+mkdir -p "$EN_V/03_Architektur_(ARC)"
+cp "$EN_V/03_architecture_(ARC)/00_ARC_"*.md "$EN_V/03_Architektur_(ARC)/"
+
+python3 "$EXPORTER" "$EN_V" --output-dir "$EX_TMP/out-dup-en" --no-timestamp \
+  >/dev/null 2>&1
+python3 "$EXPORTER" "$DE_V" --output-dir "$EX_TMP/out-dup-de" --no-timestamp \
+  >/dev/null 2>&1
+dupq() { python3 - "$1" "$2" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(eval(sys.argv[2], {"d": d, "sorted": sorted, "len": len, "any": any,
+                         "all": all, "sum": sum}))
+PY
+}
+
+TESTS=$((TESTS + 1))
+if [ "$(dupq "$EX_TMP/out-dup-en/traceability.json" 'any(f["code"]=="export-duplicate-role" and f["file"]=="01_requirements_(REQ)" and "01_Anforderungen_(ANF)" in f["message"] for f in d["findings"])')" = "True" ]; then
+  ok x; else fail "a second folder for one role must be reported, naming both"; fi
+# The same-abbreviation pair: exactly one of the two is excluded, and which
+# one is readdir's business - so the assertion is on the count and on both
+# names being in the message, never on which one the file column shows.
+TESTS=$((TESTS + 1))
+if [ "$(dupq "$EX_TMP/out-dup-en/traceability.json" 'sum(1 for f in d["findings"] if f["code"]=="export-duplicate-role" and "(ARC)" in (f["file"] or "") and "03_architecture_(ARC)" in f["message"] and "03_Architektur_(ARC)" in f["message"])')" = "1" ]; then
+  ok x; else fail "two folders sharing one abbreviation must be reported once, naming both"; fi
+# The next two pin the DECISION rather than the fix: both hold on the code
+# that shipped before this finding existed. They are what makes the finding
+# above verifiable - the loss it names is real and it is this large.
+TESTS=$((TESTS + 1))
+if [ "$(dupq "$EX_TMP/out-dup-en/traceability.json" 'sum(1 for r in d["requirements"] if r.startswith("REQ-"))')" = "0" ]; then
+  ok x; else fail "the excluded folder's requirements must be absent from the graph"; fi
+TESTS=$((TESTS + 1))
+if [ "$(dupq "$EX_TMP/out-dup-en/traceability.json" '"ANF-EXP-001" in d["requirements"]')" = "True" ]; then
+  ok x; else fail "the kept folder's requirements must be in the graph"; fi
+# The German twin loses the ADDED folder instead of its own, because the rule
+# is the sorted abbreviation and not the vault's language: same code, and a
+# graph that still carries its own rows.
+TESTS=$((TESTS + 1))
+if [ "$(dupq "$EX_TMP/out-dup-de/traceability.json" 'any(f["code"]=="export-duplicate-role" and f["file"]=="01_requirements_(REQ)" for f in d["findings"]) and "ANF-EXP-001" in d["requirements"]')" = "True" ]; then
+  ok x; else fail "the German twin must report the same code and keep its own rows"; fi
+# Determinism across the readdir-dependent pair, on one disk state. Into the
+# SAME output directory as the run above, because provenance records the
+# output path and two directories can never compare equal.
+cp -r "$EX_TMP/out-dup-en" "$EX_TMP/out-dup-en-ref"
+python3 "$EXPORTER" "$EN_V" --output-dir "$EX_TMP/out-dup-en" --no-timestamp \
+  >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if diff -r "$EX_TMP/out-dup-en-ref" "$EX_TMP/out-dup-en" >/dev/null 2>&1; then ok x; else
+  fail "two runs over a vault with duplicate domain folders must still agree"; fi
+# The counter-assertion: a vault with one folder per role reports none of it.
+TESTS=$((TESTS + 1))
+if [ "$(dupq "$EN_OUT/traceability.json" 'any(f["code"]=="export-duplicate-role" for f in d["findings"])')" = "False" ]; then
+  ok x; else fail "a vault with one folder per role must carry no duplicate-role finding"; fi
+
+rm -rf "$EN_V/01_Anforderungen_(ANF)" "$EN_V/03_Architektur_(ARC)" \
+       "$DE_V/01_requirements_(REQ)"
+
 # ==========================================================================
 # The cell splitter against the GFM tables extension, which is the only
 # authority either tool has for what a row is made of. Examples 200 and 204
