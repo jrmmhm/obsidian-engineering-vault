@@ -49,6 +49,17 @@ vault rules (`validate_vault.py`, same directory):
   vault-wide findings (uncovered REQs, orphans, ...) as advisory — they
   never block; the full audit in step 7 remains the authoritative pass.
 
+A vault carrying two folders for one domain — `03_architecture_(ARC)`
+beside `03_Architektur_(ARC)`, which is what a half-finished translation
+looks like — is reported as `domain-duplicate-folder`. The folder the
+vault reads is the first in sorted order among those holding files of the
+domain, never the one the file system happened to return last, so the
+same vault says the same thing on every machine. WARN and vault-wide: two
+folders for a while are a legitimate transitional state, so it never
+blocks. Finish the translation or delete the folder you no longer write
+to; while both exist, only the chosen one feeds the requirement index,
+the architecture overview and the traceability export.
+
 Which frontmatter fields exist, of what type and with which permitted
 values, is declared in `vault_schema.json` beside the validator — the
 validator reads it rather than knowing the rules by heart. A key that is
