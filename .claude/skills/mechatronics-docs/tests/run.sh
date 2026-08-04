@@ -3157,6 +3157,128 @@ else
   fail "real template vault not found at $REAL_VAULT"
 fi
 
+# ==========================================================================
+# Issue #42: two folders under ONE abbreviation. German and English spell
+# ARC, IMP and REF identically, so a vault mid-translation carries the pair
+# whether anyone meant to or not, and Vault used to index whichever readdir
+# returned last. The two folders here carry DIFFERENT templates on purpose:
+# with identical ones every run would agree trivially and nothing below
+# would prove which folder was read.
+# ==========================================================================
+DUP_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$EX_TMP" "$DUP_TMP"' EXIT
+
+dup_arc_en() { # <vault root>
+  mkdir -p "$1/03_architecture_(ARC)"
+  printf '## Context\n' > "$1/03_architecture_(ARC)/00_ARC_file_template.md"
+  {
+    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n'
+    printf '## Context\n\nThe English architecture note of this vault.\n'
+    printf 'It answers one question and names no concrete value.\n'
+    printf 'Written under the English template, in the English folder.\n'
+  } > "$1/03_architecture_(ARC)/ARC_Module.md"
+}
+
+dup_arc_de() { # <vault root> <full|stub>
+  mkdir -p "$1/03_Architektur_(ARC)"
+  printf '## Kontext\n' > "$1/03_Architektur_(ARC)/00_ARC_Dateitemplate.md"
+  [ "$2" = "full" ] || return 0
+  {
+    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n'
+    printf '## Kontext\n\nDie deutsche Architekturnotiz dieses Vaults.\n'
+    printf 'Sie beantwortet eine Frage und nennt keinen konkreten Wert.\n'
+    printf 'Geschrieben unter dem deutschen Template, im deutschen Ordner.\n'
+  } > "$1/03_Architektur_(ARC)/ARC_Modul.md"
+}
+
+dup_vault() { # <vault root> <en-first|de-first> <full|stub>
+  mkdir -p "$1/01_requirements_(REQ)" "$1/02_decisions_(DEC)"
+  printf '## Context\n' > "$1/01_requirements_(REQ)/00_REQ_file_template.md"
+  printf '## Context\n' > "$1/02_decisions_(DEC)/00_DEC_file_template.md"
+  # The creation order is the point: on ext4 it is the order readdir hands
+  # the entries back, so two vaults built the two ways are the two disk
+  # states one vault can have on two machines.
+  if [ "$2" = "en-first" ]; then
+    dup_arc_en "$1"; dup_arc_de "$1" "$3"
+  else
+    dup_arc_de "$1" "$3"; dup_arc_en "$1"
+  fi
+}
+
+DUP_A="$DUP_TMP/a/00_documentation/01_projectvault"
+DUP_B="$DUP_TMP/b/00_documentation/01_projectvault"
+dup_vault "$DUP_A" en-first full
+dup_vault "$DUP_B" de-first full
+dup_a=$(python3 "$VALIDATOR" "$DUP_A" 2>&1 | sed "s|$DUP_TMP/a||g")
+dup_a2=$(python3 "$VALIDATOR" "$DUP_A" 2>&1 | sed "s|$DUP_TMP/a||g")
+dup_b=$(python3 "$VALIDATOR" "$DUP_B" 2>&1 | sed "s|$DUP_TMP/b||g")
+
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$dup_a" | grep -c 'domain-duplicate-folder')" = "1" ] \
+   && contains "$dup_a" "both carry the ARC domain" \
+   && contains "$dup_a" "03_Architektur_(ARC)" \
+   && contains "$dup_a" "03_architecture_(ARC)"; then
+  ok x; else fail "two folders under one abbreviation must be reported once, naming both:"
+  printf '%s\n' "$dup_a" | grep domain-duplicate | sed 's/^/    /'
+fi
+# The rule, not the file system: both folders hold ARC_* files, so the
+# sorted-first one wins - and a capital letter sorts first.
+TESTS=$((TESTS + 1))
+if contains "$dup_a" "'03_Architektur_(ARC)' is the one this vault reads"; then
+  ok x; else fail "the kept folder must be the sorted-first one holding domain files"; fi
+# Every folder of the abbreviation contributes its templates, so the file
+# below the folder that lost is not measured against the winner's sections.
+TESTS=$((TESTS + 1))
+if ! contains "$dup_a" "template-sections" && contains "$dup_a" "0 error(s)"; then
+  ok x; else fail "neither ARC file may lose its required sections to the other folder:"
+  printf '%s\n' "$dup_a" | grep -E 'ERROR|error\(s\)' | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if [ "$dup_a" = "$dup_a2" ]; then ok x; else
+  fail "two runs over a vault with two folders under one abbreviation must agree"; fi
+# The property issue #42 was filed for: same content, opposite creation
+# order, every line of the report identical - the duplicate-basename WARNs
+# the second folder produces included.
+TESTS=$((TESTS + 1))
+if [ "$dup_a" = "$dup_b" ]; then ok x; else
+  fail "the two creation orders must produce the same report:"
+  diff <(printf '%s\n' "$dup_a") <(printf '%s\n' "$dup_b") | sed 's/^/    /'
+fi
+
+# A folder holding nothing but its template does not take the domain. That
+# is the shape a finished translation leaves behind, and sorted-first alone
+# would hand it the vault deterministically.
+DUP_C="$DUP_TMP/c/00_documentation/01_projectvault"
+dup_vault "$DUP_C" de-first stub
+dup_c=$(python3 "$VALIDATOR" "$DUP_C" 2>&1 | sed "s|$DUP_TMP/c||g")
+TESTS=$((TESTS + 1))
+if contains "$dup_c" "'03_architecture_(ARC)' is the one this vault reads" \
+   && contains "$dup_c" "domain-duplicate-folder"; then
+  ok x; else fail "a template-only folder must not take the domain from the one holding it:"
+  printf '%s\n' "$dup_c" | grep domain-duplicate | sed 's/^/    /'
+fi
+
+# A compatibility symlink left behind by a rename is ONE directory, and
+# telling the author to remove a folder that does not exist is worse than
+# saying nothing. is_dir() follows the link; rglob does not descend it.
+DUP_D="$DUP_TMP/d/00_documentation/01_projectvault"
+mkdir -p "$DUP_D/01_requirements_(REQ)" "$DUP_D/02_decisions_(DEC)"
+printf '## Context\n' > "$DUP_D/01_requirements_(REQ)/00_REQ_file_template.md"
+printf '## Context\n' > "$DUP_D/02_decisions_(DEC)/00_DEC_file_template.md"
+dup_arc_en "$DUP_D"
+ln -s "03_architecture_(ARC)" "$DUP_D/03_Architektur_(ARC)"
+dup_d=$(python3 "$VALIDATOR" "$DUP_D" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$dup_d" "domain-duplicate-folder"; then ok x; else
+  fail "a symlink to a domain folder is not a second folder:"
+  printf '%s\n' "$dup_d" | grep domain-duplicate | sed 's/^/    /'
+fi
+
+# The counter-assertion: a vault with one folder per domain says none of it.
+TESTS=$((TESTS + 1))
+if ! contains "$(python3 "$VALIDATOR" "$V" 2>&1)" "domain-duplicate-folder"; then
+  ok x; else fail "a vault with one folder per domain must carry no duplicate-folder finding"; fi
+
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
       "/tmp/claude-mechdocs/blocks-$SID"
 
