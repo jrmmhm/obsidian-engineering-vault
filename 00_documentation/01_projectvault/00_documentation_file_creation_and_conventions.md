@@ -136,10 +136,18 @@ carried, while reformatting the header row costs nothing but a note in
 the export. This is why a differently titled section is an error and a
 differently spelled one is only a warning.
 
+A domain has **exactly one folder** per vault. A translation produces two
+for a while — an English `01_requirements_(REQ)` beside a German
+`01_Anforderungen_(ANF)` — and then the export reads the first in sorted
+order, names the other in the report and writes every identifier with the
+prefix of the one it kept. Finish the translation or remove the folder
+you no longer write to; do not leave both.
+
 Everything the export cannot resolve **becomes a line in the report**
 rather than disappearing from it: a requirement ID nobody defined, a
 table in a section no template declares, a status the schema does not
-list, a range reaching past the last requirement. The export is allowed
+list, a range reaching past the last requirement, a second folder meaning
+a domain another folder already holds. The export is allowed
 to say that a vault is incomplete; it is not allowed to look complete
 because something failed quietly. Schema entries flagged `export-driven`
 are read by it and produce no validator finding — the exporter reports,
