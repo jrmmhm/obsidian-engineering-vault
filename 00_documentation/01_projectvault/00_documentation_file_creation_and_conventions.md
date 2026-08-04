@@ -127,7 +127,7 @@ finding — and it does not read the relations at all.
 
 The relations have a second reader instead. `export_traceability.py`,
 beside the validator, walks them into a graph and writes the vault out as
-a traceability report. Two consequences for the way you write:
+a traceability report. Four consequences for the way you write:
 
 The **section title is the address**, not the table's header row. A
 relation table is found by the section its domain template declares, so
@@ -135,6 +135,16 @@ retitling `## Allocation and Verification` removes every relation it
 carried, while reformatting the header row costs nothing but a note in
 the export. This is why a differently titled section is an error and a
 differently spelled one is only a warning.
+
+A requirements section may hold **several tables**, and all of them are
+read. Write your requirements a layer at a time, under `###` subheadings
+if that helps — a subheading is not a new section and does not end the
+binding. A table in that section is read as requirements only when it has
+the template's five columns and a row of it defines a requirement only
+when its second cell is the three-digit number; a revision history or a
+glossary standing beside them contributes nothing. Every other domain
+keeps the first table of its section, so do not layer an allocation
+table.
 
 A domain has **exactly one folder** per vault. A translation produces two
 for a while — an English `01_requirements_(REQ)` beside a German
