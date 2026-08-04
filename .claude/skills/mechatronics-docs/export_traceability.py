@@ -52,7 +52,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from validate_vault import (  # noqa: E402
-    DOMAIN_DIR_RE, Vault, _dict, _strlist, fold_key, is_separator,
+    Vault, _dict, _strlist, fold_key, is_separator,
     is_vault_root, load_schema, parse_frontmatter, req_tables, split_cells,
     template_files,
 )
@@ -184,24 +184,17 @@ def rel(path, root):
 def domain_dirs(vault):
     """-> {abbreviation: [directory, ...]}, sorted, duplicates included.
 
-    Vault indexes one directory per abbreviation, so the second folder of
-    a vault mid-translation is already gone before any role is resolved:
-    German and English spell ARC, IMP and REF identically, and
-    '03_Architektur_(ARC)' and '03_architecture_(ARC)' overwrite each other
-    in readdir order. Reading the root a second time is the only way to
-    see both, and sorting by name is what makes the finding below say the
-    same thing on two machines.
+    The Vault's own index since amendment 2026-08-04g, where it keeps
+    every folder of an abbreviation and picks the vault's by rule. Until
+    then it kept one directory per abbreviation in readdir order, and
+    reading the root a second time here was the only way to see the
+    second folder of a vault mid-translation at all - which also meant
+    the two tools could disagree about what the vault contains between
+    the two reads. One index, read twice, cannot.
+
+    The dict is the Vault's, not a copy: nothing here writes to it.
     """
-    out = {}
-    try:
-        entries = sorted(vault.root.iterdir(), key=lambda p: p.name)
-    except OSError:
-        return {abbr: [d] for abbr, d in vault.domains.items()}
-    for s in entries:
-        m = DOMAIN_DIR_RE.match(s.name) if s.is_dir() else None
-        if m:
-            out.setdefault(m.group(1), []).append(s)
-    return out
+    return vault.domain_dirs
 
 
 def ingestible_count(ddir, abbr):
@@ -232,13 +225,16 @@ def duplicate_role_finding(role, kept_abbr, kept_dir, dropped_abbr, dropped_dir)
     differ in what the reader can do about it, so only the closing clause
     does. Two abbreviations - '01_requirements_(REQ)' beside
     '01_Anforderungen_(ANF)' - move every identifier of the graph to the
-    kept prefix. One abbreviation twice leaves the identifiers alone and
-    makes the choice itself unpredictable, because Vault keys its index by
-    abbreviation and the last directory readdir returns wins.
+    kept prefix. One abbreviation twice leaves the identifiers alone, and
+    which of the two folders the graph reads is Vault's rule since
+    amendment 2026-08-04g - it was the order readdir returned them in
+    until then, and the tail below said so.
     """
     if dropped_abbr == kept_abbr:
-        tail = ("which of the two the graph reads is the order the file system "
-                "returns them in, and no rule fixes it")
+        tail = ("which of the two the graph reads follows a rule rather than the "
+                "file system: the first in sorted order among the folders holding "
+                f"{kept_abbr}_* files, which validate_vault reports as "
+                "domain-duplicate-folder")
     else:
         tail = (f"an identifier spelled {dropped_abbr}-* therefore resolves to "
                 f"nothing, because the graph is written with {kept_abbr}-*")
@@ -258,9 +254,12 @@ def resolve_roles(vault, schema, findings):
     abbreviation the map does not know is reported and excluded rather than
     guessed at, and so is a folder whose role another folder already holds.
 
-    The kept one is the first in sorted order. It is a rule and not a
-    judgement: the alternatives - the fuller folder, or both - each decide
-    something only the author knows. The fuller one moves every identifier
+    The kept one is the first in sorted order - among two abbreviations
+    here, and among the folders of one abbreviation in pick_domain_dir,
+    where the folders holding files of the domain come first. It is a
+    rule and not a judgement: the alternatives - the fuller folder, or
+    both - each decide something only the author knows. Counting files
+    moves every identifier
     of the export a second time, at whatever unrelated edit tips the count;
     ingesting both writes every already-translated requirement into the
     graph twice and reports its untranslated twin as unallocated. What the
@@ -291,7 +290,8 @@ def resolve_roles(vault, schema, findings):
             continue
         roles[role] = abbr
         # The one Vault indexed is the one build_graph reads; its namesakes
-        # are excluded by that indexing and not by anything decided here.
+        # are excluded by that indexing, which is pick_domain_dir's rule and
+        # no longer readdir's (amendment 2026-08-04g).
         used = vault.domains.get(abbr, dirs[0])
         for d in dirs:
             if d != used:
