@@ -860,6 +860,56 @@ The same identity without a byte-order mark. Two files claiming one
 identifier is never legitimate, so this pair must be reported.
 EOF
 
+# Issue #31: the two files Windows PowerShell 5.1 writes without being
+# asked. ARC_Powershell is what 'Out-File', '>' and '>>' produce - UTF-16LE
+# with a mark - and it used to be reported as frontmatter-missing plus
+# template-sections, two blocking ERRORs naming a cause that is sitting
+# right there in the file. ARC_Ansi is what 'Set-Content' produces on a
+# German system: structurally intact, ASCII frontmatter and headings, and
+# every umlaut silently replaced. It produced NOTHING at all before.
+python3 - "$W/03_architecture_(ARC)" <<'PY'
+import codecs, sys
+from pathlib import Path
+d = Path(sys.argv[1])
+utf16 = (
+    "---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\n"
+    "last-verified: 2026-07-01\n---\n"
+    "## Context\n"
+    "Architecture note saved by a shell that writes UTF-16 by default.\n"
+    "Its frontmatter is here and its required heading is here; neither\n"
+    "survives being decoded as UTF-8, which is what made the findings\n"
+    "about them name the wrong cause.\n")
+(d / "ARC_Powershell.md").write_bytes(codecs.BOM_UTF16_LE + utf16.encode("utf-16-le"))
+ansi = (
+    "---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\n"
+    "last-verified: 2026-07-01\n---\n"
+    "## Context\n"
+    "Architekturnotiz, gespeichert in der ANSI-Codepage dieses Systems.\n"
+    "Sie trägt keine Signatur, an der die Kodierung zu erkennen wäre.\n"
+    "Frontmatter und Überschrift sind ASCII und überleben; nur die\n"
+    "Umlaute dieser Sätze werden still zu Ersatzzeichen.\n"
+    "Genau deshalb blieb diese Datei ohne jeden Befund.\n")
+(d / "ARC_Ansi.md").write_bytes(ansi.encode("cp1252"))
+PY
+# Byte guards. Every assertion below is silently satisfied by a fixture
+# that has become UTF-8 on the way in - a file that decodes cleanly cannot
+# tell "read correctly" from "never broken" - so the bytes are asserted
+# first, the way the byte-order-mark fixtures above are.
+TESTS=$((TESTS + 1))
+if contains "$(head -c 2 "$W/03_architecture_(ARC)/ARC_Powershell.md" | od -An -tx1)" "ff fe"; then
+  ok x; else fail "the UTF-16 fixture lost its byte-order mark"; fi
+TESTS=$((TESTS + 1))
+if python3 - "$W/03_architecture_(ARC)/ARC_Ansi.md" <<'PY'
+import sys
+raw = open(sys.argv[1], "rb").read()
+try:
+    raw.decode("utf-8")
+except UnicodeDecodeError:
+    sys.exit(0)
+sys.exit(1)
+PY
+then ok x; else fail "the ANSI fixture is valid UTF-8 - it proves nothing"; fi
+
 cat > "$W/06_implementation_(IMP)/IMP_Bad.md" <<'EOF'
 ---
 domain: IMP
@@ -1108,7 +1158,7 @@ for code in filename-prefix frontmatter-missing frontmatter-malformed \
     frontmatter-domain frontmatter-date frontmatter-status template-sections \
     length code-fence impl-leak link-unresolved req-class req-nnn \
     req-duplicate req-criterion req-duplicate-global req-table-unrecognized \
-    verifies-unknown-req \
+    encoding-not-utf8 verifies-unknown-req \
     verifies-empty dec-status dec-superseded path-missing req-uncovered \
     inb-age duplicate-basename orphan id-duplicate id-scope-mismatch \
     fence-host fence-record section-near-miss section-mismatch; do
@@ -1465,6 +1515,39 @@ TESTS=$((TESTS + 1))
 if ! contains "$out" "ARC_Byte_Order_Mark\.md.*frontmatter-missing"; then ok x; else
   fail "a byte-order mark must not be reported as missing frontmatter"; fi
 
+# A file that is not UTF-8 at all (issue #31). The finding names the
+# encoding, on line 1, as an ERROR - a Markdown vault file in UTF-16 is
+# never something anybody meant, which is this project's own criterion for
+# blocking versus reporting.
+TESTS=$((TESTS + 1))
+if contains "$out" "^ERROR .*ARC_Powershell\.md:1 \[encoding-not-utf8\].*UTF-16LE"; then
+  ok x; else fail "a UTF-16 file must be reported as UTF-16, naming the encoding:"
+  printf '%s\n' "$out" | grep "ARC_Powershell" | sed 's/^/    /'
+fi
+# The signature-less half. This file produced NOT ONE finding before, which
+# is why its assertion is the presence of the new one rather than the
+# absence of the old ones: there were none to be absent.
+TESTS=$((TESTS + 1))
+if contains "$out" "^ERROR .*ARC_Ansi\.md:1 \[encoding-not-utf8\].*not valid UTF-8"; then
+  ok x; else fail "an undecodable file without a mark must be reported by its byte:"
+  printf '%s\n' "$out" | grep "ARC_Ansi" | sed 's/^/    /'
+fi
+# Never a WARN - paired with the positive assertions above, because a
+# negative alone also passes against code that does not know the string.
+TESTS=$((TESTS + 1))
+if ! contains "$out" "^WARN .*\[encoding-not-utf8\]"; then ok x; else
+  fail "encoding-not-utf8 must never be a WARN"; fi
+# The finding is ADDED, not substituted. Issue #31 proposed replacing the
+# file's other findings; the per-file ratchet is why that was refused, and
+# this is the assertion that keeps someone from quietly reintroducing it:
+# the codes below have to stay in the run, so they stay in the git-HEAD
+# baseline, so repairing the encoding cannot look like introducing them.
+for code in frontmatter-missing template-sections; do
+  TESTS=$((TESTS + 1))
+  if contains "$out" "ARC_Powershell\.md.*\[$code\]"; then ok x; else
+    fail "the consequences of the misread must stay reported: [$code] gone"; fi
+done
+
 # ==========================================================================
 # Fixture 3: German/English twin vaults - byte-identical content, differing
 # only in domain folder names and template FILE names. Everything the
@@ -1801,6 +1884,33 @@ TESTS=$((TESTS + 1))
 if contains "$(head -c 3 "$I/03_architecture_(ARC)/ARC_Byte_Order_Mark.md" | od -An -tx1)" "ef bb bf"; then
   ok x; else fail "identity fixture lost its byte-order mark"; fi
 
+# Issue #31, the git half. Committed as UTF-16, so its encoding is part of
+# the state the per-file baseline is computed from - which is only true if
+# git_head_content hands out the blob as bytes. Its heading is German and
+# the template requires 'Context', so the file carries a template-sections
+# ERROR in BOTH readings: mojibake has no '## Context' either. That
+# symmetry is what the repair assertion below measures.
+python3 - "$I/03_architecture_(ARC)" <<'PY'
+import codecs, sys
+from pathlib import Path
+body = ("---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\n"
+        "last-verified: 2026-07-01\n---\n"
+        "## Kontext\n"
+        "Architekturnotiz, committet in UTF-16. Ihre Sektion heisst nicht\n"
+        "wie im Template, in beiden Lesarten.\n")
+p = Path(sys.argv[1]) / "ARC_Powershell.md"
+p.write_bytes(codecs.BOM_UTF16_LE + body.encode("utf-16-le"))
+PY
+TESTS=$((TESTS + 1))
+if contains "$(head -c 2 "$I/03_architecture_(ARC)/ARC_Powershell.md" | od -An -tx1)" "ff fe"; then
+  ok x; else fail "the committed UTF-16 fixture lost its byte-order mark"; fi
+
+# An empty committed file. git show returns b'' for it, which is falsy and
+# not None - and hook_post asks 'is not None' on purpose, because a
+# truthiness test would call a file that has been in the repository for
+# years a file this session created.
+: > "$I/03_architecture_(ARC)/ARC_Empty.md"
+
 # Unborn HEAD: a repository without a single commit must not crash the
 # validator. Exit 2 would make both hooks fail open - enforcement silently off.
 hgit init -q
@@ -1846,6 +1956,77 @@ if ! contains "$rout" '"decision": "block"'; then ok x; else
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
       "/tmp/claude-mechdocs/blocks-$SIDR"
+
+# Issue #31 at the gate. A file that was already UTF-16 at HEAD must not
+# block the session that opens it: its baseline is computed from the blob
+# by the running validator, so encoding-not-utf8 stands in baseline and
+# current run alike - the condition amendment 2026-07-28g stated when
+# section-mismatch became the first ERROR to enter the blocking set.
+# Asserting "does not block" alone would pass against the old code too
+# (which knows no such code at all), so the report has to NAME it as
+# pre-existing; that fails against the old code and against a version
+# that decodes the blob before the baseline is taken.
+SIDE="testsession-encoding-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
+      "/tmp/claude-mechdocs/blocks-$SIDE"
+for f in ARC_Powershell.md ARC_Empty.md; do
+  printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDE" \
+    "$I/03_architecture_(ARC)/$f" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+done
+eout=$(printf '{"session_id":"%s"}' "$SIDE" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$eout" '"decision": "block"'; then ok x; else
+  fail "a file that was already UTF-16 at HEAD must not block the gate:"
+  printf '%s\n' "$eout" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if contains "$eout" "\[encoding-not-utf8\].*(pre-existing, non-blocking)"; then ok x; else
+  fail "the pre-existing encoding ERROR must be named as pre-existing:"
+  printf '%s\n' "$eout" | sed 's/^/    /'
+fi
+# ... and the empty committed file must not be reported as created this
+# session. b'' is falsy; only 'is not None' tells it from "no such blob".
+TESTS=$((TESTS + 1))
+if ! contains "$eout" "files created this session"; then ok x; else
+  fail "an empty COMMITTED file must not count as created this session:"
+  printf '%s\n' "$eout" | sed 's/^/    /'
+fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
+      "/tmp/claude-mechdocs/blocks-$SIDE"
+
+# The repair path, which is the reason encoding-not-utf8 is added to a
+# file's findings instead of replacing them. The session does exactly what
+# the finding asks - re-saves the file as UTF-8 - and the section ERROR
+# that was hidden underneath becomes readable. It stood in the baseline
+# too, because the misread produced it as well, so the gate stays quiet.
+# Replace the other findings and the baseline knows one code instead of
+# three: the session that repairs the file gets blocked for its trouble.
+python3 - "$I/03_architecture_(ARC)" <<'PY'
+import sys
+from pathlib import Path
+body = ("---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\n"
+        "last-verified: 2026-07-01\n---\n"
+        "## Kontext\n"
+        "Dieselbe Notiz, neu gespeichert als UTF-8. Die Sektion heisst\n"
+        "weiterhin nicht wie im Template - das war vorher schon so.\n")
+(Path(sys.argv[1]) / "ARC_Powershell.md").write_text(body, encoding="utf-8")
+PY
+SIDF="testsession-encfix-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
+      "/tmp/claude-mechdocs/blocks-$SIDF"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDF" \
+  "$I/03_architecture_(ARC)/ARC_Powershell.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+fout=$(printf '{"session_id":"%s"}' "$SIDF" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$fout" '"decision": "block"'; then ok x; else
+  fail "repairing the encoding must not block the session that did it:"
+  printf '%s\n' "$fout" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$fout" "encoding-not-utf8"; then ok x; else
+  fail "the repaired file must not still be reported as non-UTF-8"; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
+      "/tmp/claude-mechdocs/blocks-$SIDF"
 
 # The object disappears from the worktree while HEAD still carries it.
 rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md" \
@@ -2145,6 +2326,80 @@ mid.write_text("---\ndomain: ARC\ntags: [a﻿b]\n---\n", encoding="utf-8")
 assert vv.parse_frontmatter(vv.read_lines(mid))[0]["tags"] == ["a﻿b"]
 PY
 then ok x; else fail "read_lines must strip a leading byte-order mark and nothing else"; fi
+
+# ==========================================================================
+# decode_source: which encoding a file is in, and what the reader does with
+# that (issue #31)
+# ==========================================================================
+# At the reader again, and for the same reason as the block above: the
+# claims are equalities between two spellings, and the load-bearing one -
+# that naming an encoding does not change a single character the reader
+# hands out - has no finding that could express it. The vaults on this
+# machine contain zero such files, so these probes are the only guard.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$TMP" <<'PY'
+import codecs, sys
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+import validate_vault as vv
+
+body = "---\ndomain: ARC\nid: ARC-PRB-002\n---\n## Context\nprobe file\n"
+
+# Every mark is named, and UTF-32LE is not called UTF-16LE. FF FE 00 00
+# begins with the UTF-16LE mark, so this pair is the whole reason the
+# signature table is ordered longest-first; a reversed table passes every
+# other assertion in this file.
+for name, bom, enc in (
+        ("UTF-16LE", codecs.BOM_UTF16_LE, "utf-16-le"),
+        ("UTF-16BE", codecs.BOM_UTF16_BE, "utf-16-be"),
+        ("UTF-32LE", codecs.BOM_UTF32_LE, "utf-32-le"),
+        ("UTF-32BE", codecs.BOM_UTF32_BE, "utf-32-be")):
+    text, problem = vv.decode_source(bom + body.encode(enc))
+    assert problem and name in problem, f"{name} reported as {problem!r}"
+
+# An ordinary file, and the two UTF-8 shapes issue #21 settled: a leading
+# mark is stripped and is not a finding, one inside the text is a character.
+assert vv.decode_source(body.encode("utf-8")) == (body, None)
+assert vv.decode_source(codecs.BOM_UTF8 + body.encode("utf-8")) == (body, None)
+mid = "---\ntags: [a﻿b]\n---\n"
+assert vv.decode_source(mid.encode("utf-8")) == (mid, None)
+
+# A truncated mark is not a mark: 'ef bb' alone is undecodable, and lands
+# in the same channel as any other broken byte (amendment 2026-08-04 names
+# it as the same class).
+text, problem = vv.decode_source(b"\xef\xbb" + body.encode("utf-8"))
+assert problem and "not valid UTF-8" in problem, problem
+
+# A DOUBLED mark stays valid UTF-8 and is deliberately NOT reported here -
+# residual 1 of amendment 2026-08-04 stays open, and this asserts that it
+# is still open rather than letting a later reader assume it was closed.
+text, problem = vv.decode_source(codecs.BOM_UTF8 * 2 + body.encode("utf-8"))
+assert problem is None and text.startswith("﻿"), (problem, text[:2])
+
+# Never raises, whatever it is handed: an exception here exits 2 and both
+# hooks fail open, which switches the enforcement layer off silently.
+assert vv.decode_source("already text") == ("already text", None)
+assert vv.decode_source(b"") == ("", None)
+
+# The property the whole design rests on: the encoding is NAMED, never
+# honoured. read_text hands out exactly what it handed out before this
+# change, for every shape above - which is what keeps the exporter, whose
+# reader was not touched, reading the same bytes the same way.
+tmp = Path(sys.argv[2])
+for i, raw in enumerate((
+        body.encode("utf-8"),
+        codecs.BOM_UTF8 + body.encode("utf-8"),
+        codecs.BOM_UTF16_LE + body.encode("utf-16-le"),
+        b"\xef\xbb" + body.encode("utf-8"),
+        body.replace("\n", "\r\n").encode("utf-8"),   # 16 real files carry CRLF
+        "Gr\xf6\xdfe".encode("cp1252"))):             # no mark, undecodable
+    p = tmp / f"enc_probe_{i}.md"
+    p.write_bytes(raw)
+    assert vv.read_text(p) == p.read_text(encoding="utf-8-sig", errors="replace"), \
+        f"read_text changed for probe {i}"
+    p.unlink()
+PY
+then ok x; else fail "decode_source must name the encoding without changing what is read"; fi
 
 # ==========================================================================
 # Fixture 6: a template whose own required headings are prefixes of each
