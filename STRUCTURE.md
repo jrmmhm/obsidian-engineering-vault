@@ -221,3 +221,23 @@ first.
 together: if you rewrite `CLAUDE.md` for your project, `AGENTS.md` keeps
 pointing at it and needs no edit.
 
+---
+
+## IEC_61508_MAPPING.md
+
+The nine domains and the eight typed relations placed against the clause
+structure of IEC 61508, with the gaps named — what the standard has titles for
+and this vault has no home for.
+
+It sits at the root and not in the vault because it describes the *method*
+rather than a project: the vault holds a project's own documentation, and a
+note there would additionally have to carry frontmatter, the domain template's
+sections and the 400-line limit. It is a structural correspondence and not a
+claim of conformance, which is the first thing the file itself says.
+
+**In a project made from this template**, it describes the template's method,
+which your project inherits unchanged as long as you keep the domains and
+relations. Delete it if you map against a different standard — ISO 13849 or
+IEC 62061 for machinery, ISO 26262 for road vehicles — and write that mapping
+as its own file rather than editing this one.
+
