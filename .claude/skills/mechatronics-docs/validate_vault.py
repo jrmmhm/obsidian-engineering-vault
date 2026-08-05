@@ -2239,7 +2239,7 @@ def hook_stop(payload):
     if not touched:
         return 0
     baseline = load_json(state_path("baseline", session), {})
-    reports, new_errors, created, inb_added = [], [], [], []
+    reports, new_errors, created, inb_added, resolved = [], [], [], [], []
     roots = []
     for key in touched:
         path = Path(key)
@@ -2270,6 +2270,27 @@ def hook_stop(payload):
             else:
                 reports.append(f.render(rel_to=vault.project_root))
 
+        # Codes this file carried at HEAD that produce no finding at all
+        # now. The comparison above iterates the CURRENT findings, so a
+        # code that stopped firing is never reached by it: the session
+        # ends green and says nothing about a check that may simply have
+        # become unreachable. That blind spot is what made issue #20's
+        # instance invisible rather than merely wrong (issue #26).
+        #
+        # Full disappearance only, never a decrease. A count moves at any
+        # unrelated edit - a link target created elsewhere in the session
+        # lowers link-unresolved in a file nobody touched, which under the
+        # phased creation order is the rule and not the exception. "Does
+        # this code still fire" is the yes/no the session can answer, the
+        # same reason has_domain_files asks one instead of counting.
+        gone = sorted(c for c, n in base.items() if n > 0 and cur[c] == 0)
+        if gone:
+            try:
+                rel = str(path.resolve().relative_to(vault.project_root))
+            except ValueError:
+                rel = str(path)
+            resolved.append(f"{rel} [{', '.join(gone)}]")
+
     summary = []
     if created:
         summary.append("files created this session: "
@@ -2295,6 +2316,23 @@ def hook_stop(payload):
         summary.insert(0, "UNRESOLVED vault ERRORs (gate released after "
                        f"{MAX_STOP_BLOCKS} attempts - surface these to the user):\n"
                        + "\n".join(sorted(set(new_errors))))
+
+    # Reported, never blocking. A repaired defect and a check that stopped
+    # reaching the file produce the same absence, and where this layer
+    # cannot tell a mistake from an intention it says so rather than
+    # stopping the session - the rule the vault-wide advisory below
+    # follows for the same reason. Emitted after the blocking branch on
+    # purpose: a block reason carries one obligation, and a second,
+    # non-blocking observation inside it spends a block attempt on legacy
+    # drift. Neither line starts with ERROR or WARN, so a rendered finding
+    # stays distinguishable from a code being reported as gone.
+    if resolved:
+        shown = sorted(set(resolved))
+        if len(shown) > 15:
+            shown = shown[:15] + [f"... +{len(shown) - 15} more"]
+        summary.append("codes that stood at HEAD and did not fire this session "
+                       "(say which of them you fixed; a check that became "
+                       "unreachable looks exactly the same):\n" + "\n".join(shown))
 
     # Vault-wide checks (req-uncovered, orphan, ...) run advisory-only:
     # they have no per-file HEAD baseline, so they never enter new_errors
