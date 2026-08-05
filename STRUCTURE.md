@@ -190,6 +190,35 @@ Claude Code.
 
 ---
 
+## .claude/01_methodvault
+
+The decision record of the method itself — why the validator, the exporter, the
+schema and the templates work the way they do. One DEC note per decision, with
+its Context, the options that were rejected, the choice and its consequences.
+Start at `system_overview.md`.
+
+It is a vault in the full sense: frontmatter, the DEC template's sections, the
+line limits, exact-filename wikilinks, and an audit step of its own in CI. That
+is the point rather than a side effect — a method that is never applied to its
+own hardest document has no evidence behind it, and 31 real decisions with real
+cross-corrections are the largest scale test this format can be given. What that
+cost is written down in `DEC_The_Decision_Log_Moves_Into_A_Vault`.
+
+Note the difference to `IEC_61508_MAPPING.md` below, which is deliberately *not*
+in a vault: that file is one structural comparison with no alternatives and no
+chosen option, so it is not a decision. These 32 notes each are.
+
+It sits beside `skills/` rather than inside it so that a derived project can
+delete the history of the method while keeping the tooling, and one level under
+`.claude/` so the validator resolves `project_root` to the repository root. It
+is versioned through a second exception in `.gitignore`.
+
+**In a project made from this template**, delete this directory — like
+`CONTRIBUTING.md`, `CHANGELOG.md` and `.github/`, it describes the template and
+not your project.
+
+---
+
 ## .github
 
 Everything GitHub reads rather than a person: `workflows/validate-vault.yml`

@@ -4,8 +4,8 @@ contact_links:
     url: https://github.com/jrmmhm/obsidian-engineering-vault/blob/main/00_documentation/01_projectvault/00_documentation_file_creation_and_conventions.md
     about: When a file may exist, which domain it belongs to, how a note is written. Read this before proposing a change to it.
   - name: Why the tools behave the way they do
-    url: https://github.com/jrmmhm/obsidian-engineering-vault/blob/main/.claude/skills/mechatronics-docs/DECISIONS.md
-    about: The decision log, one amendment per change, with the options that were rejected. Most "why does the validator do that" questions are answered there.
+    url: https://github.com/jrmmhm/obsidian-engineering-vault/blob/main/.claude/01_methodvault/system_overview.md
+    about: The decision record, one note per change, with the options that were rejected. Most "why does the validator do that" questions are answered there.
   - name: You are in a project made from this template
     url: https://github.com/jrmmhm/obsidian-engineering-vault/issues
     about: These forms describe the template, not your project. Delete this .github directory and write your own - or report a template issue upstream here.

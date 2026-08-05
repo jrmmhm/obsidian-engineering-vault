@@ -17,6 +17,15 @@ Read before your first vault edit — these are the authority, this file is not:
 
 The `mechatronics-docs` skill in `.claude/skills/` implements the method and
 activates on its own. When it is active, follow it over this file.
+
+This repository carries **two** vaults, and the subject decides which one a note
+belongs in. `00_documentation/01_projectvault/` documents one project's
+engineering work. `.claude/01_methodvault/` documents this method and its tools —
+why the validator, the exporter, the schema and the templates work as they do,
+one DEC note per decision, starting at
+`.claude/01_methodvault/system_overview.md`. Both are held to the same rules by
+the same validator and audited separately in CI. A change to how a tool behaves
+is recorded there, not as an amendment to a log file.
 </context>
 
 <rules>
