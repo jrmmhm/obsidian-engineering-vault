@@ -104,7 +104,10 @@ the "new or corrected documentation" line of the table in amendment 2026-08-05h
   shortening or splitting records, which fidelity rule 1 forbids. No record
   exceeds 400 lines (longest: 255).
 - Template vault: unchanged at **0 errors, 1 warning**.
-- Test suite: **289 tests, 0 failures**, plus the new method-vault assertion.
+- Test suite: **0 failures**, one assertion richer than before — the method
+  vault is now held to the same zero-ERROR bar as the template vault locally,
+  not only in CI. The count itself is deliberately not quoted: it climbs with
+  every behaviour anyone pins.
 - Fidelity: every one of the 31 records was compared paragraph by paragraph
   against its source line range with `difflib`. Deviations found beyond the
   declared classes — frontmatter, heading level, the migration metadata block,
