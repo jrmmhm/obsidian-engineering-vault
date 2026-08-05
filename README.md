@@ -227,12 +227,38 @@ searchable for a human in Obsidian — exact filenames, self-contained context
 sections, one question per file — are the same ones that make it retrievable
 for an agent.
 
-**With Claude Code.** Symlink the bundled skill into your skills directory and
-it activates automatically in any project with this layout:
+**With Claude Code.** In a project made from this template there is nothing to
+install. The skill sits in the project's own `.claude/skills/`, Claude Code
+reads it from there, and its hooks look there first.
+
+The global entry is for the other case — using the skill in projects that do
+not carry it:
 
 ```bash
-ln -s "$PWD/.claude/skills/mechatronics-docs" ~/.claude/skills/mechatronics-docs
+ln -sfn "$PWD/.claude/skills/mechatronics-docs" ~/.claude/skills/mechatronics-docs
 ```
+
+That link stores a path, not an identity. Where `~/.claude/` is shared or
+replicated between machines, the same path travels to hosts on which it does
+not exist, and the failure is silent: the skill keeps appearing in the listing
+and only the invocation fails. Keep the entry out of the replication and
+create it once per machine. With Syncthing that is one line in the `.stignore`
+of whichever folder root covers it, anchored to that root — `/mechatronics-docs`
+when the root is `~/.claude/skills`, `/skills/mechatronics-docs` when it is
+`~/.claude`. `.stignore` is per device and is never synchronised, so the line
+is written on each machine. A Claude Code update can remove a symlinked entry
+as well, which is the second reason the command above is worth re-running
+rather than remembering.
+
+One command says which copy a machine actually reaches:
+
+```bash
+python3 .claude/skills/mechatronics-docs/validate_vault.py --check-install
+# -> reaches this copy / dangling / reaches a different copy / no entry at all
+```
+
+Call it through the repository path, as written. On a host where the entry is
+broken, the path through the entry is the one thing that cannot work.
 
 It ships with two hooks. After every write into the vault, the validator checks
 the file and feeds findings straight back into the session. At turn end, a stop
