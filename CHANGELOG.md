@@ -49,7 +49,9 @@ weeks, and the point of a version number is to be believed.
   leaking into architecture notes. REQ↔TAE coverage is decided on the
   allocation row and the `verifies:` field — on the graph, never on a
   requirement ID appearing somewhere in prose. ERRORs block, WARNs advise, and
-  the exit code reflects the worst finding.
+  the exit code reflects the worst finding. The enforced rule set, including
+  the findings the prose sections of the conventions do not describe, is
+  listed in that file's validator quick reference.
 - **`vault_schema.json`** at `schema_version` 0.3 — the declaration the
   validator reads instead of hard-coding its rules: the nine domains, the
   identifier scheme, the fields each domain carries, and eight typed relations.
