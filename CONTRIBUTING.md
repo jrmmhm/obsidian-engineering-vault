@@ -49,12 +49,14 @@ matters.
 
 ```bash
 bash .claude/skills/mechatronics-docs/tests/run.sh
-# -> 289 tests, 0 failure(s)
+# -> <n> tests, 0 failure(s)
 #    ALL TESTS PASSED
 ```
 
 The count climbs every time somebody pins a behaviour, so do not read anything
-into the number — `0 failure(s)` and the last line are the whole signal.
+into the number — `0 failure(s)` and the last line are the whole signal. It is
+left as `<n>` here for the same reason: a number quoted in prose is a number
+that goes stale, and this one has already done so once.
 
 **The template vault audit.** CI runs this by name, so that the check cannot
 silently skip if the layout ever moves.

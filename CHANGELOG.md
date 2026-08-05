@@ -5,16 +5,22 @@ follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and the
 version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 applied to the *method* rather than to a code API.
 [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
-defines what a breaking change is for a project derived from this template, and
-every entry below is classified by that table.
+defines what a breaking change is for a project derived from this template. That
+table governs every entry that moves the rule set: from here on, such an entry
+names its tier. The entries of the first release mostly describe what the
+template *is* rather than a change to something a project already adopted, so
+only those that revise an earlier decision carry one.
 
 A repository created from a template starts with a single commit and shares no
 history with the template it came from, so an update cannot be pulled — it is
 copied in by hand. This file is what an existing project reads to decide whether
 a version is worth copying, and what the copy will cost it.
 
-The development so far: 126 commits since 2026-01-22, of which the recent
-stretch arrived as 26 pull requests merged between 2026-07-28 and 2026-08-05.
+The development so far: a first commit in January 2026, a long quiet stretch,
+and then the run of pull requests through late July and early August that turned
+a folder convention into an enforced method. The counts are deliberately not
+written down — `git log` holds them and holds them correctly, and a figure
+copied into prose is wrong from the next merge onward.
 What changed is recorded here; *why* it changed is in the method vault,
 [`system_overview.md`](.claude/01_methodvault/system_overview.md), one note per
 decision.
@@ -108,6 +114,14 @@ weeks, and the point of a version number is to be believed.
   template section or rule moved and no vault that was clean becomes unclean, so
   it is MINOR. The audit found one real defect in the log on first contact — an
   unbackticked wikilink example that thirty amendments of review had not caught.
+- **A contribution route that does not depend on asking** —
+  [CONTRIBUTING.md](CONTRIBUTING.md) with the tool-versus-method split, the three
+  local checks and their real output, the versioning table that defines a
+  breaking change for a derived project, and the release procedure; a bug-report
+  and a method-change issue form under `.github/ISSUE_TEMPLATE/`, the latter
+  asking for the cost to a project that already adopted the current rule and for
+  the expected tier; and a pull request template whose checklist is the set of
+  gates a reviewer would otherwise have to re-derive.
 - **MIT license.**
 
 [Unreleased]: https://github.com/jrmmhm/obsidian-engineering-vault/commits/main
