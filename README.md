@@ -392,6 +392,8 @@ paywalled.
 ├── 99_archive/             superseded content, kept not deleted
 ├── .claude/skills/mechatronics-docs/
 │                           the documentation skill, validator, exporter and tests
+├── .claude/01_methodvault/ the method's own decision record — a second vault,
+│                           audited by the same validator
 ├── .github/                CI workflow, issue forms, pull request template
 ├── IEC_61508_MAPPING.md    IEC 61508 correspondence — not a conformance claim
 └── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md

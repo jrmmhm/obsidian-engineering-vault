@@ -15,9 +15,9 @@ a version is worth copying, and what the copy will cost it.
 
 The development so far: 126 commits since 2026-01-22, of which the recent
 stretch arrived as 26 pull requests merged between 2026-07-28 and 2026-08-05.
-What changed is recorded here; *why* it changed is in
-[`DECISIONS.md`](.claude/skills/mechatronics-docs/DECISIONS.md), one amendment
-per decision.
+What changed is recorded here; *why* it changed is in the method vault,
+[`system_overview.md`](.claude/01_methodvault/system_overview.md), one note per
+decision.
 
 > **In a project made from this template**, this file describes the template and
 > not your project. Replace it with your own or delete it — the same holds for
@@ -95,6 +95,19 @@ weeks, and the point of a version number is to be believed.
   into: no domain, relation, field or rule moved, so it is MINOR — the
   expectation recorded in `DECISIONS.md` amendment 2026-08-05h, that #6 would
   be MAJOR because it would remap object and relation types, was not borne out.
+- **The method's own decision record, as a vault** —
+  [`.claude/01_methodvault/`](.claude/01_methodvault/system_overview.md). The 31
+  records of the appended decision log were migrated verbatim into one DEC note
+  each, held to the same frontmatter, template sections, line limits and link
+  rules as any project vault and audited by name in CI and in the test suite.
+  `.claude/skills/mechatronics-docs/DECISIONS.md` keeps no decision content and
+  forwards, mapping every amendment date to its note, so every citation of an
+  amendment by date in the tools stays true. A method change now earns a DEC
+  note rather than an amendment; `CONTRIBUTING.md`, the pull request template
+  and the issue forms say so. This is issue #53: no domain, relation, field,
+  template section or rule moved and no vault that was clean becomes unclean, so
+  it is MINOR. The audit found one real defect in the log on first contact — an
+  unbackticked wikilink example that thirty amendments of review had not caught.
 - **MIT license.**
 
 [Unreleased]: https://github.com/jrmmhm/obsidian-engineering-vault/commits/main
