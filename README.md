@@ -223,6 +223,13 @@ their path, this validator does not, so `[[README]]` is ambiguous and
 one of them is the only remedy. Keeping both names is a fair choice, and while
 you do, no wikilink may address either file by that name.
 
+That generalises: a WARN advises, it does not fail. A run that reports warnings
+and no ERROR exits 0, so no gate here blocks on one — not CI, not the pre-commit
+hook, not the hooks around a Claude Code session. Each warning is still a
+decision you make once, because the warning nobody triages is the one everybody
+learns to scroll past. If your run shows an ERROR, or a second warning you did
+not expect, that one is yours.
+
 Then open the vault:
 
 1. Open Obsidian → **Open folder as vault**
