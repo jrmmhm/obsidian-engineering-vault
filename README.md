@@ -359,7 +359,8 @@ throwaway one.
 ├── 99_archive/             superseded content, kept not deleted
 ├── .claude/skills/mechatronics-docs/
 │                           the documentation skill, validator, exporter and tests
-└── .github/                CI workflow, issue forms, pull request template
+├── .github/                CI workflow, issue forms, pull request template
+└── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md
 ```
 
 Full rules for what belongs where — including the two distinctions that trip
