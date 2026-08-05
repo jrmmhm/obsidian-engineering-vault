@@ -16,6 +16,9 @@ SKILL_DIR=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 VALIDATOR="$SKILL_DIR/validate_vault.py"
 # Skill lives at <repo>/.claude/skills/mechatronics-docs -> repo root is 3 levels up.
 REAL_VAULT="$(cd -P -- "$SKILL_DIR/../../.." && pwd -P)/00_documentation/01_projectvault"
+# The method's own decision record is a vault too, and is held to the same
+# zero-ERROR bar. Same -P reasoning as above.
+METHOD_VAULT="$(cd -P -- "$SKILL_DIR/../../.." && pwd -P)/.claude/01_methodvault"
 FAILURES=0
 TESTS=0
 
@@ -2899,6 +2902,19 @@ else
   fail "real template vault not found at $REAL_VAULT"
 fi
 
+# The method vault carries the decision record of this skill. It is audited by
+# name in CI; this assertion says the same thing locally. Its length WARNs are
+# the measured result of migrating 31 real decisions and are not an ERROR.
+TESTS=$((TESTS + 1))
+if [ -d "$METHOD_VAULT" ]; then
+  out=$(python3 "$VALIDATOR" "$METHOD_VAULT" 2>&1); rc=$?
+  if [ $rc -eq 0 ]; then ok x; else
+    fail "method vault must contain no ERRORs:"; printf '%s\n' "$out" | grep '^ERROR' | sed 's/^/    /'
+  fi
+else
+  fail "method vault not found at $METHOD_VAULT"
+fi
+
 # ==========================================================================
 # Fixture 7: the traceability exporter. One vault carrying every construct
 # the production corpora actually contain - a range, a number continuation,
@@ -3613,10 +3629,13 @@ then ok x; else fail "the wikilink matcher must read same-file links and the tab
 # requirement rows differently wherever one quoted a table as documentation.
 # The rule now lives in both, which is only worth anything if nothing lets
 # the two copies drift apart again - so it is asserted on every Markdown
-# file every fixture in this suite builds, plus the shipped vault.
+# file every fixture in this suite builds, plus the shipped vault and the
+# method vault - the latter is 32 hand-migrated notes carrying fenced blocks,
+# indented blocks and quoted wikilinks, which is exactly the corpus a fence
+# reader gets wrong.
 # ==========================================================================
 TESTS=$((TESTS + 1))
-if python3 - "$SKILL_DIR" "$TMP" "$DE_TMP" "$EN_TMP" "$EX_TMP" "$REAL_VAULT" <<'PY'
+if python3 - "$SKILL_DIR" "$TMP" "$DE_TMP" "$EN_TMP" "$EX_TMP" "$REAL_VAULT" "$METHOD_VAULT" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
 import validate_vault as vv, export_traceability as ex
