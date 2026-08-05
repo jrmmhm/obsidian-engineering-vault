@@ -31,3 +31,7 @@ Every DEC file uses the fixed schema:
 - **Deprecated**: no longer relevant (e.g. discarded, without direct successor)
 
 **Rule:** Decisions are not deleted "silently" if they were ever implemented or discussed relevantly. Instead, set to **Superseded**. Only trivial incorrect notes that were never used may be removed.
+
+## Implementation leakage (`impl-leak`)
+
+The vault validator can emit an `impl-leak` **WARN** when DEC section **Context** contains implementation-level numbers or detail that belong in ARC. Keep Context about the decision and forces; put concrete dimensions, endpoints, and code-shaped facts in ARC (or a linked technical note).
