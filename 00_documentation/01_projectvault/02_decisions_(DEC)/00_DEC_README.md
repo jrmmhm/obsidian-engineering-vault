@@ -34,4 +34,9 @@ Every DEC file uses the fixed schema:
 
 ## Implementation leakage (`impl-leak`)
 
-The vault validator can emit an `impl-leak` **WARN** when DEC section **Context** contains implementation-level numbers or detail that belong in ARC. Keep Context about the decision and forces; put concrete dimensions, endpoints, and code-shaped facts in ARC (or a linked technical note).
+The vault validator reads the **Context** section of a DEC file and reports
+a number carrying a unit, or a pin or register token, as `impl-leak` (WARN).
+Context frames the problem and the forces that act on it; a number that
+weighs an alternative belongs in **Options**, and a number that says how the
+thing is built belongs in IMP, CMP or IFC. ARC is not the destination: ARC
+stores no values, and the same check reports one there as an ERROR.
