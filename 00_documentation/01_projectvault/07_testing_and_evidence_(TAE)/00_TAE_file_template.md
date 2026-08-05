@@ -12,7 +12,7 @@ _What was tested/investigated._
 ## Test Conditions
 _Under which conditions it was tested, e.g. test component, environmental conditions (if relevant), prerequisites. With the help of the test conditions, the test should be able to be conducted exactly the same a second time._
 
-- Test object (recommended): Link to [[CMP_...]] or [[IFC_...]]
+- Test object (recommended): Link to \[\[CMP_...]] or \[\[IFC_...]]
 - Test setup / used equipment (only as far as relevant)
 - Environmental conditions (temperature/humidity/EMC), if relevant
 - Prerequisites (e.g. calibration, warm-up time, configuration)
