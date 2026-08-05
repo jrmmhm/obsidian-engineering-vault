@@ -411,7 +411,7 @@
       "why": "'verifies' and 'evidence' are separate relations with separate subjects and can disagree without either being wrong on its own.",
       "enforced": "export-driven",
       "owed_to_issue": 2,
-      "note": "Reported by the exporter as evidence-covers-allocation, never by the validator. The rule compares two relations, and neither is extracted until something reads the allocation table into a graph."
+      "note": "Reported by the exporter as the coverage gap evidence-disagrees, never by the validator and never under this rule's own id. The rule compares two relations, and neither is extracted until something reads the allocation table into a graph."
     },
     {
       "id": "verified-needs-evidence",
