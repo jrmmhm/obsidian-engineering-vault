@@ -133,7 +133,9 @@ itself — it may be a symlink carrying a path that only one machine can
 follow. `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py --check-install`
 says whether that entry reaches this copy, reaches a different one, or
 reaches nothing at all. Run it when a rule this file describes appears
-not to be enforced.
+not to be enforced. Claude Code substitutes `${CLAUDE_SKILL_DIR}` in this
+file before you read it; nothing outside a session expands it, so a
+command typed into a shell takes the path to a copy on disk instead.
 
 Rules that follow from this mechanism:
 
