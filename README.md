@@ -307,7 +307,7 @@ it manually or in CI:
 
 ```bash
 python3 .claude/skills/mechatronics-docs/validate_vault.py path/to/01_projectvault
-# -> ERRORs block, WARNs advise, exit code reflects the worst finding
+# -> ERRORs block, WARNs advise, warnings alone still exit 0
 ```
 
 That third hook covers what the editor gates never see — an Obsidian edit, a
