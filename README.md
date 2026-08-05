@@ -201,9 +201,19 @@ git clone https://github.com/jrmmhm/obsidian-engineering-vault.git my-project
 cd my-project
 
 # 2. Check the vault is intact — expect 0 errors
+#    (one WARN is normal: duplicate-basename on README under
+#     00_documentation — [[README]] is ambiguous between
+#     01_projectvault/README.md and 02_documents/README.md)
 python3 .claude/skills/mechatronics-docs/validate_vault.py \
         00_documentation/01_projectvault
 ```
+
+That first validate run should report **0 errors**. You may see a single
+`duplicate-basename` **WARN** for `README` under `00_documentation` — both
+`01_projectvault/README.md` and `02_documents/README.md` ship with the template,
+so wikilinks of the form `[[README]]` are genuinely ambiguous. That warning is
+expected on a fresh clone; rename one of the files (or always link with a full
+path) when you customize the vault.
 
 Then open the vault:
 
