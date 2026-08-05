@@ -393,6 +393,7 @@ paywalled.
 ├── .claude/skills/mechatronics-docs/
 │                           the documentation skill, validator, exporter and tests
 ├── .github/                CI workflow, issue forms, pull request template
+├── IEC_61508_MAPPING.md    IEC 61508 correspondence — not a conformance claim
 └── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md
 ```
 
