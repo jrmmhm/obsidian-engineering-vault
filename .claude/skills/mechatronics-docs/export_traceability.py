@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Traceability exporter for SSOT mechatronics vaults.
 
-Reads a vault into a graph and writes it back out as three artifacts a
+Reads a vault into a graph and writes it back out as four artifacts a
 reviewer, an examiner or an auditor can be handed without being taught
 the method first: a JSON graph, two CSV views and a self-contained HTML
-report (DECISIONS.md, amendment 2026-07-31b; issue #2).
+report (DECISIONS.md, amendment 2026-07-31b; issue #2), plus a Markdown
+index written for an agent's first read - one line per object and per
+requirement (amendment 2026-08-05e; issue #53).
 
     export_traceability.py <vault_root> --output-dir DIR [--formats ...]
 
@@ -57,7 +59,7 @@ from validate_vault import (  # noqa: E402
     template_files,
 )
 
-EXPORT_SCHEMA_VERSION = "1.0"
+EXPORT_SCHEMA_VERSION = "1.1"
 ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 ROW_NNN_RE = re.compile(r"^\d{3}$")
 FULL_ID_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]{2,4})-(\d{3})\b")
@@ -78,6 +80,14 @@ WIKILINK_RE = re.compile(r"!?\[\[([^\]\n]+)\]\]")
 # annotates in its own vocabulary, and the shape is what makes it an id.
 ANNOTATION_RE = re.compile(r"\s*\(([A-Z]{2,4}-[A-Z]{2,4}-\d{3})\)")
 SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
+# The index carries one sentence per object, cut by a rule and never by
+# judgement (amendment 2026-08-05e). A terminator ends the sentence only
+# where the next word does not continue it in lower case, which is what
+# carries 'e.g. the pack' and 'bzw. der Pack' past the dot; 240 characters
+# is the ceiling for prose that never reaches a terminator at all.
+SENTENCE_END_RE = re.compile(r"[.!?](?=\s|$)")
+LIST_MARKER_RE = re.compile(r"(?:[-*+]\s|\d+[.)]\s)")
+SUMMARY_CAP = 240
 # URL schemes that may appear in an href. Everything else is rendered as
 # text: html.escape does not touch "javascript:", and a data: URL is a
 # document of its own (OWASP XSS Prevention, rule 5).
@@ -177,6 +187,75 @@ def body_links(lines, start, skip_lines):
             ann = ANNOTATION_RE.match(text, m.end())
             out.append((target, ann.group(1) if ann else None, i + 1))
     return out
+
+
+def summary_of(lines, section_title):
+    """The one sentence the index carries for a file, or '' when it has none.
+
+    The section is the one this project's own requirements template
+    declares - '## Context' and '## Kontext' in every vault measured
+    (vault_schema.json, table_bindings.binding_discovery.unbound_table) -
+    so the sentence comes from the place the conventions already ask to
+    stand on its own, and the export needs no second discovery rule for
+    it (amendment 2026-08-05e).
+
+    Read is the first block of consecutive prose lines of that section: a
+    heading, a table row, a list item, a quote and a fenced block are each
+    stepped over, because none of them is a sentence about the file. A
+    file whose section carries only tables - homelab's shape, and the
+    template vault's shadowed fixture - yields '' and one line of the
+    index without a sentence, which the index head counts. It is not a
+    finding: a requirements file whose context is a table is a legitimate
+    shape, and the count says how many there are without a report nobody
+    can act on.
+    """
+    if not section_title:
+        return ""
+    want = fold_key(section_title)
+    mask = fenced_mask(lines)
+    para, taking = [], False
+    for i, line in enumerate(lines):
+        if line.startswith("## ") and not mask[i]:
+            if taking:
+                break  # the next section: whatever was found is all there is
+            taking = fold_key(line[3:].strip()) == want
+            continue
+        if not taking:
+            continue
+        stripped = line.strip()
+        if (mask[i] or not stripped or line.startswith("#")
+                or split_cells(line) is not None
+                or LIST_MARKER_RE.match(stripped) or stripped.startswith(">")):
+            if para:
+                break  # the paragraph ends where prose stops
+            continue
+        para.append(stripped)
+    if not para:
+        return ""
+    text = " ".join(" ".join(para).split())
+    text = WIKILINK_RE.sub(
+        lambda m: m.group(1).split("|")[-1].split("#")[0].strip(), unescape(text))
+    return cap_sentence(cut_sentence(text))
+
+
+def cut_sentence(text):
+    """Text up to the first terminator a following word does not continue."""
+    for m in SENTENCE_END_RE.finditer(text):
+        rest = text[m.end():].lstrip()
+        if not rest or not rest[0].islower():
+            return text[:m.end()]
+    return text
+
+
+def cap_sentence(text, cap=SUMMARY_CAP):
+    """A ceiling on a sentence that never reached a terminator."""
+    if len(text) <= cap:
+        return text
+    head = text[:cap]
+    cut = head.rfind(" ")
+    if cut > cap // 2:
+        head = head[:cut]
+    return head.rstrip() + "…"
 
 
 def nfc(s):
@@ -570,6 +649,9 @@ class Graph:
         self.requirements = {}
         self.edges = []
         self.findings = []
+        # Derived, and kept apart from the nodes for that reason: a located,
+        # collapsed, cut and truncated sentence is worked out, not authored.
+        self.summaries = {}
 
     def add_edge(self, kind, src, dst, path, line, qualifier=None):
         self.edges.append({"kind": kind, "source": src, "target": dst,
@@ -601,6 +683,10 @@ def build_graph(vault, schema, roles, bindings):
     proven_value = alloc_spec.get("qualifier_proven_value")
     if not isinstance(proven_value, str):
         proven_value = "Verified"
+
+    # The section the requirements template declares is the prose section of
+    # every vault measured, so it is where the index reads its sentence from.
+    summary_section = bindings.get("req_table", {}).get("section")
 
     by_name = {}
     files_by_role = {}
@@ -637,6 +723,9 @@ def build_graph(vault, schema, roles, bindings):
                 "last_verified": fm.get("last-verified")
                 if isinstance(fm.get("last-verified"), str) else None,
             }
+            sentence = summary_of(lines, summary_section)
+            if sentence:
+                g.summaries[key] = sentence
             by_name.setdefault(f.stem, []).append(key)
             files_by_role.setdefault(role, []).append((f, lines, key))
 
@@ -1070,9 +1159,11 @@ def write_json(path, graph, back, coverage, prov, roles, bindings):
         "provenance": prov,
         "field_types": {
             "authored": ["nodes", "requirements", "edges"],
-            "derived": ["reverse", "coverage"],
+            "derived": ["reverse", "coverage", "summaries"],
             "note": "Every key under 'reverse' is computed from 'edges' in one "
-                    "pass. No file in the vault stores a back-link.",
+                    "pass. No file in the vault stores a back-link. A summary "
+                    "is the first sentence of a file's context section, located "
+                    "and cut by rule - worked out, not written down.",
         },
         "roles": roles,
         "bindings": {k: {"section": v.get("section"), "template": v.get("template")}
@@ -1082,6 +1173,7 @@ def write_json(path, graph, back, coverage, prov, roles, bindings):
         "edges": sorted(graph.edges, key=lambda e: (
             e["kind"], e["source"], e["target"], e["file"] or "", e["line"] or 0)),
         "reverse": {k: back[k] for k in sorted(back)},
+        "summaries": {k: graph.summaries[k] for k in sorted(graph.summaries)},
         "coverage": coverage,
         "gap_classes": GAP_CLASSES,
         "findings": sorted((f.as_dict(Path(prov["vault"])) for f in graph.findings),
@@ -1148,6 +1240,77 @@ def write_csv_edges(path, graph):
                 e["kind"], e["source"], e["target"], e["file"] or "", e["line"] or 0)):
             w.writerow([e["kind"], e["source"], e["target"], e["qualifier"] or "",
                         e["file"] or "", e["line"] or ""])
+
+
+def index_text(value):
+    """Free text on one line of the index: one line, and never structural.
+
+    Markdown carries raw HTML, and the vault's own words are what this
+    column shows - the requirement row of the export fixture holds a
+    script tag on purpose. Escaping it is the same posture the report
+    takes with esc(): the record is shown, it is not executed. Whitespace
+    is collapsed because a line of this file is one record.
+    """
+    return html.escape(" ".join(str(value or "").split()), quote=False)
+
+
+def write_index(path, graph, prov, section_title):
+    """The vault as one line per object, for the first read of a session.
+
+    An agent working in the vault re-derives its structure by search
+    otherwise: the graph the export already builds is written outside the
+    vault by design (STRUCTURE.md), so nothing in the vault points at it.
+    This is that graph at its cheapest - identifier, domain, file and one
+    sentence - and it stays generated, so it cannot drift from the vault
+    the way a committed index would (amendment 2026-08-05e, issue #53).
+
+    Every ordering here is sorted, and nothing but the provenance stamp
+    depends on the run: two exports of one vault compare equal, which is
+    the property the CI diffs.
+    """
+    out = []
+    a = out.append
+    a("# Vault index")
+    a("")
+    a(f"Generated by export_traceability.py from `{prov['vault']}`. One line "
+      "per object of the graph: identifier, domain, file, and the first "
+      "sentence of its context. Regenerate it rather than trusting a copy - "
+      "the vault is the source and this file is derived from it.")
+    a("")
+    if section_title:
+        a(f"- sentence source: the first prose paragraph under "
+          f"`## {section_title}`, the section this project's own requirements "
+          "template declares")
+    else:
+        a("- sentence source: none - this project's templates declare no "
+          "requirement table, so no section could be bound and no sentence "
+          "was read")
+    missing = sum(1 for k in graph.nodes if not graph.summaries.get(k))
+    a(f"- objects without a sentence: {missing} of {len(graph.nodes)}")
+    a(f"- input files: {prov['input_files']}, digest `{prov['input_digest']}`")
+    if "generated_at" in prov:
+        a(f"- generated at: {prov['generated_at']}")
+    a("")
+
+    a(f"## Objects ({len(graph.nodes)})")
+    a("")
+    if not graph.nodes:
+        a("- none - this vault carries no file the graph could read")
+    for key in sorted(graph.nodes):
+        node = graph.nodes[key]
+        a((f"- `{key}` · {node['domain']} · `{node['file']}` · "
+           f"{index_text(graph.summaries.get(key))}").rstrip())
+    a("")
+
+    a(f"## Requirements ({len(graph.requirements)})")
+    a("")
+    if not graph.requirements:
+        a("- none - no requirement row of this vault reached the graph")
+    for rid in sorted(graph.requirements):
+        req = graph.requirements[rid]
+        a((f"- `{rid}` · {rid.split('-')[0]} · `{req['file']}:{req['line']}` · "
+           f"{index_text(req['text'])}").rstrip())
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 CSS = """
@@ -1353,7 +1516,7 @@ def main(argv):
     ap.add_argument("vault_root")
     ap.add_argument("--output-dir", required=True,
                     help="directory for the artifacts; must be outside any vault")
-    ap.add_argument("--formats", default="json,csv,html")
+    ap.add_argument("--formats", default="json,csv,html,index")
     ap.add_argument("--no-timestamp", action="store_true",
                     help="omit the generation time so two runs compare equal")
     args = ap.parse_args(argv)
@@ -1410,6 +1573,9 @@ def main(argv):
     if "html" in formats:
         write_html(out / "traceability.html", graph, back, coverage, prov,
                    finding_dicts)
+    if "index" in formats:
+        write_index(out / "traceability_index.md", graph, prov,
+                    bindings.get("req_table", {}).get("section"))
 
     proven = sum(1 for c in coverage.values() if c["proven"])
     print(f"vault: {root}")
