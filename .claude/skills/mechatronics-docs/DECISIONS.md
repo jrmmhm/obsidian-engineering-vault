@@ -4552,7 +4552,7 @@ the TAE body. That is precisely what the old rule accepted as proof.
    the skill complete"; it checks `SKILL.md` and no sibling file.
 
 
-## Amendment 2026-08-05e — The index an agent reads is generated, not committed (Accepted)
+## Amendment 2026-08-05f — The index an agent reads is generated, not committed (Accepted)
 
 ### Context
 
@@ -4679,7 +4679,7 @@ Two runs into the same directory with `--no-timestamp` compare byte-equal
 under `diff -r`, which is the property the CI step measures.
 
 
-## Amendment 2026-08-05f — AGENTS.md forwards, it does not duplicate (Accepted)
+## Amendment 2026-08-05g — AGENTS.md forwards, it does not duplicate (Accepted)
 
 ### Context
 

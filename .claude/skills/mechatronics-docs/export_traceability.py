@@ -6,7 +6,7 @@ reviewer, an examiner or an auditor can be handed without being taught
 the method first: a JSON graph, two CSV views and a self-contained HTML
 report (DECISIONS.md, amendment 2026-07-31b; issue #2), plus a Markdown
 index written for an agent's first read - one line per object and per
-requirement (amendment 2026-08-05e; issue #53).
+requirement (amendment 2026-08-05f; issue #53).
 
     export_traceability.py <vault_root> --output-dir DIR [--formats ...]
 
@@ -81,7 +81,7 @@ WIKILINK_RE = re.compile(r"!?\[\[([^\]\n]+)\]\]")
 ANNOTATION_RE = re.compile(r"\s*\(([A-Z]{2,4}-[A-Z]{2,4}-\d{3})\)")
 SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
 # The index carries one sentence per object, cut by a rule and never by
-# judgement (amendment 2026-08-05e). A terminator ends the sentence only
+# judgement (amendment 2026-08-05f). A terminator ends the sentence only
 # where the next word does not continue it in lower case, which is what
 # carries 'e.g. the pack' and 'bzw. der Pack' past the dot; 240 characters
 # is the ceiling for prose that never reaches a terminator at all.
@@ -197,7 +197,7 @@ def summary_of(lines, section_title):
     (vault_schema.json, table_bindings.binding_discovery.unbound_table) -
     so the sentence comes from the place the conventions already ask to
     stand on its own, and the export needs no second discovery rule for
-    it (amendment 2026-08-05e).
+    it (amendment 2026-08-05f).
 
     Read is the first block of consecutive prose lines of that section: a
     heading, a table row, a list item, a quote and a fenced block are each
@@ -1262,7 +1262,7 @@ def write_index(path, graph, prov, section_title):
     vault by design (STRUCTURE.md), so nothing in the vault points at it.
     This is that graph at its cheapest - identifier, domain, file and one
     sentence - and it stays generated, so it cannot drift from the vault
-    the way a committed index would (amendment 2026-08-05e, issue #53).
+    the way a committed index would (amendment 2026-08-05f, issue #53).
 
     Every ordering here is sorted, and nothing but the provenance stamp
     depends on the run: two exports of one vault compare equal, which is
