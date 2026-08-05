@@ -113,6 +113,11 @@ DOM_IN_NAME_RE = re.compile(r"\(([A-Z]{2,4})\)")
 # frontmatter. Identity lives in the file, not in its name, so a rename does
 # not change what an object is.
 ID_RE = re.compile(r"^(?:REQ|DEC|ARC|CMP|IFC|IMP|TAE|OAU|REF)-[A-Z]{2,4}-\d{3}$")
+# The same shape without the English domain vocabulary, for a field that
+# names OTHER objects rather than the file itself. A vault spelling its
+# domains KMP/SST would have every value rejected by ID_RE, and the
+# exporter's own key check (object_key) accepts exactly this shape.
+OBJECT_ID_RE = re.compile(r"^[A-Z]{2,4}-[A-Z]{2,4}-\d{3}$")
 REQ_FILE_ID_RE = re.compile(r"^REQ-([A-Z]{2,4})-\d{3}$")
 # Excluded from the scheme: SKILL.md classifies both as not engineering
 # documentation (DECISIONS.md, amendment 2026-07-28b).
@@ -229,6 +234,9 @@ FALLBACK_SCHEMA = {
         "verifies": {"type": "list", "item": "req-row-identifier", "required": False,
                      "code": "verifies-format", "empty_code": "verifies-empty",
                      "enforced": "declared-only"},
+        "test-object": {"type": "list", "item": "object-identifier",
+                        "required": False, "code": "test-object-format",
+                        "enforced": "schema-driven"},
     }},
     "domains": {
         "DEC": {"fields": {"status": {"required": False}},
@@ -1266,6 +1274,11 @@ def check_field_value(key, value, desc, abbr, path, findings):
                 if not (isinstance(item, str) and REQ_ID_RE.fullmatch(item)):
                     findings.append(Finding("ERROR", code, str(path), 1,
                                             f"'{item}' is not a REQ-DOM-NNN id"))
+        elif desc.get("item") == "object-identifier":
+            for item in value:
+                if not (isinstance(item, str) and OBJECT_ID_RE.fullmatch(item)):
+                    findings.append(Finding("ERROR", code, str(path), 1,
+                                            f"'{item}' is not a DOMAIN-SCOPE-NNN id"))
         return
 
     # An empty scalar is a missing scalar; the required-key check owns it.
