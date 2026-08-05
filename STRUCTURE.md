@@ -207,3 +207,17 @@ how a change was authored.
 describes the template rather than your project. Delete it, or keep the workflow
 and replace the templates with your own.
 
+---
+
+## AGENTS.md
+
+The rules an AI agent works under live in `CLAUDE.md` at the repository root.
+`AGENTS.md` is the cross-tool convention for the same purpose and holds nothing
+but a pointer to that file, plus one line each for this document and the skill —
+one set of rules, in one place, so a second file cannot drift away from the
+first.
+
+**In a project made from this template**, both travel with it. Keep them
+together: if you rewrite `CLAUDE.md` for your project, `AGENTS.md` keeps
+pointing at it and needs no edit.
+
