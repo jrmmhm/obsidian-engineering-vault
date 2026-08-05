@@ -72,6 +72,11 @@ RANGE_SEPARATORS = ("bis", "to", "–", "—")
 # them as defects; the exporter would ingest them as relations.
 FENCE_RE = re.compile(r"^( {0,3})(`{3,}|~{3,})(.*)$")
 WIKILINK_RE = re.compile(r"!?\[\[([^\]\n]+)\]\]")
+# The identifier a cross-domain link carries after it, as vault_schema's
+# link_annotation declares it: '[[CMP_Battery_Pack]] (CMP-BAT-001)'. The
+# domain token is not spelled out - a vault whose folders are KMP/SST
+# annotates in its own vocabulary, and the shape is what makes it an id.
+ANNOTATION_RE = re.compile(r"\s*\(([A-Z]{2,4}-[A-Z]{2,4}-\d{3})\)")
 SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
 # URL schemes that may appear in an href. Everything else is rendered as
 # text: html.escape does not touch "javascript:", and a data: URL is a
@@ -140,6 +145,37 @@ def links_in(cell):
         target = m.group(1).split("|")[0].split("#")[0].strip()
         if target and target not in out:
             out.append(target)
+    return out
+
+
+def body_links(lines, start, skip_lines):
+    """-> [(target, identifier|None, line)] for the body of one file.
+
+    One entry per distinct target, in file order, so a module naming the
+    same component in two sections contributes one relation and two runs
+    of the export compare equal. A list rather than a set for that second
+    reason: every ordering this file emits is authored, never hashed.
+
+    Three things are stepped over. Fenced blocks, because a documentation
+    example is not an assertion about this vault - the same rule
+    sections_with_tables uses. The frontmatter, whose fields are relations
+    of their own. And 'skip_lines', the lines a table binding already
+    read: a relation is authored in exactly one place, so an allocation
+    row must not become containment as well.
+    """
+    mask = fenced_mask(lines)
+    out, seen = [], set()
+    for i in range(start, len(lines)):
+        if mask[i] or (i + 1) in skip_lines:
+            continue
+        text = unescape(lines[i])
+        for m in WIKILINK_RE.finditer(text):
+            target = m.group(1).split("|")[0].split("#")[0].strip()
+            if not target or target in seen:
+                continue
+            seen.add(target)
+            ann = ANNOTATION_RE.match(text, m.end())
+            out.append((target, ann.group(1) if ann else None, i + 1))
     return out
 
 
@@ -659,6 +695,11 @@ def build_graph(vault, schema, roles, bindings):
 
     # ---- architecture tables ---------------------------------------------
     arc_abbr = roles.get("ARC")
+    rels = _dict(schema, "relations")
+    contains_spec = _dict(rels, "contains")
+    body_domains = _strlist(contains_spec, "object_domains_primary")
+    sub_domains = _strlist(contains_spec, "object_domains_secondary")
+    tobj_domains = _strlist(_dict(rels, "test-object"), "object_domains")
     alloc_section = bindings.get("arc_allocation_table", {}).get("section")
     iface_section = bindings.get("arc_interface_table", {}).get("section")
     sub_section = bindings.get("arc_main_module_table", {}).get("section")
@@ -698,8 +739,10 @@ def build_graph(vault, schema, roles, bindings):
                     else:
                         for target in links_in(cells[0]):
                             dst = resolve(target)
-                            if dst:
+                            if dst and g.nodes[dst]["role"] in sub_domains:
                                 g.add_edge("contains", key, dst, rel(f, root), line)
+            _contains_from_body(g, f, root, key, lines, bound_lines,
+                                body_domains, resolve)
             _report_unbound(g, f, lines, bound_lines)
 
     # ---- evidence frontmatter --------------------------------------------
@@ -723,7 +766,58 @@ def build_graph(vault, schema, roles, bindings):
                         "export-unknown-requirement", f, 1,
                         f"'verifies' names {rid}, which is defined in no "
                         "requirements file"))
+            for oid in fm.get("test-object") or []:
+                if not isinstance(oid, str) or not oid.strip():
+                    continue
+                oid = oid.strip()
+                node = g.nodes.get(oid)
+                if node is None:
+                    g.findings.append(Finding(
+                        "export-unknown-test-object", f, 1,
+                        f"'test-object' names {oid}, which is the identifier "
+                        "of no file in this vault"))
+                elif node["role"] not in tobj_domains:
+                    g.findings.append(Finding(
+                        "export-test-object-domain", f, 1,
+                        f"'test-object' names {oid}, a {node['role']} object - "
+                        f"a test object is one of {', '.join(tobj_domains)}"))
+                else:
+                    g.add_edge("test-object", key, oid, rel(f, root), 1)
     return g, proven_value
+
+
+def _contains_from_body(g, f, root, key, lines, bound_lines, domains, resolve):
+    """Containment authored as annotated links in the ARC body.
+
+    The annotation is what states that a link is a relation rather than
+    navigation, so an unannotated link produces no edge. It does produce a
+    finding: every vault written from the templates before 2026-08-05
+    carries these links unannotated, and letting the graph come out empty
+    without a word is the one output this tool must not produce.
+
+    A link the annotation and the file disagree about is exported along
+    the wikilink - the way every other link in this file resolves - and
+    the disagreement is named rather than silently picked apart.
+    """
+    _fm, end, bad = parse_frontmatter(lines)
+    start = 0 if bad or end is None else end
+    for target, ident, line in body_links(lines, start, bound_lines):
+        dst = resolve(target)
+        if dst is None or g.nodes[dst]["role"] not in domains:
+            continue
+        if ident is None:
+            g.findings.append(Finding(
+                "export-unannotated-link", f, line,
+                f"[[{target}]] would be a contains relation but carries no "
+                "identifier - annotate it as '[[name]] (DOMAIN-SCOPE-NNN)' "
+                "or the graph does not see it"))
+            continue
+        if g.nodes[dst]["id_source"] == "frontmatter" and ident != dst:
+            g.findings.append(Finding(
+                "export-annotation-mismatch", f, line,
+                f"[[{target}]] is annotated {ident} but that file's own id "
+                f"is {dst} - the edge follows the link"))
+        g.add_edge("contains", key, dst, rel(f, root), line)
 
 
 def _alloc_row(g, f, root, arc_key, cells, line, req_abbr, declared, proven, resolve):

@@ -63,11 +63,14 @@ Describes what the module includes and what it does not, using structured Includ
 List of relevant REQ files (not individual table rows).
 
 **Entry:**
-- `[[REQ_...]]`: Why relevant for this module (exactly 1 sentence)
+- `[[REQ_...]] (REQ-DOM-NNN)`: Why relevant for this module (exactly 1 sentence)
 
 **Rules:**
 - Do not copy REQ content
 - Exactly one justification sentence per REQ file (no novels)
+- Annotate the link with the target's identifier. The annotation is what makes
+  the entry a `contains` relation in the traceability export; an unannotated
+  link stays navigation and is reported as `export-unannotated-link`.
 
 ---
 
@@ -75,7 +78,7 @@ List of relevant REQ files (not individual table rows).
 List of relevant DEC files that influence this module/design.
 
 **Entry:**
-- `[[DEC_...]]`: Classification in architecture (exactly 1 sentence)
+- `[[DEC_...]] (DEC-DOM-NNN)`: Classification in architecture (exactly 1 sentence)
 
 **Rules:**
 - The sentence describes *what* the decision influences architecturally (not *why* it was made)
@@ -87,7 +90,7 @@ List of relevant DEC files that influence this module/design.
 List of components/assemblies that directly form the module.
 
 **Entry:**
-- `[[CMP_...]]`: Role in the module (brief, 1 sentence or bullet)
+- `[[CMP_...]] (CMP-DOM-NNN)`: Role in the module (brief, 1 sentence or bullet)
 
 **Rules:**
 - Only direct components of the module (do not inflate with "environmental components")
@@ -115,7 +118,7 @@ The interface table describes which IFCs the module uses externally (or between 
 List of implementation files that concretely implement the mentioned requirements, decisions, components and interfaces.
 
 **Entry:**
-- `[[IMP_...]]`: What is concretely realized (brief, 1 sentence or bullet).
+- `[[IMP_...]] (IMP-DOM-NNN)`: What is concretely realized (brief, 1 sentence or bullet).
 
 **Rules:**
 - Only IMP files that directly belong to the module.

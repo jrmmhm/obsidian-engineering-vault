@@ -2947,9 +2947,18 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
     printf '| M | 005 | last one | pass if last | none |\n'
   } > "$V/$RQ/${P}_Export (EXP).md"
 
+  # The ARC body carries the four shapes an annotated link comes in. Only the
+  # first is a relation; the other three are the ways this mechanism used to
+  # fail silently, and each must now be visible in the output.
   {
     printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n---\n'
     printf '## %s\n\nThe module under export.\n\n' "$CTX"
+    printf -- '- [[%s_Export (EXP)]] (%s-EXP-000): annotated, so this is a relation.\n' "$P" "$P"
+    printf -- '- [[%s_Shadowed (SHD)]] (%s-EXP-000): annotated with the wrong id.\n' "$P" "$P"
+    printf -- '- [[%s_Loose (LSE)]]: no annotation, so no relation - but a finding.\n' "$P"
+    printf -- '- [[ARC_Top]] (ARC-EXP-001): a peer module is navigation, not containment.\n'
+    printf 'A quoted example must not become an edge:\n\n'
+    printf '```markdown\n- [[%s_Fenced (FNC)]] (%s-EXP-000): quoted\n```\n\n' "$P" "$P"
     printf '## %s\n| Submodule | Allocated | Verification | Status |\n' "$ALLOC"
     printf '| --- | --- | --- | --- |\n'
     printf '| [[ARC_Export]] | %s-EXP-001 | [[%s_Export]] | Verified |\n' "$P" "$EV"
@@ -2960,8 +2969,12 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
     printf '| too wide | %s-EXP-004 bis %s-EXP-008 | [[%s_Export]] | Verified |\n' "$P" "$P" "$EV"
   } > "$V/$AR/ARC_Export.md"
 
+  # The id makes this file addressable by identifier, which is what a
+  # test-object field names. Without one its key is its filename and no
+  # frontmatter field could reach it.
   {
-    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n---\n'
+    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n'
+    printf 'id: ARC-EXP-001\n---\n'
     printf '## %s\n\nTop module.\n\n' "$CTX"
     printf '## %s\n| Submodule | Description |\n| --- | --- |\n' "$SUB"
     printf '| [[ARC_Export]] | the module under export |\n'
@@ -2969,7 +2982,8 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
 
   {
     printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n' "$EV"
-    printf 'verifies: [%s-EXP-001, %s-EXP-002]\n---\n' "$P" "$P"
+    printf 'verifies: [%s-EXP-001, %s-EXP-002]\n' "$P" "$P"
+    printf 'test-object: [ARC-EXP-001, ARC-EXP-900]\n---\n'
     printf '## %s\n\nEvidence for the export example.\n' "$CTX"
   } > "$V/$TA/${EV}_Export.md"
 
@@ -3007,7 +3021,8 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
   #    and the revision row is what proves the row predicate still holds: its
   #    second cell carries a date, so it defines no requirement.
   {
-    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n---\n' "$P"
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-04\nlast-verified: 2026-08-04\n' "$P"
+    printf 'id: %s-SHD-000\n---\n' "$P"
     printf '## %s\n\n' "$CTX"
     printf '| Version | Date | Author | Change | Review |\n'
     printf '| --- | --- | --- | --- | --- |\n'
@@ -3063,8 +3078,8 @@ TESTS=$((TESTS + 1))
 if [ "$en_counts" = "$de_counts" ]; then ok x; else
   fail "German and English twin must export the same graph: '$en_counts' vs '$de_counts'"; fi
 TESTS=$((TESTS + 1))
-if [ "$en_counts" = "7 4 15" ]; then ok x; else
-  fail "expected 7 requirements, 4 proven, 15 edges; got '$en_counts'"; fi
+if [ "$en_counts" = "7 4 18" ]; then ok x; else
+  fail "expected 7 requirements, 4 proven, 18 edges; got '$en_counts'"; fi
 
 exq() { python3 - "$EN_OUT/traceability.json" "$1" <<'PY'
 import json, sys
@@ -3102,8 +3117,37 @@ TESTS=$((TESTS + 1))
 if [ "$(exq 'any(a["owner_text"].startswith("Tailnet") for a in d["coverage"]["REQ-EXP-002"]["allocations"])')" = "True" ]; then
   ok x; else fail "a prose subject must survive as the owner"; fi
 TESTS=$((TESTS + 1))
-if [ "$(exq 'any(e["kind"]=="contains" for e in d["edges"])')" = "True" ]; then ok x; else
+if [ "$(exq 'any(e["kind"]=="contains" and e["source"]=="ARC-EXP-001" for e in d["edges"])')" = "True" ]; then ok x; else
   fail "the main-module submodule table must yield an ARC-to-ARC edge"; fi
+
+# Issue #49: both relations were declared and produced nothing. Every
+# assertion in this block fails on the code that shipped before the fix.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(e["kind"]=="contains" and e["target"]=="REQ:REQ_Export (EXP)" for e in d["edges"])')" = "True" ]; then
+  ok x; else fail "an annotated link in the ARC body must yield a contains edge"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'sum(1 for e in d["edges"] if e["kind"]=="test-object")')" = "1" ]; then
+  ok x; else fail "a test-object frontmatter field must yield exactly its resolvable edge"; fi
+# The three shapes that must NOT become containment.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(e["kind"]=="contains" and e["target"]=="ARC-EXP-001" for e in d["edges"])')" = "False" ]; then
+  ok x; else fail "an annotated peer-module link in the ARC body must stay navigation"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any("Loose" in e["target"] for e in d["edges"] if e["kind"]=="contains")')" = "False" ]; then
+  ok x; else fail "an unannotated link must not become a relation"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any("Fenced" in str(e["target"]) for e in d["edges"])')" = "False" ]; then
+  ok x; else fail "an annotated link quoted in a code fence must not become an edge"; fi
+# ... and each of them says so, rather than leaving the graph quietly short.
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["code"]=="export-unannotated-link" and "Loose" in f["message"] for f in d["findings"])')" = "True" ]; then
+  ok x; else fail "a link that could have been a relation must be reported when unannotated"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["code"]=="export-annotation-mismatch" for f in d["findings"])')" = "True" ]; then
+  ok x; else fail "an annotation contradicting the linked file's own id must be reported"; fi
+TESTS=$((TESTS + 1))
+if [ "$(exq 'any(f["code"]=="export-unknown-test-object" and "900" in f["message"] for f in d["findings"])')" = "True" ]; then
+  ok x; else fail "a test-object naming no file in the vault must be reported"; fi
 TESTS=$((TESTS + 1))
 if [ "$(exq '"no-evidence-note" in d["coverage"]["REQ-EXP-005"]["open_questions"]')" = "True" ]; then
   ok x; else fail "a requirement no evidence note names must carry that open question"; fi
