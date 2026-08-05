@@ -176,5 +176,10 @@ The exporter (`export_traceability.py`) writes outside the vault by design and
 refuses any `--output-dir` inside one, because the vault is Markdown only. A
 revision worth keeping belongs in `00_documentation/02_documents/`.
 
+That holds for `traceability_index.md` too — the compact index an agent reads
+first. It stays generated rather than committed: a stored index is only as
+current as its last run, and the vault is what it is derived from. `CLAUDE.md`
+therefore names the command, not a path.
+
 See the [README](README.md#the-ai-layer) for how to use it, with or without
 Claude Code.

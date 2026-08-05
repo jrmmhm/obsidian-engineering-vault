@@ -46,6 +46,14 @@ requirement-table format and REQ↔TAE coverage, and flags implementation
 details leaking into ARC. Run it manually from the project root with
 `python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault`.
 
+The second tool of that skill reads this vault as a graph and writes it out
+beside the project: `python3 .claude/skills/mechatronics-docs/export_traceability.py 00_documentation/01_projectvault --output-dir ../traceability`
+produces, next to the report and the two CSV views, a
+`traceability_index.md` carrying one line per object and per requirement —
+the fastest way to see what this vault contains without opening it file by
+file. It is generated on the spot, never stored here: the vault is the
+source, the export is derived from it.
+
 
 Finally, it is recommended to open [[system_overview]], as it centrally describes and explains the main modules in the form of ARC files. The system overview thus serves as a central point of contact.
 
