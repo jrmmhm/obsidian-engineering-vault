@@ -97,10 +97,12 @@ the "new or corrected documentation" line of the table in amendment 2026-08-05h
 
 ### Measured result
 
-- Method vault: **0 errors, 25 warnings**, all 25 `length` (>150 lines). They are
-  the honest measurement the issue asked for: 25 of 31 real decisions are longer
-  than the recommendation. Removing them means shortening or splitting records,
-  which fidelity rule 1 forbids. No record exceeds 400 lines (longest: 255).
+- Method vault: **0 errors, 26 warnings**, all 26 `length` (>150 lines). They are
+  the honest measurement the issue asked for: 25 of the 31 migrated decisions are
+  longer than the recommendation, and the twenty-sixth is this note, which fails
+  its own format exactly as the records it describes do. Removing the 25 means
+  shortening or splitting records, which fidelity rule 1 forbids. No record
+  exceeds 400 lines (longest: 255).
 - Template vault: unchanged at **0 errors, 1 warning**.
 - Test suite: **289 tests, 0 failures**, plus the new method-vault assertion.
 - Fidelity: every one of the 31 records was compared paragraph by paragraph
@@ -169,12 +171,15 @@ itself here.
 4. **ID order is append order, not date order.** `2026-08-04e` precedes
    `2026-08-04d` and `2026-08-05j` precedes `2026-08-05i`, because suffixes were
    assigned when pull requests landed. Renumbering would invent a history.
-5. **One citation in the source resolves to no record.** `2026-08-04c` cites
-   "amendment 2026-07-28g" twice; no record carries that date, and the statement
-   it attributes belongs to `2026-07-31`
+5. **One cited date resolves to no record.** "amendment 2026-07-28g" is cited
+   four times — twice inside the record migrated as
+   [[DEC_A_Non_UTF8_File_Says_Which_Encoding]] and twice in the tool sources
+   (`validate_vault.py`, `tests/run.sh`). No record carries that date, and the
+   statement it attributes belongs to `2026-07-31`
    ([[DEC_A_Near_Miss_Is_Not_An_Absence]]), which introduced `section-mismatch`.
-   It is migrated verbatim and left unlinked: correcting it would be editing the
-   record. Found by this migration, and worth its own issue.
+   All four are left standing and unlinked: correcting the two in the record
+   would be editing the record, and the two in the code are Group C, which this
+   change does not touch. Found by this migration, and worth its own issue.
 6. **Bare cross-references stay unlinked.** "follow-up 7", "residual 3 there" and
    a date reached only through a continuation (`amendments 2026-07-31b,
    2026-08-01`) carry no link — linking mid-sentence there would be a text edit.
