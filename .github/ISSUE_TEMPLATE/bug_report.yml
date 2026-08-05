@@ -1,0 +1,68 @@
+name: Bug report
+description: A tool does not behave the way a document says it does
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A defect here is the gap between what a document states and what a tool
+        does. The more precisely you can name both sides of that gap, the
+        shorter the road to a fix — so the fields below ask for the command you
+        ran and for the sentence you were going by.
+
+        If instead you think the documented behaviour is the wrong behaviour,
+        that is a method change, not a bug. Use the other form.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag you are on, or the output of `git rev-parse --short HEAD`.
+      placeholder: v0.1.0, or 8363cf4
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part
+      options:
+        - validate_vault.py (the validator)
+        - export_traceability.py (the traceability export)
+        - the mechatronics-docs skill or its hooks
+        - the vault templates or a domain README
+        - the CI workflow
+        - something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: The command you ran, and what it printed
+      description: Paste both. Trim it to the findings that matter, but do not paraphrase them.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead, and which document says so
+      description: >
+        Name the file, and quote the line if you can. "The validator should not
+        report this" is hard to act on; "00_REQ_README.md says a requirements
+        section may hold several tables" is a defect report.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: The smallest thing that reproduces it
+      description: >
+        A single note, a fragment of frontmatter, a two-row table. If it only
+        happens in your whole vault, say that — but a fixture-sized case is what
+        turns into an assertion in `tests/run.sh`.
+    validations:
+      required: true

@@ -357,8 +357,9 @@ throwaway one.
 ├── 60_releases/            baseline snapshots
 ├── 90_administration/      non-engineering project material
 ├── 99_archive/             superseded content, kept not deleted
-└── .claude/skills/mechatronics-docs/
-                            the documentation skill, validator, exporter and tests
+├── .claude/skills/mechatronics-docs/
+│                           the documentation skill, validator, exporter and tests
+└── .github/                CI workflow, issue forms, pull request template
 ```
 
 Full rules for what belongs where — including the two distinctions that trip
@@ -379,6 +380,22 @@ If your project is pure application software, the domain model will feel heavy �
 
 The vault is language-agnostic. This template ships in English; the domain
 abbreviations are just folder names, and translating them is a rename away.
+
+---
+
+## Contributing
+
+Two kinds of change reach this repository. One fixes a tool — the validator
+misreads a table, the exporter drops an edge. The other changes the method
+itself: what a domain means, which sections a note must have, which rule becomes
+an ERROR. Only the second costs anything to the projects already derived from
+this template, because a repository made from a template shares no history with
+it and cannot pull an update — it copies one in by hand.
+
+So the two are proposed differently and versioned differently.
+**[CONTRIBUTING.md](CONTRIBUTING.md)** says how, including what counts as a
+breaking change for a derived project, and
+**[CHANGELOG.md](CHANGELOG.md)** records what each release costs one.
 
 ---
 

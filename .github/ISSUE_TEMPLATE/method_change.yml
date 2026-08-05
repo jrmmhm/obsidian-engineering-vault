@@ -1,0 +1,99 @@
+name: Method change proposal
+description: Change a domain definition, a required template section, the field schema, an identifier rule, a typed relation or a validator rule
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The method is the part a derived project cannot simply re-run.** The
+        nine domain definitions, the sections a template requires, the
+        frontmatter field schema, the identifier scheme, the typed relations in
+        `vault_schema.json`, which rules the validator reports and at what
+        severity, and the fields the exporter writes.
+
+        A change to any of those reaches every project ever created from this
+        template — and those projects share no history with it, so they cannot
+        pull the change; they copy it in by hand and live with it. That is why
+        this form asks what your change *costs* somebody who already adopted the
+        current rule.
+
+        A merged method change carries an amendment in
+        `.claude/skills/mechatronics-docs/DECISIONS.md`, and the Options section
+        of that amendment is usually built from the discussion in this issue.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the method
+      options:
+        - a domain definition — what a domain means or what belongs in it
+        - a section a file template requires
+        - the frontmatter field schema
+        - the identifier scheme or a scope rule
+        - a typed relation, or where one is authored
+        - a validator rule, or the severity it reports at
+        - the fields or columns the exporter writes
+        - the conventions document itself
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: The rule as it stands today
+      description: Name the file it lives in and quote it. If it is enforced in code but written down nowhere, say that — it is a finding in its own right.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: What should hold instead
+      description: State the replacement rule as a rule, in the form it would be written into the conventions document.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: Where the current rule decides wrongly
+      description: >
+        One concrete case — a real note, a real vault, a real command and its
+        output. An argument from principle is not enough on its own; the
+        decision log is full of principled options that measurement rejected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: cost
+    attributes:
+      label: What this costs a project that already adopted the current rule
+      description: >
+        How many notes have to change, and does a vault that is clean today
+        start reporting findings? "None, existing vaults stay clean" is a
+        perfectly good answer — it is also the difference between a MINOR and a
+        MAJOR release.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which version tier you think this lands in
+      description: See the table in CONTRIBUTING.md under "Versioning — what a breaking change means here". A wrong guess costs nothing; not thinking about it costs the reviewer.
+      options:
+        - MAJOR — the set of rules moves, a clean vault stops conforming
+        - MINOR — new capability, existing vaults stay clean
+        - PATCH — the rules do not move, a tool starts applying them correctly
+        - not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: groundwork
+    attributes:
+      label: Groundwork
+      options:
+        - label: I have read the versioning section of CONTRIBUTING.md
+          required: true
+        - label: I have run the validator against a vault where the current rule decides wrongly
