@@ -118,6 +118,26 @@ each one is written down, is declared in
 exactly one place where it is authored; the opposite direction is never
 written by hand.
 
+The annotation is the statement, not the link. In an ARC file, an
+annotated link to a requirement, a decision, a component or an
+implementation is what the export reads as containment; the same link
+without an identifier stays navigation and is reported as
+`export-unannotated-link`, so the graph is never quietly short. Two
+shapes are deliberately not annotated: a link to a peer ARC module,
+which is navigation rather than containment — ARC-to-ARC containment is
+written in the submodule table of the main module template — and a link
+to a `00_` README or template, which is a documentation pointer. Where
+an annotation and the linked file's own `id` disagree, the relation
+follows the link and the disagreement is reported
+(`export-annotation-mismatch`).
+
+Not every relation is a link. A TAE note names the objects it was
+measured on in its `test-object:` frontmatter field, by identifier,
+beside `verifies:` — a field rather than a sentence, because a field can
+be checked and a missing sentence cannot. The Test Conditions section
+still describes the setup in prose for the reader; the field is what the
+graph reads.
+
 The worked example under
 [[ARC_Battery_Monitoring]] shows all of this in one thread. The validator
 checks the identifiers it can see: the same value on two files is an

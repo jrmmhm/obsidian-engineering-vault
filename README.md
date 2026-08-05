@@ -178,9 +178,11 @@ It prints one verdict line per requirement ID. The same note also records the
 same evaluator failing against a deliberately altered log — a check that cannot
 fail proves nothing, so the example shows that this one can.
 
-Every object in the thread carries an `id` in its frontmatter, and every link
-between them is annotated with the target's identifier. What those identifiers
-and relations mean is declared in
+Every object in the thread carries an `id` in its frontmatter, and every
+cross-domain link between them is annotated with the target's identifier. The
+annotation is not decoration: it is what turns a link into a relation the
+export reads, and a link that could be one and is not annotated is reported.
+What those identifiers and relations mean is declared in
 `.claude/skills/mechatronics-docs/vault_schema.json`.
 
 **Deleting it.** The example is illustration, not infrastructure. Remove the
