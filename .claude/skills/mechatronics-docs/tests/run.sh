@@ -25,6 +25,40 @@ check() { # check <description> <condition-result 0|1>
 }
 contains() { printf '%s' "$1" | grep -q "$2"; }
 
+# field <name> <stop-hook stdout> -> the named top-level JSON field, decoded.
+#
+# Every assertion about the stop gate goes through this. Asserting on the
+# raw stdout cannot tell a channel that reaches someone from one that does
+# not - the defect of issue #44 was invisible to 232 tests for exactly that
+# reason. It also restores line semantics: json.dumps emits one line, where
+# a grep pattern spanning '.*' silently reaches across findings that used to
+# sit on separate lines.
+#
+# Missing field -> empty string, never an error: a negative assertion must
+# be able to say "this text is NOT in reason".
+field() {
+  printf '%s' "$2" | python3 -c '
+import json, sys
+try:
+    print(json.loads(sys.stdin.read()).get(sys.argv[1], ""), end="")
+except ValueError:
+    pass' "$1"
+}
+
+# has_key <name> <stop-hook stdout> -> 0 when the TOP-LEVEL key exists.
+# Structural, not substring: json.dumps of the nested hookSpecificOutput
+# form contains the literal '"decision": "block"' too, so every
+# substring assertion in this file passes against a mutant that Claude
+# Code 2.1.220 ignores entirely - a gate that blocks nothing, all green.
+has_key() {
+  printf '%s' "$2" | python3 -c '
+import json, sys
+try:
+    sys.exit(0 if sys.argv[1] in json.loads(sys.stdin.read()) else 1)
+except ValueError:
+    sys.exit(1)' "$1"
+}
+
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
@@ -1990,8 +2024,9 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDR" \
   "$I/03_architecture_(ARC)/ARC_Qualifier.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 rout=$(printf '{"session_id":"%s"}' "$SIDR" | python3 "$VALIDATOR" --hook stop 2>&1)
+rmsg=$(field systemMessage "$rout")
 TESTS=$((TESTS + 1))
-if ! contains "$rout" '"decision": "block"'; then ok x; else
+if ! has_key decision "$rout"; then ok x; else
   fail "a pre-existing section-mismatch must not block the stop gate:"
   printf '%s\n' "$rout" | sed 's/^/    /'
 fi
@@ -2000,8 +2035,21 @@ fi
 # be absent entirely. An implementation that simply echoes the baseline
 # passes every positive assertion and fails this one.
 TESTS=$((TESTS + 1))
-if ! contains "$rout" "did not fire this session"; then ok x; else
+if ! contains "$rmsg" "did not fire this session"; then ok x; else
   fail "an unchanged pre-existing ERROR must not be reported as resolved:"
+  printf '%s\n' "$rmsg" | sed 's/^/    /'
+fi
+# The channel itself, on a session that reports without blocking: the
+# report must arrive as systemMessage and nowhere else. A bare print()
+# satisfies every assertion above and reaches nobody (issue #44).
+TESTS=$((TESTS + 1))
+if has_key systemMessage "$rout" && contains "$rmsg" "vault validator session report"; then ok x; else
+  fail "a non-blocking session report must travel as systemMessage:"
+  printf '%s\n' "$rout" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$rout" "^vault validator session report"; then ok x; else
+  fail "the report must not also be emitted as bare stdout:"
   printf '%s\n' "$rout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
@@ -2024,22 +2072,27 @@ for f in ARC_Powershell.md ARC_Empty.md; do
     "$I/03_architecture_(ARC)/$f" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 done
 eout=$(printf '{"session_id":"%s"}' "$SIDE" | python3 "$VALIDATOR" --hook stop 2>&1)
+emsg=$(field systemMessage "$eout")
 TESTS=$((TESTS + 1))
-if ! contains "$eout" '"decision": "block"'; then ok x; else
+if ! has_key decision "$eout"; then ok x; else
   fail "a file that was already UTF-16 at HEAD must not block the gate:"
   printf '%s\n' "$eout" | sed 's/^/    /'
 fi
+# Read through field(): the pattern spans '.*' and needs the code and the
+# tag on ONE finding line. Against the raw json.dumps output the whole
+# report is one line, so '.*' would reach across findings and the
+# assertion would pass while encoding-not-utf8 was reported as NEW.
 TESTS=$((TESTS + 1))
-if contains "$eout" "\[encoding-not-utf8\].*(pre-existing, non-blocking)"; then ok x; else
+if contains "$emsg" "\[encoding-not-utf8\].*(pre-existing, non-blocking)"; then ok x; else
   fail "the pre-existing encoding ERROR must be named as pre-existing:"
-  printf '%s\n' "$eout" | sed 's/^/    /'
+  printf '%s\n' "$emsg" | sed 's/^/    /'
 fi
 # ... and the empty committed file must not be reported as created this
 # session. b'' is falsy; only 'is not None' tells it from "no such blob".
 TESTS=$((TESTS + 1))
-if ! contains "$eout" "files created this session"; then ok x; else
+if ! contains "$emsg" "files created this session"; then ok x; else
   fail "an empty COMMITTED file must not count as created this session:"
-  printf '%s\n' "$eout" | sed 's/^/    /'
+  printf '%s\n' "$emsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
       "/tmp/claude-mechdocs/blocks-$SIDE"
@@ -2067,19 +2120,21 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDF" \
   "$I/03_architecture_(ARC)/ARC_Powershell.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 fout=$(printf '{"session_id":"%s"}' "$SIDF" | python3 "$VALIDATOR" --hook stop 2>&1)
+fmsg=$(field systemMessage "$fout")
 TESTS=$((TESTS + 1))
-if ! contains "$fout" '"decision": "block"'; then ok x; else
+if ! has_key decision "$fout"; then ok x; else
   fail "repairing the encoding must not block the session that did it:"
   printf '%s\n' "$fout" | sed 's/^/    /'
 fi
 # Asserted on the finding's MESSAGE, not on its code: since issue #26 the
 # code name also appears in the report of what stopped firing, and a
 # code-only assertion would fail on the very report that proves the repair.
-# Not anchored either - a blocking stop hook emits one json.dumps line with
-# escaped newlines, where '^ERROR' can never match and the assertion would
-# pass vacuously on exactly the regression it exists for (issue #31).
+# Still unanchored, although field() restores the line structure: the
+# positive assertion below is what proves the field is non-empty, and a
+# negative assertion on a field that could silently vanish is exactly the
+# vacuous shape this suite keeps rediscovering (issue #31, issue #44).
 TESTS=$((TESTS + 1))
-if ! contains "$fout" "this vault is UTF-8"; then ok x; else
+if ! contains "$fmsg" "this vault is UTF-8"; then ok x; else
   fail "the repaired file must not still be reported as non-UTF-8"; fi
 # The other half: the repair has to be NAMED, which is the whole point of
 # issue #26. Both codes the misread produced are gone from the current run,
@@ -2088,9 +2143,9 @@ if ! contains "$fout" "this vault is UTF-8"; then ok x; else
 # again. template-sections is absent from the list on purpose: it stood at
 # HEAD and still fires, so it is not something this session resolved.
 TESTS=$((TESTS + 1))
-if contains "$fout" "ARC_Powershell\.md \[encoding-not-utf8, frontmatter-missing\]"; then
+if contains "$fmsg" "ARC_Powershell\.md \[encoding-not-utf8, frontmatter-missing\]"; then
   ok x; else fail "the repair must be named as a code that stopped firing:"
-  printf '%s\n' "$fout" | sed 's/^/    /'
+  printf '%s\n' "$fmsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
       "/tmp/claude-mechdocs/blocks-$SIDF"
@@ -2155,17 +2210,18 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDG" \
   "$I/03_architecture_(ARC)/ARC_Resolved.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 gout=$(printf '{"session_id":"%s"}' "$SIDG" | python3 "$VALIDATOR" --hook stop 2>&1)
+gmsg=$(field systemMessage "$gout")
 TESTS=$((TESTS + 1))
-if contains "$gout" "ARC_Resolved\.md \[template-sections\]"; then ok x; else
+if contains "$gmsg" "ARC_Resolved\.md \[template-sections\]"; then ok x; else
   fail "a code that stopped firing must be named in the session report:"
-  printf '%s\n' "$gout" | sed 's/^/    /'
+  printf '%s\n' "$gmsg" | sed 's/^/    /'
 fi
 # Reporting, not blocking: from counts alone a repair and an unreachable
 # check are the same absence, and this layer never blocks on an ambiguity
 # it cannot resolve. Blocking here would punish exactly the session that
 # fixed the defect the gate asked it to fix.
 TESTS=$((TESTS + 1))
-if ! contains "$gout" '"decision": "block"'; then ok x; else
+if ! has_key decision "$gout"; then ok x; else
   fail "a code that stopped firing must not block the session that fixed it:"
   printf '%s\n' "$gout" | sed 's/^/    /'
 fi
@@ -2207,10 +2263,11 @@ that the other file's unresolved-link count falls without its content
 changing. The file itself is unremarkable on purpose.
 EOF
 pout=$(printf '{"session_id":"%s"}' "$SIDH" | python3 "$VALIDATOR" --hook stop 2>&1)
+pmsg=$(field systemMessage "$pout")
 TESTS=$((TESTS + 1))
-if ! contains "$pout" "ARC_Linker\.md \[link-unresolved\]"; then ok x; else
+if ! contains "$pmsg" "ARC_Linker\.md \[link-unresolved\]"; then ok x; else
   fail "a code that merely fires less often must not be reported as resolved:"
-  printf '%s\n' "$pout" | sed 's/^/    /'
+  printf '%s\n' "$pmsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
       "/tmp/claude-mechdocs/blocks-$SIDH"
@@ -2617,21 +2674,62 @@ if [ "$n" -eq 1 ]; then ok x; else
 
 sout=$(printf '{"session_id":"%s"}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
 TESTS=$((TESTS + 1))
-if contains "$sout" '"decision": "block"'; then ok x; else fail "stop hook must block on new ERRORs (1st attempt)"; fi
+if has_key decision "$sout" && [ "$(field decision "$sout")" = "block" ]; then ok x; else
+  fail "stop hook must block on new ERRORs (1st attempt)"; fi
+# The form of the block, not just its presence. Claude Code 2.1.220 reads
+# Stop decisions from the TOP LEVEL only; wrapped in hookSpecificOutput -
+# the shape every other event uses, and the tidier-looking one - the hook
+# is accepted, reported as success, and blocks nothing. json.dumps of that
+# mutant still contains the substring '"decision": "block"', so the whole
+# suite stayed green against a gate that had silently stopped gating.
 TESTS=$((TESTS + 1))
-if ! contains "$sout" "vault-wide"; then ok x; else
+if ! has_key hookSpecificOutput "$sout"; then ok x; else
+  fail "a Stop decision inside hookSpecificOutput is ignored by Claude Code:"
+  printf '%s\n' "$sout" | sed 's/^/    /'
+fi
+# The obligation and the advisory travel in different fields, to different
+# readers: reason reaches Claude, systemMessage reaches the user. A block
+# reason carries one obligation - the vault-wide section is legacy state
+# and would spend a block attempt on it.
+TESTS=$((TESTS + 1))
+if ! contains "$(field reason "$sout")" "vault-wide"; then ok x; else
   fail "block reason must not carry the vault-wide advisory section"; fi
+TESTS=$((TESTS + 1))
+if contains "$(field systemMessage "$sout")" "vault validator blocked the turn end"; then ok x; else
+  fail "a blocking turn must tell the user who blocked it:"
+  printf '%s\n' "$sout" | sed 's/^/    /'
+fi
 sout=$(printf '{"session_id":"%s","stop_hook_active":true}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
 TESTS=$((TESTS + 1))
-if contains "$sout" '"decision": "block"'; then ok x; else fail "stop hook must block on 2nd attempt"; fi
+if [ "$(field decision "$sout")" = "block" ]; then ok x; else fail "stop hook must block on 2nd attempt"; fi
 sout=$(printf '{"session_id":"%s","stop_hook_active":true}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
+smsg=$(field systemMessage "$sout")
+# The fail-open report goes to the user and NOT to the model. The gate has
+# demanded these fixes twice already; a third automatic attempt is the
+# user's call. Asserting the field is what separates the two - the text
+# occurs in the output either way.
 TESTS=$((TESTS + 1))
-if contains "$sout" "UNRESOLVED"; then ok x; else fail "stop hook must fail open with report on 3rd attempt"; fi
+if contains "$smsg" "UNRESOLVED"; then ok x; else
+  fail "the fail-open report must reach the user as systemMessage:"
+  printf '%s\n' "$sout" | sed 's/^/    /'
+fi
 TESTS=$((TESTS + 1))
-if ! contains "$sout" '"decision": "block"'; then ok x; else fail "stop hook must not block a 3rd time"; fi
+if ! contains "$(field reason "$sout")" "UNRESOLVED"; then ok x; else
+  fail "the fail-open report must not be handed back to the model as a reason"; fi
 TESTS=$((TESTS + 1))
-if contains "$sout" "vault-wide findings (advisory" && contains "$sout" "req-uncovered"; then ok x; else
+if ! has_key decision "$sout"; then ok x; else fail "stop hook must not block a 3rd time"; fi
+TESTS=$((TESTS + 1))
+if contains "$smsg" "vault-wide findings (advisory" && contains "$smsg" "req-uncovered"; then ok x; else
   fail "fail-open report must carry vault-wide advisory incl. req-uncovered"; fi
+# The whole report is one systemMessage, and Claude Code replaces any hook
+# output string over 10000 characters with a file path plus a 2 KB preview
+# (measured on 2.1.220). This is the fail-open report of a vault carrying
+# every seeded violation there is - if it does not stay under the ceiling,
+# nothing here does.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$smsg" | wc -c)
+if [ "$n" -lt 10000 ]; then ok x; else
+  fail "the session report must stay under the 10000-character hook cap, got $n"; fi
 
 # post hook outside any vault: silent no-op
 hout=$(payload "/tmp/not_a_vault_note.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
@@ -2649,10 +2747,122 @@ TESTS=$((TESTS + 1))
 if [ -z "$hout" ]; then ok x; else fail "post hook on clean file must stay silent"; fi
 sout=$(printf '{"session_id":"%s"}' "$SID2" | python3 "$VALIDATOR" --hook stop 2>&1)
 TESTS=$((TESTS + 1))
-if ! contains "$sout" "vault-wide"; then ok x; else
+if ! contains "$(field systemMessage "$sout")" "vault-wide"; then ok x; else
   fail "clean vault stop report must not add a vault-wide section"; fi
 rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2" \
       "/tmp/claude-mechdocs/blocks-$SID2"
+
+# Nothing to say -> say nothing. The report now renders in the transcript,
+# so an empty one is not a harmless newline any more: it would print
+# "Stop says: vault validator session report:" at the end of every single
+# turn. The file is touched and then removed, which is the shortest way to
+# a session whose every section is empty (the stop pass skips a file that
+# no longer exists, so no vault root is ever collected either).
+SID3="testsession3-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SID3" "/tmp/claude-mechdocs/baseline-$SID3" \
+      "/tmp/claude-mechdocs/blocks-$SID3"
+cp "$V/06_implementation_(IMP)/IMP_MainBoard_ADC.md" \
+   "$V/06_implementation_(IMP)/IMP_Transient.md"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID3" \
+  "$V/06_implementation_(IMP)/IMP_Transient.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+rm -f "$V/06_implementation_(IMP)/IMP_Transient.md"
+sout=$(printf '{"session_id":"%s"}' "$SID3" | python3 "$VALIDATOR" --hook stop 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 0 ] && [ -z "$sout" ]; then ok x; else
+  fail "an empty session report must print nothing at all, got rc=$rc:"
+  printf '%s\n' "$sout" | sed 's/^/    /'
+fi
+rm -f "/tmp/claude-mechdocs/touched-$SID3" "/tmp/claude-mechdocs/baseline-$SID3" \
+      "/tmp/claude-mechdocs/blocks-$SID3"
+
+# ==========================================================================
+# Fixture 8: the advisory cap. The whole report travels as one
+# systemMessage, and Claude Code replaces any hook output string above
+# 10000 characters with a file path plus a 2 KB preview - a report that
+# outgrows the ceiling is back on a channel nobody reads, which is the
+# defect of issue #44 in a new costume.
+#
+# Its own vault, because the assertion is arithmetic: twenty notes, one
+# advisory finding each, and every other finding class deliberately
+# absent. In the violation vault the same session would drag along
+# whatever else is seeded there and the count would stop being a count.
+# ==========================================================================
+CAP_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP" "$CAP_TMP"' EXIT
+P="$CAP_TMP/Capproj/00_documentation/01_projectvault"
+mkdir -p "$P/01_requirements_(REQ)" "$P/03_architecture_(ARC)" \
+         "$P/07_testing_and_evidence_(TAE)"
+printf '## Context\n' > "$P/01_requirements_(REQ)/00_REQ_file_template.md"
+printf '## Context\n' > "$P/03_architecture_(ARC)/00_ARC_file_template.md"
+printf '## Context\n## Evidence\n' > "$P/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+i=1
+while [ $i -le 20 ]; do
+  cat > "$P/03_architecture_(ARC)/ARC_Filler_$i.md" <<EOF
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+Filler note number $i of the advisory-cap fixture. It exists so that one
+session produces more advisory findings than the report may carry, and it
+contributes exactly one of its own: the artifact it points at,
+20_software/filler_$i/build_$i.py, is not in the tree. Everything else about
+this note is deliberately correct, so no second finding can enter the
+report from here and the count stays arithmetic.
+EOF
+  i=$((i + 1))
+done
+SIDC="testsession-cap-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDC" "/tmp/claude-mechdocs/baseline-$SIDC" \
+      "/tmp/claude-mechdocs/blocks-$SIDC"
+i=1
+while [ $i -le 20 ]; do
+  printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDC" \
+    "$P/03_architecture_(ARC)/ARC_Filler_$i.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+  i=$((i + 1))
+done
+cout=$(printf '{"session_id":"%s"}' "$SIDC" | python3 "$VALIDATOR" --hook stop 2>&1)
+cmsg=$(field systemMessage "$cout")
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$cmsg" | grep -c 'path-missing')
+if [ "$n" -eq 15 ]; then ok x; else
+  fail "the advisory section must be capped at 15 lines, got $n of 20"; fi
+TESTS=$((TESTS + 1))
+if contains "$cmsg" "advisory findings:" && contains "$cmsg" "\.\.\. +5 more"; then ok x; else
+  fail "the capped advisory section must say how many lines it dropped:"
+  printf '%s\n' "$cmsg" | sed 's/^/    /'
+fi
+# The ceiling itself, on the session this fixture was built to be the worst
+# case of. A cap that leaves the report above 10000 characters buys nothing.
+TESTS=$((TESTS + 1))
+n=$(printf '%s' "$cmsg" | wc -c)
+if [ "$n" -lt 10000 ]; then ok x; else
+  fail "the session report must stay under the 10000-character hook cap, got $n"; fi
+
+# The other half of the cap, and the only one no vault fixture can reach:
+# ERROR-severity lines are exempt from it. A session needs more than
+# fifteen PRE-EXISTING ERRORs in one report to tell the two implementations
+# apart - below that, sorted() puts every ERROR line ahead of every WARN
+# line and a plain lines[:15] agrees with the exempting one by accident.
+# Asserted on the function, because a fixture proving one boolean would
+# have to commit sixteen broken files to do it.
+TESTS=$((TESTS + 1))
+if python3 -c '
+import sys; sys.path.insert(0, sys.argv[1])
+from validate_vault import cap_report_lines
+lines = ["ERROR f%d" % i for i in range(20)] + ["WARN f%d" % i for i in range(20)]
+out = cap_report_lines(lines)
+assert len([l for l in out if l.startswith("ERROR")]) == 20, "ERROR lines were dropped"
+assert len([l for l in out if l.startswith("WARN")]) == 0, "WARNs must yield to ERRORs"
+assert out[-1] == "... +20 more", out[-1]
+assert cap_report_lines(["WARN a", "ERROR b"]) == ["ERROR b", "WARN a"]
+assert cap_report_lines([]) == []
+' "$SKILL_DIR" 2>/dev/null; then ok x; else
+  fail "the report cap must never drop an ERROR line"; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDC" "/tmp/claude-mechdocs/baseline-$SIDC" \
+      "/tmp/claude-mechdocs/blocks-$SIDC"
 
 # ==========================================================================
 # Crash mode and real template vault
@@ -2660,6 +2870,20 @@ rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2"
 python3 "$VALIDATOR" /nonexistent_vault_root >/dev/null 2>&1; rc=$?
 TESTS=$((TESTS + 1))
 if [ $rc -eq 2 ]; then ok x; else fail "invalid root must exit 2, got $rc"; fi
+
+# The gate releasing itself is the one message that must never be quiet: it
+# says the vault rules are not being enforced right now. It used to go to
+# stderr, which for a hook exiting 0 is the same dead channel as plain
+# stdout. Unparsable stdin is the shortest real crash - json.load raises
+# before any vault is touched.
+gout=$(printf 'not json at all' | bash "$SKILL_DIR/hooks/stop_gate.sh" 2>/dev/null); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 0 ]; then ok x; else fail "a validator crash must release the gate, got rc=$rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$(field systemMessage "$gout")" "stop gate released"; then ok x; else
+  fail "a validator crash must reach the user as systemMessage:"
+  printf '%s\n' "$gout" | sed 's/^/    /'
+fi
 
 TESTS=$((TESTS + 1))
 if [ -d "$REAL_VAULT" ]; then

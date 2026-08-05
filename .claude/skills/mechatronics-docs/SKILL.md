@@ -53,6 +53,16 @@ vault rules (`validate_vault.py`, same directory):
   repaired and a check that stopped reaching the file produce the same
   absence, and only the session knows which of the two it did.
 
+The two halves of the gate address two readers, and the transcript shows
+which is which. Everything advisory appears as `Stop says: vault
+validator session report: ...` — that line is for the user; it lists
+legacy findings, created files and questions the session owner has to
+answer, and it is not an instruction to you. What the gate wants from
+*you* arrives as `Stop hook feedback:` and names only the ERRORs this
+session introduced. A released gate says so too: `vault validator
+crashed - stop gate released` means the vault rules went unchecked for
+that turn, so verify by hand before finishing.
+
 A vault carrying two folders for one domain — `03_architecture_(ARC)`
 beside `03_Architektur_(ARC)`, which is what a half-finished translation
 looks like — is reported as `domain-duplicate-folder`. The folder the
