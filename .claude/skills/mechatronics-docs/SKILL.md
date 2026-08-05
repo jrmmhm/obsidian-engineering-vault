@@ -54,14 +54,18 @@ vault rules (`validate_vault.py`, same directory):
   absence, and only the session knows which of the two it did.
 
 The two halves of the gate address two readers, and the transcript shows
-which is which. Everything advisory appears as `Stop says: vault
-validator session report: ...` — that line is for the user; it lists
-legacy findings, created files and questions the session owner has to
-answer, and it is not an instruction to you. What the gate wants from
-*you* arrives as `Stop hook feedback:` and names only the ERRORs this
-session introduced. A released gate says so too: `vault validator
-crashed - stop gate released` means the vault rules went unchecked for
-that turn, so verify by hand before finishing.
+which is which. Everything advisory reaches the user as `Stop says: ...`
+— it lists legacy findings, created files and questions the session owner
+has to answer, and it is not an instruction to you. Its first line names
+the turn it belongs to: `vault validator blocked the turn end (attempt
+n/2)` when the gate blocked, `vault validator session report:` when it
+did not — including the turn after two blocked attempts, where the report
+opens with `UNRESOLVED vault ERRORs` and the gate has already released.
+What the gate wants from *you* arrives as `Stop hook feedback:` and names
+only the ERRORs this session introduced. A gate that could not run says
+so as well: `vault validator crashed - stop gate released` means the
+vault rules went unchecked for that turn, so verify by hand before
+finishing.
 
 A vault carrying two folders for one domain — `03_architecture_(ARC)`
 beside `03_Architektur_(ARC)`, which is what a half-finished translation
