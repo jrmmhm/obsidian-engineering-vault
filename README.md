@@ -267,6 +267,17 @@ python3 .claude/skills/mechatronics-docs/validate_vault.py --check-install
 Call it through the repository path, as written. On a host where the entry is
 broken, the path through the entry is the one thing that cannot work.
 
+Which of the two spellings of that path is right follows from who types it.
+The skill's own text writes `${CLAUDE_SKILL_DIR}/validate_vault.py`, and
+Claude Code substitutes that placeholder in the skill's Markdown before a
+session reads it, so the call reaches the copy that is actually running — and
+a broken entry is never that copy, which is why the check above is typed by
+hand with a real path instead. Nothing outside a session expands the
+placeholder. Wherever a person or a script types the command — this README,
+`CLAUDE.md`, the CI workflow, a project derived from this template — what
+works is the path to a copy on disk: the repository path where the project
+carries the skill, `~/.claude/skills/mechatronics-docs/` where it does not.
+
 It ships with two Claude Code hooks, and a third that needs no Claude Code at
 all (below). After every write into the vault, the validator checks
 the file and feeds findings straight back into the session. At turn end, a stop
