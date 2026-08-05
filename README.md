@@ -267,19 +267,32 @@ python3 .claude/skills/mechatronics-docs/validate_vault.py --check-install
 Call it through the repository path, as written. On a host where the entry is
 broken, the path through the entry is the one thing that cannot work.
 
-It ships with two hooks. After every write into the vault, the validator checks
+It ships with two Claude Code hooks, and a third that needs no Claude Code at
+all (below). After every write into the vault, the validator checks
 the file and feeds findings straight back into the session. At turn end, a stop
 gate blocks completion on errors introduced during that session — ratcheted
 against git `HEAD`, so pre-existing issues in legacy files never hold you
 hostage.
 
 **Without Claude Code.** The validator is a dependency-free Python script. Run
-it manually, in a pre-commit hook, or in CI:
+it manually or in CI:
 
 ```bash
 python3 .claude/skills/mechatronics-docs/validate_vault.py path/to/01_projectvault
 # -> ERRORs block, WARNs advise, exit code reflects the worst finding
 ```
+
+That third hook covers what the editor gates never see — an Obsidian edit, a
+hand edit, a subagent write. It validates the staged files at commit time and
+reports without blocking:
+
+```bash
+ln -sf ../../.claude/skills/mechatronics-docs/hooks/pre_commit_vault.sh \
+       .git/hooks/pre-commit
+```
+
+Set `MECHDOCS_PRECOMMIT_BLOCK=1` to make it refuse a commit whose staged files
+carry ERRORs.
 
 Its own test suite lives next to it:
 
