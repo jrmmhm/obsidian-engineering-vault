@@ -3790,6 +3790,246 @@ fi
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
       "/tmp/claude-mechdocs/blocks-$SID"
 
+# ==========================================================================
+# Fixture 10: coverage vault - what counts as coverage and what only looks
+# like it (issue #50). Until then 'req-uncovered' was 'rid in text' over
+# whole ARC and TAE files, so every shape below except the first passed as
+# proof: the identifier appeared somewhere, and nothing asked in what role.
+#
+# The templates carry TABLES, unlike the precision vault's. That is not
+# decoration: the allocation half of the rule is read from the section the
+# project's OWN ARC template declares, and a template without tables binds
+# nothing - which is exactly the second variant below, asserted rather than
+# assumed.
+#
+# Every must-not-count row is paired with a grep against the fixture: an
+# assertion that a finding EXISTS proves nothing about the old rule unless
+# the identifier really is written in an ARC or TAE file, which is what the
+# old rule would have accepted.
+# ==========================================================================
+CV_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP" "$SC_TMP" "$PF_TMP" \
+      "$CAP_TMP" "$EX_TMP" "$DUP_TMP" "$CI_TMP" "$CV_TMP"' EXIT
+
+build_coverage_vault() { # build_coverage_vault <vault_dir>
+  local C="$1"
+  mkdir -p "$C/01_requirements_(REQ)" "$C/03_architecture_(ARC)" \
+           "$C/07_testing_and_evidence_(TAE)"
+
+  {
+    printf '## Context\n\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '|  |  |  |  |  |\n'
+  } > "$C/01_requirements_(REQ)/00_REQ_file_template.md"
+
+  {
+    printf '## Context\n\n'
+    printf '## Allocation and Verification\n'
+    printf '| Submodule (ARC/CMP/IFC) | Allocated Requirements (REQ-IDs) | Verification (TAE) | Status |\n'
+    printf '| --- | --- | --- | --- |\n'
+    printf '|  |  |  | Draft |\n'
+  } > "$C/03_architecture_(ARC)/00_ARC_file_template.md"
+
+  printf '## Context\n' > "$C/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+
+  # 001 closed loop; 002-004 mentioned only; 005 allocated only; 006
+  # verified only; 007 closed loop in a table under a heading of this
+  # file's own making, which the graph does not carry at all.
+  {
+    printf -- '---\ndomain: REQ\nstatus: active\ncreated: 2026-08-05\nlast-verified: 2026-08-05\n---\n'
+    printf '## Context\nRequirements of the coverage example.\n\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | allocated and verified | pass if both hold | none |\n'
+    printf '| M | 002 | named in architecture prose | pass if measured | none |\n'
+    printf '| M | 003 | named in a heading | pass if measured | none |\n'
+    printf '| M | 004 | named in evidence prose | pass if measured | none |\n'
+    printf '| M | 005 | allocated, never verified | pass if measured | none |\n'
+    printf '| M | 006 | verified, never allocated | pass if measured | none |\n\n'
+    printf '## Detached layer\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 007 | closed loop outside the bound section | pass if silent | none |\n'
+  } > "$C/01_requirements_(REQ)/REQ_Coverage (COV).md"
+
+  {
+    printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-08-05\nlast-verified: 2026-08-05\n---\n'
+    printf '## Context\n'
+    printf 'The module under coverage. REQ-COV-002 was dropped from this\n'
+    printf 'module and is named here for that reason alone.\n\n'
+    printf '### REQ-COV-003 is still open\n'
+    printf 'A heading naming a requirement is a table of contents entry.\n\n'
+    printf '## Allocation and Verification\n'
+    printf '| Submodule (ARC/CMP/IFC) | Allocated Requirements (REQ-IDs) | Verification (TAE) | Status |\n'
+    printf '| --- | --- | --- | --- |\n'
+    printf '| acquisition path | REQ-COV-001 | [[TAE_Coverage]] | Verified |\n'
+    printf '| supply path | REQ-COV-005 | measured during bring-up | Draft |\n'
+  } > "$C/03_architecture_(ARC)/ARC_Coverage.md"
+
+  {
+    printf -- '---\ndomain: TAE\nstatus: active\ncreated: 2026-08-05\nlast-verified: 2026-08-05\n'
+    printf 'verifies: [REQ-COV-001, REQ-COV-006, REQ-COV-007]\n---\n'
+    printf '## Context\n'
+    printf 'Evidence for the coverage example. REQ-COV-004 is named here as an\n'
+    printf 'open point and is not among the requirements this note verifies.\n'
+  } > "$C/07_testing_and_evidence_(TAE)/TAE_Coverage.md"
+}
+
+CV="$CV_TMP/Covproj/00_documentation/01_projectvault"
+build_coverage_vault "$CV"
+
+# The fixture only proves something if the identifiers really are written
+# where the old rule looked.
+TESTS=$((TESTS + 1))
+if grep -q "REQ-COV-002" "$CV/03_architecture_(ARC)/ARC_Coverage.md" && \
+   grep -q "^### REQ-COV-003" "$CV/03_architecture_(ARC)/ARC_Coverage.md" && \
+   grep -q "REQ-COV-004" "$CV/07_testing_and_evidence_(TAE)/TAE_Coverage.md"; then
+  ok x; else fail "the must-not-count identifiers are not in the fixture at all"; fi
+
+cv_out=$(python3 "$VALIDATOR" "$CV" 2>&1)
+uncovered() { contains "$cv_out" "\[req-uncovered\] $1"; }
+
+# The closed loop: silent. Paired with the five below, so a check that
+# stopped running cannot pass as a pass.
+TESTS=$((TESTS + 1))
+if ! uncovered "REQ-COV-001"; then ok x; else
+  fail "an allocated and verified requirement must not be reported:"
+  printf '%s\n' "$cv_out" | grep "REQ-COV-001" | sed 's/^/    /'; fi
+
+for rid in 002 003 004 005 006; do
+  TESTS=$((TESTS + 1))
+  if uncovered "REQ-COV-$rid"; then ok x; else
+    fail "REQ-COV-$rid must be reported as uncovered"; fi
+done
+
+# The finding has to name which half of the loop is missing, or it cannot
+# be acted on. Three shapes, three sentences.
+TESTS=$((TESTS + 1))
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-002 has no allocation row naming it and no TAE"; then
+  ok x; else fail "a mention-only requirement must be reported as missing BOTH halves"; fi
+TESTS=$((TESTS + 1))
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-005 is named by no TAE in 'verifies'"; then
+  ok x; else fail "an allocated requirement must be reported as missing the evidence half"; fi
+TESTS=$((TESTS + 1))
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-006 is verified by TAE_Coverage but no allocation row"; then
+  ok x; else fail "a verified requirement must be reported as missing the allocation half"; fi
+
+# A requirement row the graph does not carry - here one under a heading of
+# the file's own making, the shape REQ_Loose (LSE) is built for above and
+# the one nativclaw carries seven times. Its loop IS closed; only the
+# exporter cannot see the row. Holding the allocation half against it would
+# report a correct requirement as a gap.
+TESTS=$((TESTS + 1))
+if ! uncovered "REQ-COV-007"; then ok x; else
+  fail "a requirement outside the bound section must not lose its coverage:"
+  printf '%s\n' "$cv_out" | grep "REQ-COV-007" | sed 's/^/    /'; fi
+
+# Coverage never blocks: these are vault-wide WARNs and the vault carries
+# no ERROR, so the audit exits 0.
+TESTS=$((TESTS + 1))
+if [ -z "$(printf '%s' "$cv_out" | grep '^ERROR')" ]; then ok x; else
+  fail "the coverage fixture must carry no ERROR:"
+  printf '%s\n' "$cv_out" | grep '^ERROR' | sed 's/^/    /'; fi
+
+# (b) A project whose own ARC template declares no allocation table. No row
+# can be read, so the allocation half falls silent and the verification
+# half alone decides - REQ-COV-006 stops being a finding, the four that
+# nothing verifies stay findings. The degradation is asserted, not assumed:
+# it is the difference between a check that lost reach and one that lost
+# its voice.
+CV_B="$CV_TMP/NoAlloc/00_documentation/01_projectvault"
+build_coverage_vault "$CV_B"
+printf '## Context\n\n## Allocation and Verification\n' \
+  > "$CV_B/03_architecture_(ARC)/00_ARC_file_template.md"
+cvb_out=$(python3 "$VALIDATOR" "$CV_B" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$cvb_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+  fail "without an allocation binding the allocation half must not be held against a REQ"; fi
+TESTS=$((TESTS + 1))
+if contains "$cvb_out" "\[req-uncovered\] REQ-COV-002" && \
+   contains "$cvb_out" "\[req-uncovered\] REQ-COV-005"; then ok x; else
+  fail "without an allocation binding the verification half must still be enforced"; fi
+
+# (c) The exporter missing beside the validator - what a project that
+# vendored one file has, and what the schema fixtures above build twice.
+# The graph cannot be built at all; the rule keeps its verification half
+# and the run must not exit 2, which is the code both hooks fail open on.
+mkdir -p "$CV_TMP/noexp"
+cp "$VALIDATOR" "$SKILL_DIR/vault_schema.json" "$CV_TMP/noexp/"
+cve_out=$(python3 "$CV_TMP/noexp/validate_vault.py" "$CV" 2>&1); cve_rc=$?
+TESTS=$((TESTS + 1))
+if [ $cve_rc -ne 2 ]; then ok x; else
+  fail "a missing exporter must not crash the validator"; fi
+TESTS=$((TESTS + 1))
+if contains "$cve_out" "\[req-uncovered\] REQ-COV-002" && \
+   ! contains "$cve_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+  fail "without the exporter the verification half must still decide alone"; fi
+
+# (d) A vault mid-translation: the requirements folder exists twice, and
+# 'ANF' sorts before 'REQ', so the graph gives the REQ role to the German
+# folder and excludes the English one. The validator's own index still
+# reads the English folder, so every identifier is unknown to the graph -
+# and a state this project explicitly supports must not turn into a
+# vault-wide sweep of findings on correct requirements.
+CV_D="$CV_TMP/Trans/00_documentation/01_projectvault"
+build_coverage_vault "$CV_D"
+mkdir -p "$CV_D/01_Anforderungen_(ANF)"
+cp "$CV_D/01_requirements_(REQ)/00_REQ_file_template.md" \
+   "$CV_D/01_Anforderungen_(ANF)/00_ANF_Dateitemplate.md"
+{
+  printf -- '---\ndomain: ANF\nstatus: active\ncreated: 2026-08-05\nlast-verified: 2026-08-05\n---\n'
+  printf '## Context\nDie uebersetzte Zwillingsdatei der Anforderungen.\n\n'
+  printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+  printf '| --- | --: | --- | --- | --- |\n'
+  printf '| M | 001 | uebersetzte Anforderung | pass if measured | none |\n'
+} > "$CV_D/01_Anforderungen_(ANF)/ANF_Abdeckung (COV).md"
+cvd_out=$(python3 "$VALIDATOR" "$CV_D" 2>&1); cvd_rc=$?
+TESTS=$((TESTS + 1))
+if [ $cvd_rc -ne 2 ]; then ok x; else
+  fail "a vault carrying two requirement folders must not crash the validator"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$cvd_out" "\[req-uncovered\] REQ-COV-001"; then ok x; else
+  fail "a mid-translation vault must not lose the coverage of a closed loop:"
+  printf '%s\n' "$cvd_out" | grep "REQ-COV-001" | sed 's/^/    /'; fi
+
+# (e) The two tools must be ONE pair of modules even when the validator is
+# the script. Run as one it lives in sys.modules as '__main__', and the
+# exporter's own 'from validate_vault import ...' would load a second copy:
+# two Vault classes, two schema caches, and the identity asserted between
+# the tools above quietly false. The parity test there imports both
+# normally and cannot see this at all.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$CV" <<'PY'
+import contextlib, importlib.util, io, sys
+from pathlib import Path
+skill, vault_root = sys.argv[1], sys.argv[2]
+sys.path.insert(0, skill)
+spec = importlib.util.spec_from_file_location("__main__", skill + "/validate_vault.py")
+mod = importlib.util.module_from_spec(spec)
+sys.modules["__main__"] = mod
+sys.argv = ["validate_vault.py", "--check-install"]
+buf = io.StringIO()
+try:
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+        spec.loader.exec_module(mod)   # the CLI guard runs, as in a real script run
+except SystemExit:
+    pass
+assert "validate_vault" not in sys.modules, "precondition: nothing has imported it yet"
+alloc = mod.allocation_index(mod.Vault(Path(vault_root)))
+# Every requirement the graph CARRIES, with the allocation question
+# answered - and REQ-COV-007, whose row sits outside the bound section,
+# absent rather than answered False. That distinction is the whole reason
+# the index returns three states instead of two.
+assert alloc == {"REQ-COV-001": True, "REQ-COV-002": False, "REQ-COV-003": False,
+                 "REQ-COV-004": False, "REQ-COV-005": True,
+                 "REQ-COV-006": False}, alloc
+import export_traceability as ex
+assert ex.Vault is mod.Vault, "the exporter bound a second copy of validate_vault"
+assert ex.split_cells is mod.split_cells, "the two tools do not share one reader"
+PY
+then ok x; else fail "a script-mode validator must not load the exporter against a second copy of itself"; fi
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
