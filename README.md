@@ -114,7 +114,8 @@ requirement IDs, the component or interface that owns them, the evidence note,
 and a status. A row only reaches `Verified` when a TAE link actually exists —
 `Draft → Approved → Verified`, per allocation, not per file. That is what turns
 "we tested it" into "these three requirements are still unproven", and it is
-the one rule the validator can check for you.
+the one rule a tool can check for you: the exporter reads the allocation table
+and names every row that claims more than its evidence cell carries.
 
 | Domain | Question it answers | Change rate |
 | ------ | ------------------- | ----------- |

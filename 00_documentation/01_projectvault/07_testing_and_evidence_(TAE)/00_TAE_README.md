@@ -30,7 +30,7 @@ Rules:
 All conditions/prerequisites necessary to reproduce the test or interpret it correctly.
 
 Typical content:
-- Test object (recommended): Link to [[CMP_...]] or [[IFC_...]] or [[ARC_...]]
+- Test object (recommended): Link to `[[CMP_...]]` or `[[IFC_...]]` or `[[ARC_...]]`
 - Test setup / used equipment (only as far as relevant)
 - Environmental conditions (temperature/humidity/EMC), if relevant
 - Prerequisites (e.g. calibration, warm-up time, configuration)

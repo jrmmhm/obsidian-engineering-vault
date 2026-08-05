@@ -92,8 +92,8 @@ Rules:
 
 ## Shutdown / Emergency
 Shutdown procedures are maintained as separate OAU files (Single Source of Truth), e.g.:
-- [[OAU_Shutdown_Normal]]
-- [[OAU_Shutdown_Emergency]]
+- `[[OAU_Shutdown_Normal]]`
+- `[[OAU_Shutdown_Emergency]]`
 
 OAU workflows refer to these instead of duplicating shutdown steps.
 Deviations are only permissible if they are workflow-dependent and explicitly stated.
