@@ -144,9 +144,9 @@ logistics and `99_inbox_(INB)` for unclassified raw material.
   deserve to exist, what single question does it answer, which role does it
   play, at what change rate. If a question cannot be answered cleanly, the file
   gets split instead of written.
-- **Machine-readable frontmatter** on every note — `domain`, `status`,
-  `created`, `last-verified` — so freshness is a queryable property, not a
-  guess.
+- **Machine-readable frontmatter** on every domain note — `domain`, `status`,
+  `created`, `last-verified`; DEC files keep their Status line in the body
+  instead — so freshness is a queryable property, not a guess.
 - **A validator** that checks naming, required sections, frontmatter,
   wikilink and artifact-path integrity, requirement-table format, REQ↔TAE
   coverage — decided on the allocation row and the `verifies:` field, never
