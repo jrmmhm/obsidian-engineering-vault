@@ -34,9 +34,14 @@
 # A.I.
 # =============================================================================
 # The mechatronics-docs skill ships WITH this template - keep .claude/skills/
-# tracked. Only machine-local Claude Code state is ignored.
+# tracked. The method's own decision record is a vault and ships too, so
+# .claude/01_methodvault/ is re-included as well: git cannot re-include a file
+# under an excluded DIRECTORY, so both exceptions name the directory itself and
+# must stay below the '.claude/*' line. Only machine-local Claude Code state is
+# ignored.
 .claude/*
 !.claude/skills/
+!.claude/01_methodvault/
 .claude/skills/**/__pycache__/
 .claude/settings.local.json
 
