@@ -4,6 +4,7 @@ status: active
 created: 2026-07-28
 last-verified: 2026-07-28
 verifies: [REQ-BAT-001, REQ-BAT-002, REQ-BAT-003]
+test-object: [CMP-BAT-001, IFC-BAT-001]
 id: TAE-BAT-001
 ---
 ## Context

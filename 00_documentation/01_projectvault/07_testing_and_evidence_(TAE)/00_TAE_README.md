@@ -30,7 +30,11 @@ Rules:
 All conditions/prerequisites necessary to reproduce the test or interpret it correctly.
 
 Typical content:
-- Test object (recommended): Link to `[[CMP_...]]` or `[[IFC_...]]` or `[[ARC_...]]`
+- Test object (recommended): Link to `[[CMP_...]]` or `[[IFC_...]]` or `[[ARC_...]]`,
+  and name it by identifier in the `test-object:` frontmatter field. The field is
+  the authored form of the `test-object` relation; the sentence here is for the
+  reader. An identifier naming no file in the vault is reported
+  (`export-unknown-test-object`), a missing sentence never can be.
 - Test setup / used equipment (only as far as relevant)
 - Environmental conditions (temperature/humidity/EMC), if relevant
 - Prerequisites (e.g. calibration, warm-up time, configuration)
