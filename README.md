@@ -214,12 +214,14 @@ python3 .claude/skills/mechatronics-docs/validate_vault.py \
         00_documentation/01_projectvault
 ```
 
-That first validate run should report **0 errors**. You may see a single
-`duplicate-basename` **WARN** for `README` under `00_documentation` — both
-`01_projectvault/README.md` and `02_documents/README.md` ship with the template,
-so wikilinks of the form `[[README]]` are genuinely ambiguous. That warning is
-expected on a fresh clone; rename one of the files (or always link with a full
-path) when you customize the vault.
+Zero ERRORs is the gate, and that one warning is the known state of the shipped
+vault rather than something you broke. `01_projectvault/README.md` and
+`02_documents/README.md` both ship under `00_documentation`, and this vault
+resolves a wikilink by its basename alone — Obsidian would tell the two apart by
+their path, this validator does not, so `[[README]]` is ambiguous and
+`[[01_projectvault/README]]` is reported as `link-unresolved` instead. Renaming
+one of them is the only remedy. Keeping both names is a fair choice, and while
+you do, no wikilink may address either file by that name.
 
 Then open the vault:
 
