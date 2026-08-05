@@ -5,6 +5,7 @@ status: draft
 created: YYYY-MM-DD
 last-verified: YYYY-MM-DD
 verifies: []
+test-object: []
 ---
 ## Context
 _What was tested/investigated._
@@ -12,7 +13,10 @@ _What was tested/investigated._
 ## Test Conditions
 _Under which conditions it was tested, e.g. test component, environmental conditions (if relevant), prerequisites. With the help of the test conditions, the test should be able to be conducted exactly the same a second time._
 
-- Test object (recommended): Link to \[\[CMP_...]] or \[\[IFC_...]]
+- Test object (recommended): Link to \[\[CMP_...]] or \[\[IFC_...]] or \[\[ARC_...]].
+  Name the same object in the `test-object:` frontmatter field by its
+  identifier - that field, not this sentence, is what the traceability export
+  reads.
 - Test setup / used equipment (only as far as relevant)
 - Environmental conditions (temperature/humidity/EMC), if relevant
 - Prerequisites (e.g. calibration, warm-up time, configuration)
