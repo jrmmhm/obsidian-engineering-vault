@@ -4715,13 +4715,13 @@ sentence that explains the file name. Thirteen lines, no rule of its own,
 nothing a later change to `CLAUDE.md` could contradict.
 
 
-## Amendment 2026-08-05e — The method carries a version, and a breaking change is defined (Accepted)
+## Amendment 2026-08-05h — The method carries a version, and a breaking change is defined (Accepted)
 
 ### Context
 
 The method is versioned in two places and as a whole in none.
 `vault_schema.json` declares `schema_version: 0.3`, and
-`export_traceability.py` declares `EXPORT_SCHEMA_VERSION = "1.0"`. Neither
+`export_traceability.py` declares `EXPORT_SCHEMA_VERSION = "1.1"`. Neither
 answers the question a reader of this repository actually has, which is
 whether the method they adopted six months ago still means what it meant.
 
@@ -4850,5 +4850,18 @@ mean "unreleased". The release notes are therefore drafted inside
 No tag is created and no GitHub release is published by this change. The
 version number is chosen and justified; cutting it is a separate act,
 described in `CONTRIBUTING.md` under *Cutting a release*.
+
+### Aligned on integration
+
+Rebased onto amendments 2026-08-05e (coverage on the graph) and 05f/05g (the
+generated index and the `AGENTS.md` forwarder); this amendment moved from
+suffix `e` to `h`. Both of those changes then became the tier table's worked
+examples, because they are the two ends of it: coverage moving from a prose
+mention to the allocation row and `verifies:` is a rule redefined, so a
+previously clean vault can report `req-uncovered` with its notes untouched —
+MAJOR. The fifth export artifact and the additive `summaries` key, with
+`EXPORT_SCHEMA_VERSION` at 1.1, break no reader and dirty no vault — MINOR. A
+policy stated against two changes that already happened is harder to argue
+with than one stated in the abstract.
 
 

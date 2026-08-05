@@ -47,9 +47,12 @@ matters.
 
 ```bash
 bash .claude/skills/mechatronics-docs/tests/run.sh
-# -> 259 tests, 0 failure(s)
+# -> 289 tests, 0 failure(s)
 #    ALL TESTS PASSED
 ```
+
+The count climbs every time somebody pins a behaviour, so do not read anything
+into the number — `0 failure(s)` and the last line are the whole signal.
 
 **The template vault audit.** CI runs this by name, so that the check cannot
 silently skip if the layout ever moves.
@@ -203,7 +206,8 @@ counts as correct changed.
 - A typed relation is added, removed, or changes where it is authored.
 - A rule is newly introduced, or an existing WARN is raised to ERROR.
 - A field in `traceability.json`, or a column in either CSV, is renamed,
-  removed, or changes meaning.
+  removed, or changes meaning. *Adding* one is not — `EXPORT_SCHEMA_VERSION`
+  carries its own minor number for exactly that case.
 
 ### MINOR — new capability, existing vaults stay clean
 
@@ -242,6 +246,26 @@ its old required sections and stays clean. The MAJOR tier prices what adopting
 the change costs — it does not announce a break that happens to anyone who does
 nothing. This is the one place where the tier is a warning about the future
 rather than a description of the present, and it is deliberate.
+
+### Two worked examples
+
+Both are in this repository's own history, and they are the clearest short
+statement of what the tiers mean.
+
+**Coverage moved from a mention to the graph — MAJOR.** The validator used to
+count a requirement as covered when its ID appeared anywhere in ARC or TAE
+prose; it now decides on the allocation row and the `verifies:` field. That is a
+rule redefined, so a vault that was clean under the old reading can report
+`req-uncovered` under the new one — through no change of its own and with the
+notes untouched. Nothing in it broke; what counts as proof got stricter. MAJOR
+is the honest label, and the changelog entry says which finding code to grep
+for.
+
+**The exporter gained a fifth artifact — MINOR.** `traceability_index.md` is
+new output, and the `summaries` key is a new field in `traceability.json`;
+`EXPORT_SCHEMA_VERSION` went from 1.0 to 1.1. Nothing that read the old JSON
+stops working, and no vault gains a finding. New capability, existing vaults
+clean: MINOR.
 
 ### Three version numbers, and which one you read
 

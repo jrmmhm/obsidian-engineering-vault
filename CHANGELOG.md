@@ -45,22 +45,28 @@ weeks, and the point of a version number is to be believed.
   queryable property rather than a guess.
 - **`validate_vault.py`** — a dependency-free validator for naming, required
   sections, frontmatter, wikilink and artifact-path integrity,
-  requirement-table format, REQ↔TAE coverage, identifier uniqueness, and
-  implementation detail leaking into architecture notes. ERRORs block, WARNs
-  advise, and the exit code reflects the worst finding.
+  requirement-table format, identifier uniqueness, and implementation detail
+  leaking into architecture notes. REQ↔TAE coverage is decided on the
+  allocation row and the `verifies:` field — on the graph, never on a
+  requirement ID appearing somewhere in prose. ERRORs block, WARNs advise, and
+  the exit code reflects the worst finding.
 - **`vault_schema.json`** at `schema_version` 0.3 — the declaration the
   validator reads instead of hard-coding its rules: the nine domains, the
   identifier scheme, the fields each domain carries, and eight typed relations.
-- **`export_traceability.py`** — reads the vault into a graph and writes a
-  self-contained HTML report, a requirement-centric CSV, an edge-list CSV and a
-  JSON graph. Both directions of the requirement-to-evidence matrix, with what
-  is unproven stated rather than left as an empty cell. Standard library only,
-  like the validator.
+- **`export_traceability.py`** — reads the vault into a graph and writes five
+  artifacts: a self-contained HTML report, a requirement-centric CSV, an
+  edge-list CSV, a JSON graph at `EXPORT_SCHEMA_VERSION` 1.1, and
+  `traceability_index.md`, a compact index written for the agent or newcomer
+  who wants to know what the vault holds before opening anything. Both
+  directions of the requirement-to-evidence matrix, with what is unproven
+  stated rather than left as an empty cell. Standard library only, like the
+  validator.
 - **The `mechatronics-docs` Claude Code skill** — instructions for writing into
   the vault under these rules, with hooks that run the validator after every
   write and a stop gate that blocks turn end on ERRORs introduced during the
   session, ratcheted against git `HEAD` so legacy files never hold anyone
-  hostage.
+  hostage. `CLAUDE.md` carries the rules; `AGENTS.md` forwards to it rather
+  than restating them, so the two cannot drift apart.
 - **`--check-install`** — says which copy of the skill a machine actually
   reaches, for the case where the personal skill entry is a symlink that
   travelled to a host on which its target does not exist.
