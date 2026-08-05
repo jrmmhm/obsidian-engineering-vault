@@ -206,12 +206,10 @@ errors with all of it gone.
 git clone https://github.com/jrmmhm/obsidian-engineering-vault.git my-project
 cd my-project
 
-# 2. Check the vault is intact — expect 0 errors
-#    (one WARN is normal: duplicate-basename on README under
-#     00_documentation — [[README]] is ambiguous between
-#     01_projectvault/README.md and 02_documents/README.md)
+# 2. Check the vault is intact
 python3 .claude/skills/mechatronics-docs/validate_vault.py \
         00_documentation/01_projectvault
+# -> 0 error(s), 1 warning(s)
 ```
 
 Zero ERRORs is the gate, and that one warning is the known state of the shipped
