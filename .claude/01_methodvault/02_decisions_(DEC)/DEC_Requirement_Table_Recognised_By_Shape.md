@@ -7,10 +7,11 @@ last-verified: 2026-08-05
 Date: 2026-08-04
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04b — A requirement table is recognised by its shape, not by its header text (Accepted)".
+Corrected by: [[DEC_Exporter_Reports_Unread_Requirement_Rows]]
 
 ## Context
 
-Issue #25, residual 1 of amendment 2026-08-01. `check_req_table` gates
+Issue #25, residual 1 of amendment 2026-08-01 ([[DEC_One_Fence_Definition_For_Both_Tools]]). `check_req_table` gates
 every row check on `header_ok`, a flag set by one thing only: a table row
 whose first cell contains `Class` or whose first two cells contain `NNN`.
 Nothing resets it and nothing else sets it. Since issue #20 made
@@ -30,7 +31,7 @@ with one broken row produces zero findings.
 **What identifies a requirement table.**
 
 - **A — the template-declared section title**, as `export_traceability.py`
-  binds its tables since amendment 2026-07-31b, and the candidate issue
+  binds its tables since amendment 2026-07-31b ([[DEC_Reading_The_Vault_As_A_Graph]]), and the candidate issue
   #25 names. Rejected on measurement: across the four vault roots on this
   machine that carry a `REQ` folder, 121 requirement rows are checked
   today and the section binding would check 87. The 34 lost rows all sit

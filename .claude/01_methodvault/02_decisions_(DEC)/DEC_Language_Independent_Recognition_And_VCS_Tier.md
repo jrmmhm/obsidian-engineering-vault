@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-07-28
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-07-28 — Language-independent recognition, VCS tier (Accepted)". Its title names two questions; the record argues both from one Context and is therefore kept whole — see [[DEC_The_Decision_Log_Moves_Into_A_Vault]].
+Corrected by: [[DEC_Identifier_Enforcement]]
 
 ## Context
 

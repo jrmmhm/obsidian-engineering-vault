@@ -28,7 +28,7 @@ ever exist under `project_root`, and none of them is a stale pointer.
 
 The check is dormant today only because both German production vaults
 spell the headings `## Verweise` and `## Quelle(n)`, which contain
-neither marker word — accepted residual 2 of amendment 2026-07-28. Any
+neither marker word — accepted residual 2 of amendment 2026-07-28 ([[DEC_Language_Independent_Recognition_And_VCS_Tier]]). Any
 vault adopting the English template inherits the whole set at once.
 
 Measured on a structure-faithful copy of the homelab vault (288 files,
@@ -62,7 +62,7 @@ defects, and no fix may cost those 11.
   of the 178 findings standing, 37 of them false. And it is a silent
   bypass: a leading `/` switches a blocking check off with nothing
   visible in the text, which is weaker than the deliberately *visible*
-  `pending` marker of amendment 2026-07-27.
+  `pending` marker of amendment 2026-07-27 ([[DEC_E2E_Test_Driven_Hardening]]).
 - **B — Apply the existing shape gate in both zones (chosen).** Delete
   the `not in_ref and` conjunct, so a token is checked only where it is
   shaped like a project artifact, in either zone. This is the first

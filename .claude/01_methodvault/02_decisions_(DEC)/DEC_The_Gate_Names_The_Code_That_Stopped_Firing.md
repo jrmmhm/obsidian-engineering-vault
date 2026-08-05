@@ -7,10 +7,11 @@ last-verified: 2026-08-05
 Date: 2026-08-05
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-05 — The gate says which code stopped firing (Accepted)".
+Corrected by: [[DEC_The_Stop_Report_Goes_Where_It_Is_Read]]
 
 ## Context
 
-Issue #26, residual 2 of amendment 2026-08-01. `hook_stop` compares each
+Issue #26, residual 2 of amendment 2026-08-01 ([[DEC_One_Fence_Definition_For_Both_Tools]]). `hook_stop` compares each
 finding of the current run against the file's git HEAD baseline and
 blocks on `cur[f.code] > base.get(f.code, 0)`. The loop iterates the
 findings that *exist*. A code standing in the baseline that produces no
@@ -53,7 +54,7 @@ invisible rather than merely wrong, and the blind spot survived the fix.
   `{'link-unresolved': 1}` on a committed file whose content was
   untouched. Under the phased creation order that is the ordinary
   mid-pass state, so the channel would be noise on arrival — the same
-  noise the aggregated link WARN of amendment 2026-07-28f exists to
+  noise the aggregated link WARN of amendment 2026-07-28f ([[DEC_Records_Not_Copies_For_Fenced_Blocks]]) exists to
   suppress one layer up.
 - **D — full disappearance only, `n → 0` (chosen).** Asks a yes/no
   instead of comparing counts, for the reason `has_domain_files` does:

@@ -10,7 +10,7 @@ Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04e — E
 
 ## Context
 
-Issue #37, residual 3 of amendment 2026-08-04d. `bound_tables` takes the
+Issue #37, residual 3 of amendment 2026-08-04d ([[DEC_Exporter_Reports_Unread_Requirement_Rows]]). `bound_tables` takes the
 first table of the bound section whose header has the requested column
 count and stops at the blank line below it, so a REQ file that writes its
 requirements as several tables under `###` subheadings inside one

@@ -71,7 +71,7 @@ five encoding literals"._
   honest, though, is not the helper but the assertion: the reader-parity
   harness now compares `validate_vault.read_lines` against
   `export_traceability.read_lines` on every fixture file.
-- **The exporter has been right since amendment 2026-07-31b.** Its
+- **The exporter has been right since amendment 2026-07-31b ([[DEC_Reading_The_Vault_As_A_Graph]]).** Its
   `read_lines` docstring names this exact defect, and its design point
   "the exporter carries its own parsing primitives" listed the
   validator's BOM behaviour as a live, exported defect. That statement
@@ -135,7 +135,7 @@ five encoding literals"._
    `template-sections` rather than a word about the encoding. A
    truncated mark (`ef bb`) is the same class. Filed as issue #31,
    which needs a new finding, not a reading option.
-3. **The `splitlines()` half of residual 5 of amendment 2026-08-01b
+3. **The `splitlines()` half of residual 5 of amendment 2026-08-01b ([[DEC_One_Cell_Splitter_For_Both_Tools]])
    stays open.** That residual named two ways the two tools read lines
    differently; the BOM half is closed here. The validator still splits
    with `splitlines()`, which also breaks on `\v`, `\f` and U+2028,

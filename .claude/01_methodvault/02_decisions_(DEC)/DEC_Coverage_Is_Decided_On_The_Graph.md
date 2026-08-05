@@ -37,7 +37,7 @@ vault roots this session had access to:
 The homelab column is the more important one. That vault spells its
 requirements folder `01_Anforderungen_(ANF)`, so `domains.get("REQ")` is
 `None`, `req_index()` is empty, and the coverage rule has never checked
-anything there at all — accepted residual 1 of amendment 2026-07-28,
+anything there at all — accepted residual 1 of amendment 2026-07-28 ([[DEC_Language_Independent_Recognition_And_VCS_Tier]]),
 still accepted and now measured a second time.
 
 ## Options
@@ -49,7 +49,7 @@ still accepted and now measured a second time.
   an allocation row lives in the section the project's own ARC template
   declares, so this means re-implementing `discover_bindings` and
   `bound_tables` — a third definition of an allocation beside the two the
-  table readers were unified into (amendments 2026-07-31b, 2026-08-01).
+  table readers were unified into (amendments 2026-07-31b ([[DEC_Reading_The_Vault_As_A_Graph]]), 2026-08-01).
 - **C — Two halves from the two places that already own them.** Chosen.
 
 ## Decision
@@ -99,7 +99,7 @@ basis, in order:
    UID — the split this validator already has between `req-uncovered` and
    `verifies-unknown-req`.
 4. Vault-wide findings never enter the stop gate's blocking set anyway
-   (amendment 2026-07-28f), so ERROR would only change the exit code of
+   (amendment 2026-07-28f ([[DEC_Records_Not_Copies_For_Fenced_Blocks]])), so ERROR would only change the exit code of
    the full audit.
 
 The measured effect of this change on both real vault roots is **zero

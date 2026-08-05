@@ -169,7 +169,7 @@ control available.
 - `STRUCTURE.md` — a `## IEC_61508_MAPPING.md` section, the treatment
   `AGENTS.md` got, saying why the file is not in the vault
 - `CHANGELOG.md` — the entry under `Unreleased`, MINOR, naming the
-  deviation from amendment 2026-08-05h
+  deviation from amendment 2026-08-05h ([[DEC_The_Method_Carries_A_Version]])
 
 The suffix `j` assumes that issue #51 takes `i`. Like amendment
 2026-08-05h before it, this one may move at integration.

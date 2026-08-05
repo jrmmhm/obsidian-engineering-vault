@@ -7,10 +7,11 @@ last-verified: 2026-08-05
 Date: 2026-08-04
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04d — The exporter reports the requirement rows it never read (Accepted)".
+Corrected by: [[DEC_Every_Requirement_Table_Of_The_Bound_Section]]
 
 ## Context
 
-Issue #34, residual 4 of amendment 2026-08-04b. `_report_unbound` is
+Issue #34, residual 4 of amendment 2026-08-04b ([[DEC_Requirement_Table_Recognised_By_Shape]]). `_report_unbound` is
 called from the ARC loop of `build_graph` and from nowhere else, so a
 requirement table the export did not read leaves no trace at all. That
 contradicts `table_bindings.binding_discovery.unbound_table` ("an empty

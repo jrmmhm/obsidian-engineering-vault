@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-07-27
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-07-27 — E2E-test-driven hardening (Accepted)". The source record carries no headings; its paragraphs are placed under the template's sections unchanged and unsplit.
+Corrected by: [[DEC_The_Stop_Report_Goes_Where_It_Is_Read]]
 
 ## Context
 

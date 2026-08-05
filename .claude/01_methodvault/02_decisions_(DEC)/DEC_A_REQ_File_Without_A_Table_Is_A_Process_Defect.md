@@ -46,7 +46,7 @@ table and cannot be read as one is `req-table-unrecognized` (WARN).
 
 This is a statement about the rule set, not a change to it. No vault that
 was clean becomes unclean and no finding code starts or stops firing, so
-the tier under amendment 2026-08-05h is **MINOR** — "new or corrected
+the tier under amendment 2026-08-05h ([[DEC_The_Method_Carries_A_Version]]) is **MINOR** — "new or corrected
 documentation", the line that amendment's own table gives this case. What
 that amendment excludes from the classification is the reverse question:
 whether a rule happened to be documented never decides the tier of a change
