@@ -31,4 +31,4 @@ last-verified: YYYY-MM-DD
 -
 
 ## Consists of (CMP)
-- [[CMP_Example]]: Brief explanation
+- \[\[CMP_Example]]: Brief explanation
