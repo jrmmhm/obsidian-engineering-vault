@@ -339,9 +339,10 @@ The most common misplacements. Follow strictly:
 9. **DEC files for discoveries start as Draft.** Never make irreversible
    design decisions autonomously.
 10. **Frontmatter is part of the file.** Fill `domain`, `status`, `created`,
-    `last-verified` (TAE: `verifies`, and `test-object` when the note was
-    measured on a component, an interface or a module) with real values
-    from the template.
+    `last-verified` (DEC: no frontmatter `status` is required — the body
+    `Status:` line carries it, beside the reasoning; TAE: `verifies`, and
+    `test-object` when the note was measured on a component, an interface
+    or a module) with real values from the template.
     Update `last-verified` whenever you confirm a file's content is still
     true. `status: draft` relaxes nothing.
 
