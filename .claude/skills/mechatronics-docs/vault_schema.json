@@ -180,6 +180,14 @@
         "empty_code": "verifies-empty",
         "note": "Declared vault-wide, enforced only in TAE (see domains.TAE). A vault in another language carries this field on its own evidence domain - homelab has 37 such files, all with an empty list - and enforcing the rule there would be a convention rollout on a vault that never had the convention, not a defect report. Extending it belongs to the domain-alias follow-up of amendment 2026-07-28.",
         "enforced": "declared-only"
+      },
+      "test-object": {
+        "type": "list",
+        "item": "object-identifier",
+        "required": false,
+        "code": "test-object-format",
+        "note": "The objects a TAE note was measured on, as file identifiers. Frontmatter and not prose (amendment 2026-08-05d): a section binding would have to be discovered from template body text, which nothing enforces, and the Test Conditions section carries the setup and the equipment beside the test object. A key is also the only form the blocking layer can check - an identifier naming nothing is a finding, a missing prose annotation never is. Optional everywhere, including TAE: not every note has a physical test object.",
+        "enforced": "schema-driven"
       }
     }
   },
@@ -344,22 +352,26 @@
     },
     "contains": {
       "subject_domains": ["ARC"],
-      "object_domains": ["REQ", "DEC", "CMP", "IMP"],
-      "authored_in": "annotated links in the ARC body lists",
+      "object_domains": ["REQ", "DEC", "CMP", "IMP", "ARC"],
+      "authored_in": "annotated links in the ARC body, outside the bound tables",
+      "object_domains_primary": ["REQ", "DEC", "CMP", "IMP"],
+      "object_domains_secondary": ["ARC"],
       "subtype_from": "domain token of the object identifier",
       "reverse_key": "contains_back",
       "outgoing": "contains",
       "incoming": "belongs to",
       "authored_in_secondary": "arc_main_module_table",
+      "note": "The two sources reach different domains, so the domains are declared per source and 'object_domains' is their union, kept for readers that ask what a contains edge may point at. The split is load-bearing: the ARC file template puts a 'Related Modules' bullet in the Context section, and an annotated peer-module link there is navigation, not containment. ARC-to-ARC containment is authored in the submodule table of the main-module template and nowhere else - amendment 2026-08-05d.",
       "enforced": "export-driven"
     },
     "test-object": {
       "subject_domains": ["TAE"],
       "object_domains": ["CMP", "IFC", "ARC"],
-      "authored_in": "annotated link in the TAE Test Conditions section",
+      "authored_in": "TAE frontmatter field 'test-object'",
       "reverse_key": "test-object_back",
       "outgoing": "was tested on",
       "incoming": "was the test object of",
+      "note": "Authored in frontmatter since amendment 2026-08-05d. The prose form it declared before was never implemented and could not have been discovered honestly: the Test Conditions section would have to be found from template body text, which nothing enforces, and it holds the setup and the equipment beside the test object.",
       "enforced": "export-driven"
     },
     "superseded-by": {
