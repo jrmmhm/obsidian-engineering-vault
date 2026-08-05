@@ -9,10 +9,10 @@ decision, audited by `validate_vault.py` in CI like any other vault. Start at
 `.claude/01_methodvault/system_overview.md`.
 
 This file keeps no decision content, so nothing in it can drift. It keeps the
-map, because ten comments in `validate_vault.py`, one in
-`export_traceability.py`, the prose notes in `vault_schema.json` and one in
-`tests/run.sh` cite an amendment by its date. Every date below resolves to the
-note that carries it. Why the record moved and what that cost is itself a
+map, because the tools cite an amendment by its date in **48 lines** — counting
+every line that names one: 20 in `validate_vault.py`, 14 in `vault_schema.json`,
+8 in `export_traceability.py` and 6 in `tests/run.sh`, naming 15 distinct dates
+between them. Every date below resolves to the note that carries it. Why the record moved and what that cost is itself a
 decision there: `DEC_The_Decision_Log_Moves_Into_A_Vault` (DEC-MTH-032).
 
 **A new decision is a new DEC note in the method vault, not an amendment here.**
@@ -56,7 +56,7 @@ All notes below are in `.claude/01_methodvault/02_decisions_(DEC)/`.
 | — (the migration itself) | DEC-MTH-032 | `DEC_The_Decision_Log_Moves_Into_A_Vault` |
 
 **One date resolves to nothing: `2026-07-28g`.** No amendment ever carried it.
-It is cited three times — twice in this repository's own sources
+It is cited four times: twice in this repository's own sources
 (`validate_vault.py`, `tests/run.sh`) and twice inside the record migrated as
 `DEC_A_Non_UTF8_File_Says_Which_Encoding` — always for the condition under which
 `section-mismatch` became the first ERROR to enter the stop gate's blocking set.
