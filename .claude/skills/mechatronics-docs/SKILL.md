@@ -203,7 +203,7 @@ this file? A concrete parameter (changes fast) inside an ARC file (changes
 medium) is a leak — when it later changes, the vault holds two truths. This
 is the single most common documentation defect in practice: implementation
 details casually dropped into ARC, CMP, DEC or REQ files. The validator
-catches numbers in ARC mechanically; every other domain is on you.
+catches numbers in ARC mechanically, and also flags `impl-leak` WARN on DEC Context sections; other domains still need human review for leakage.
 
 ## The 4-Question Rule — Before Creating ANY File
 

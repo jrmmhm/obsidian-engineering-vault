@@ -257,3 +257,23 @@ update `last-verified`. When content becomes wrong, fix it or mark it
 superseded/deprecated in the same work session — never leave a stale
 claim standing. After changing an artifact (code, schematic, parameter),
 search the vault for files referencing it and update them.
+
+## Validator-enforced rules (quick reference)
+
+These findings come from `validate_vault.py`. They are easy to hit on a fresh vault and were under-documented relative to the line limits and link budget.
+
+| Code | Rule |
+| --- | --- |
+| `stub` | File has fewer than 5 content lines (beyond frontmatter / empty scaffolding). |
+| `structure` | More than 100 lines without a subheading — break long prose with `##` sections. |
+| `duplicate-basename` | The same basename appears twice under the vault root; wikilinks to the short name are ambiguous. Prefer unique basenames or full-path links. |
+| `link-repeat` | The same link target appears 3+ times in one file — usually a copy-paste smell. |
+| `encoding-not-utf8` | File is not valid UTF-8. Save as UTF-8. |
+| `id-scope-mismatch` | Frontmatter ID scope does not match the filename convention for that domain. |
+| `orphan` | Nothing links to the file. Link it from an index/README or from a parent overview. |
+
+Also related:
+
+- `impl-leak` (WARN) on DEC files: numbers and implementation detail that belong in ARC can also be flagged in **DEC** section *Context* — not only in ARC. See `02_decisions_(DEC)/00_DEC_README.md`.
+- REQ tables: a missing requirement table is **not** currently a hard validator error; only a present-but-unreadable table is flagged. Treat the REQ table as obligatory by process even when the tool is silent.
+
