@@ -7,12 +7,15 @@ last-verified: 2026-08-05
 Date: 2026-07-31
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-07-31b — Reading the vault as a graph (Accepted)".
+Corrected by: [[DEC_One_Cell_Splitter_For_Both_Tools]]
+Corrected by: [[DEC_One_BOM_Safe_Reader_For_Every_File]]
+Corrected by: [[DEC_Two_Declared_Relations_Get_A_Source]]
 
 ## Context
 
 The vault is readable in Obsidian or as raw Markdown and nowhere else.
 Amendment 2026-07-28b declared seven relation kinds with their reverse
-keys and left every one of them `declared-only`; amendment 2026-07-28d
+keys and left every one of them `declared-only`; amendment 2026-07-28d ([[DEC_Schema_Driven_Field_Validation]])
 made the field vocabulary schema-driven but not the relations. Issue #2
 asks for the artifact that turns those declarations into something a
 reviewer, an examiner or an auditor can be handed: a requirement-to-
@@ -42,7 +45,7 @@ relation it carried — is live: homelab's ARC template writes
   identical across all seven vaults on this machine. Rejected as the
   primary mechanism: it invents a second vocabulary next to the
   abbreviations the schema already enumerates, and follow-up 4 of
-  amendment 2026-07-28 has already decided the explicit alias map.
+  amendment 2026-07-28 ([[DEC_Language_Independent_Recognition_And_VCS_Tier]]) has already decided the explicit alias map.
 - **C — the template-declared section position (chosen).** The project's
   own `00_*template*` file names the section, `check_sections` enforces
   that every file of the domain carries it as a blocking ERROR, and
@@ -85,7 +88,7 @@ modify it. It writes JSON, CSV and a self-contained HTML report into a
 directory the caller names, refuses to write inside a vault, and derives
 every reverse edge instead of reading one.
 
-The two consistency rules that amendment 2026-07-28b reassigned to this
+The two consistency rules that amendment 2026-07-28b ([[DEC_Object_Identity_And_Typed_Relations]]) reassigned to this
 issue are reported by the export and enforced by nothing: measured,
 `verified-needs-evidence` fires on 21 legitimate homelab rows whose
 verification is prose, which is the false-positive rate this project
@@ -154,7 +157,7 @@ named in the README and in the export's provenance block instead.
    because both rest on annotated links and no production vault carries a
    single `id:`. The mechanism is exercised only by the template vault and
    the test fixtures.
-   _Corrected 2026-08-05 (amendment 2026-08-05d): both halves were wrong.
+   _Corrected 2026-08-05 (amendment 2026-08-05d ([[DEC_Two_Declared_Relations_Get_A_Source]])): both halves were wrong.
    Measured on the template vault, `contains` and `test-object` were zero
    there too — `test-object` was never implemented, and only the submodule
    table half of `contains` was, which the template vault does not use. The

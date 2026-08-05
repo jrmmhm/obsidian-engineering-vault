@@ -7,10 +7,11 @@ last-verified: 2026-08-05
 Date: 2026-08-04
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04f — Two folders meaning one domain is a finding, not a choice (Accepted)".
+Corrected by: [[DEC_One_Abbreviation_One_Folder_By_Rule]]
 
 ## Context
 
-Issue #38, residual 4 of amendment 2026-08-04d, found by the adversarial
+Issue #38, residual 4 of amendment 2026-08-04d ([[DEC_Exporter_Reports_Unread_Requirement_Rows]]), found by the adversarial
 review of issue #34 and out of scope there. `resolve_roles` keeps the
 sorted-first abbreviation via `roles.setdefault(role, abbr)`, and
 `build_graph` then skips every file of the other folder at `if role is
@@ -32,7 +33,7 @@ The way to acquire it is a translation, and this repository's own
 German→English migration is exactly that.
 
 The letter `e` is skipped deliberately: PR #39 (issue #37) is open and
-carries amendment 2026-08-04e, so taking `f` here keeps the two records
+carries amendment 2026-08-04e ([[DEC_Every_Requirement_Table_Of_The_Bound_Section]]), so taking `f` here keeps the two records
 from colliding when both land.
 
 ## Options

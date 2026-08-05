@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-08-01
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-01b — One cell splitter for both tools (Accepted)".
+Corrected by: [[DEC_Link_Matcher_Reads_Two_Unseen_Shapes]]
 
 ## Context
 
@@ -32,11 +33,11 @@ of them is in a REQ or an ARC file, so no positional reader touches one
 today — 58 rows carry an escaped pipe inside a code span and 0 carry an
 unescaped one, which is why the defect has stayed latent.
 
-This is the other half of the design point in amendment 2026-07-31b, "the
+This is the other half of the design point in amendment 2026-07-31b ([[DEC_Reading_The_Vault_As_A_Graph]]), "the
 exporter carries its own parsing primitives … fixing them is a change to
 the blocking layer with its own blast radius and belongs in its own
 issue". This is that issue, and it supersedes that design point for the
-cell splitter. Residual 3 of amendment 2026-08-01 — "the rule still lives
+cell splitter. Residual 3 of amendment 2026-08-01 ([[DEC_One_Fence_Definition_For_Both_Tools]]) — "the rule still lives
 in two files" — closes here for the splitter and stays open for the fence.
 
 ## Options

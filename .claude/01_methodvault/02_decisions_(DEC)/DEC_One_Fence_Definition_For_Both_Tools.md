@@ -26,7 +26,7 @@ and `req-uncovered`, and the global duplicate scan in
 so a quoted example could satisfy a TAE `verifies:` entry and mask a
 genuine ERROR.
 
-This is residual 1 of amendment 2026-07-31b — the exporter and the
+This is residual 1 of amendment 2026-07-31b ([[DEC_Reading_The_Vault_As_A_Graph]]) — the exporter and the
 validator disagreeing about how many requirement rows a vault has —
 observed from the other side.
 

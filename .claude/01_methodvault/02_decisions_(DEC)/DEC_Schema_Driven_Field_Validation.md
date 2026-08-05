@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-07-28
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-07-28d — Schema-driven field validation (Accepted)".
+Corrected by: [[DEC_Frontmatter_Reader_Learns_The_Editor_Spelling]]
 
 ## Context
 
@@ -24,7 +25,7 @@ an undeclared frontmatter key** — the single candidate, PMDE's
 both of which an editor-field allowlist covers. An undeclared-field
 check therefore costs all three vaults zero findings, which puts it in
 the bug-fix class rather than the convention-rollout class that
-follow-up 4 of the 2026-07-28 amendment exists to keep separate.
+follow-up 4 of the 2026-07-28 amendment ([[DEC_Language_Independent_Recognition_And_VCS_Tier]]) exists to keep separate.
 
 Second, and unrelated to the issue but on the exact code path it
 rewrites: a list-valued scalar field crashes the validator.
@@ -134,7 +135,7 @@ against the other seven kinds, which are all authored subject-first.
   extending it this way: zero findings on all three vaults.
 - **One grouped finding per file, not one per key.** A file with five
   stray keys must not produce five lines — the lesson of the aggregated
-  link feedback in amendment 2026-07-27, where dozens of identical WARNs
+  link feedback in amendment 2026-07-27 ([[DEC_E2E_Test_Driven_Hardening]]), where dozens of identical WARNs
   taught the reader to ignore the channel.
 - **Every schema access is type-checked at the access, not once at
   load.** `check_dec_status` and `check_req_table` read nested keys; a
@@ -168,7 +169,7 @@ against the other seven kinds, which are all authored subject-first.
    declares them, #2 reads them. The two consistency rules that need a
    parsed allocation table were reassigned to #2 accordingly.
 2. **The table header signatures remain language-dependent and
-   unverified**, as residuals 3 and 4 of amendment 2026-07-28b describe.
+   unverified**, as residuals 3 and 4 of amendment 2026-07-28b ([[DEC_Object_Identity_And_Typed_Relations]]) describe.
    A rule asserting that a vault's own tables still match the declared
    signature was considered here and deferred: while nothing extracts
    relations, such a rule would report that an extraction failed which
@@ -203,7 +204,7 @@ against the other seven kinds, which are all authored subject-first.
    reported as malformed would start parsing — and belongs in its own
    change with its own measurement.
 8. Reconsider requiring `id`, and merging the file and row identifier
-   namespaces (residual 1 of amendment 2026-07-28c), once the vaults that
+   namespaces (residual 1 of amendment 2026-07-28c ([[DEC_Identifier_Enforcement]])), once the vaults that
    predate the scheme have been migrated. Both are convention rollouts and
    must not ride along with a bug fix.
 

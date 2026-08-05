@@ -121,7 +121,7 @@ do the whole job"._
    issue.
 4. **`[[A\\|B]]` yields the target `A\`.** The escaped backslash no
    longer escapes the pipe, so `split_cells` divides the cell there
-   (amendment 2026-08-01b) while the link matcher keeps the backslash.
+   (amendment 2026-08-01b ([[DEC_One_Cell_Splitter_For_Both_Tools]])) while the link matcher keeps the backslash.
    Degenerate in both readings — the target is illegal either way, and
    the shape occurs zero times.
 

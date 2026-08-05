@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-07-28
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-07-28f — Records, not copies: fenced blocks whose source is not a file here (Accepted)".
+Corrected by: [[DEC_The_Gate_Names_The_Code_That_Stopped_Firing]]
 
 ## Context
 
@@ -139,7 +140,7 @@ any procedure module".
   content is scanned and no marker suppresses anything; a declared block
   containing `deploy/20_software/...` was therefore reported as a stale
   project pointer. It is now skipped there, which is the ownership rule
-  of amendment 2026-07-28e — reachable for the first time because the
+  of amendment 2026-07-28e ([[DEC_One_Project_Path_Definition_In_Both_Zones]]) — reachable for the first time because the
   block says so instead of the validator guessing.
 - **The baseline argument, stated correctly.** `hook_post` computes the
   per-file baseline at runtime from `git show HEAD:<file>` with the
@@ -155,7 +156,7 @@ any procedure module".
 1. **Nothing verifies that a declared block truly has no source file.**
    The declaration is an author's claim; the validator can see neither
    the other machine nor the absence of a local original. This is
-   follow-up 2 of the 2026-07-25 decision (doc-claim grep check), and it
+   follow-up 2 of the 2026-07-25 decision ([[DEC_Enforcement_Layer_For_The_Vault_Conventions]]) (doc-claim grep check), and it
    is why the exemption reports rather than stays silent.
 2. **The machine name is validated against nothing.** Ruff's split is
    the model — RUF100 stays permissive while RUF102 checks codes against
@@ -165,7 +166,7 @@ any procedure module".
    off-switch. There is no home for the registry yet; see follow-up 9.
 3. **A copy short enough stays silent.** A 10-line excerpt of a file in
    `20_software/` produces no finding. Precision over recall, the same
-   trade as the body path scan of amendment 2026-07-27.
+   trade as the body path scan of amendment 2026-07-27 ([[DEC_E2E_Test_Driven_Hardening]]).
 4. **The four-space indented block still evades every fence rule.**
    Closing it would mean judging every indented line inside every list,
    which is a false-positive surface this project has consistently
@@ -183,7 +184,7 @@ any procedure module".
    rather than parsed: machine names do not contain spaces, and the
    value is reported in the finding, so the mistake is visible.
 7. **Case-sensitive.** `HOST=` is not recognised, consistently, like the
-   identifier reader of amendment 2026-07-28c.
+   identifier reader of amendment 2026-07-28c ([[DEC_Identifier_Enforcement]]).
 8. **This partially adopts option C of amendment 2026-07-28e** (an
    explicit foreign-artifact syntax in the vault), for fenced blocks
    only. The 37 foreign paths written relative, residual 3 there, stay

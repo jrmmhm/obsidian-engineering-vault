@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-08-05
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-05h — The method carries a version, and a breaking change is defined (Accepted)".
+Corrected by: [[DEC_Safety_Standard_Correspondence_Is_Structural]]
 
 ## Context
 
@@ -105,7 +106,7 @@ An adversarial review of the plan killed four factual claims that would
 have shipped in the changelog, each verified against the source: that the
 schema declares nine typed relations (it declares eight — the ninth
 `relations` key is `note`, a prose explanation, and this file already said
-"eight" in amendment 2026-08-05d); that the skill ships two hooks (`hooks/`
+"eight" in amendment 2026-08-05d ([[DEC_Two_Declared_Relations_Get_A_Source]])); that the skill ships two hooks (`hooks/`
 holds three, and the README sentence claiming two is issue #52); that
 frontmatter carries `domain, status, created, last-verified` on every note
 (DEC carries no `status` — issue #52 again); and that 26 pull requests were
@@ -148,7 +149,7 @@ described in `CONTRIBUTING.md` under *Cutting a release*.
 
 ### Aligned on integration
 
-Rebased onto amendments 2026-08-05e (coverage on the graph) and 05f/05g (the
+Rebased onto amendments 2026-08-05e ([[DEC_Coverage_Is_Decided_On_The_Graph]]) (coverage on the graph) and 05f/05g (the
 generated index and the `AGENTS.md` forwarder); this amendment moved from
 suffix `e` to `h`. Both of those changes then became the tier table's worked
 examples, because they are the two ends of it: coverage moving from a prose

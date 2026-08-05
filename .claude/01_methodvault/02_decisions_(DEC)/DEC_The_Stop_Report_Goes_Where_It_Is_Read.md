@@ -18,7 +18,7 @@ pre-existing-ERROR lines, the created-files note with its inbox warning,
 the vault-wide advisory — whose only automatic channel this is, because
 `hook_post` never shows vault-wide findings — the fail-open ERROR report
 that exists precisely to surface unfixed ERRORs once the gate releases,
-and, since amendment 2026-08-05, the codes that stopped firing. Residual
+and, since amendment 2026-08-05 ([[DEC_The_Gate_Names_The_Code_That_Stopped_Firing]]), the codes that stopped firing. Residual
 1 of that amendment named the suspicion; issue #44 is it.
 
 Amendment 2026-07-27 had recorded the opposite as a verified hook-API
@@ -66,7 +66,7 @@ switched this gate off in a way nothing in this repository could see.
 - **A — `additionalContext`.** Rejected on the measurement: it reaches
   the model but continues the turn. A routine advisory about legacy
   drift would spend a model turn on work nobody asked for — the ground on
-  which amendment 2026-07-27 rejected it, now with a number behind it.
+  which amendment 2026-07-27 ([[DEC_E2E_Test_Driven_Hardening]]) rejected it, now with a number behind it.
 - **B — `systemMessage` (chosen).** The report is written for a human:
   it names files created, legacy findings, and questions only the session
   owner can answer ("say which of them you fixed").

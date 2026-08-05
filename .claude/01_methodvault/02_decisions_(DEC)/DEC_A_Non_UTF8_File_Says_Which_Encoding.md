@@ -10,7 +10,7 @@ Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04c — A
 
 ## Context
 
-Issue #31, residual 2 of amendment 2026-08-04. `read_text` decoded every
+Issue #31, residual 2 of amendment 2026-08-04 ([[DEC_One_BOM_Safe_Reader_For_Every_File]]). `read_text` decoded every
 file with `errors="replace"`, so a file that is not UTF-8 was read
 successfully and read wrongly. Reproduced against the validator as it
 stood: an ARC note written as UTF-16LE — what Windows PowerShell 5.1

@@ -31,7 +31,7 @@ would report every domain file in both.
   homelab has 244 domain files and PMDE 232, none with an identifier, so
   this single decision would have roughly doubled homelab's finding count
   and added about 56% to PMDE's. That is a convention rollout wearing a
-  bug fix's clothes — the same mixing that follow-up 4 of the 2026-07-28
+  bug fix's clothes — the same mixing that follow-up 4 of the 2026-07-28 ([[DEC_Language_Independent_Recognition_And_VCS_Tier]])
   amendment was split off to avoid.
 - **A2 — compare only the identifiers that are actually present
   (chosen).** Costs both German vaults exactly zero findings, measured

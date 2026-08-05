@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-08-01
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-01c — The frontmatter reader learns the spelling the editor writes (Accepted)". The source record opens without headings; its opening paragraphs are placed under the template's sections unchanged and unsplit.
+Migration note: "this document" in the Context below is the appended decision log this vault replaces; the claim it makes is about the records migrated from it, not about this file.
 
 ## Context
 
@@ -22,7 +23,7 @@ tags:
 ```
 
 `editor_fields` had tolerated `tags`, `aliases` and `cssclasses` in the
-vocabulary since amendment 2026-07-28d while the parser rejected the form
+vocabulary since amendment 2026-07-28d ([[DEC_Schema_Driven_Field_Validation]]) while the parser rejected the form
 the editor writes them in. That contradiction was recorded there as
 residual 3 and deferred as follow-up 7, on the measured grounds that no
 file anywhere carried the form. Both spellings now fold into one list.
@@ -48,7 +49,7 @@ What the eleven files gain is the point of the change. One
 all true, all previously masked. The files carry no `domain`, no `created`
 and no `last-verified`, and spell `status: Accepted`, which is not in the
 vocabulary. A single parse failure had been standing in for five real
-defects, which is the same shape as amendment 2026-08-01's stop-gate blind
+defects, which is the same shape as amendment 2026-08-01 ([[DEC_One_Fence_Definition_For_Both_Tools]])'s stop-gate blind
 spot: a check that reports something is not the same as a check that
 reports the truth.
 

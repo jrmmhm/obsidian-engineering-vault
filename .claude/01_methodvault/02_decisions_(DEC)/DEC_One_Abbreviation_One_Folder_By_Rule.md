@@ -10,7 +10,7 @@ Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04g — O
 
 ## Context
 
-Issue #42, residual 1 of amendment 2026-08-04f. `Vault.__init__` writes
+Issue #42, residual 1 of amendment 2026-08-04f ([[DEC_Two_Folders_One_Domain_Is_A_Finding]]). `Vault.__init__` writes
 `self.domains[abbr] = s` while iterating `self.root.iterdir()`, so two
 folders carrying one abbreviation — `03_architecture_(ARC)` beside
 `03_Architektur_(ARC)` — collapse to the one the file system happens to

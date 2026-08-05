@@ -64,7 +64,7 @@ rollout class this project keeps separating out.
   This is what the adversarial review of this change preferred, and it is
   genuinely simpler: no ERROR moves anywhere, and the issue itself calls
   exact matching for qualifiers "defensible either way". Rejected on one
-  concrete consequence: amendment 2026-07-28b binds relations to
+  concrete consequence: amendment 2026-07-28b ([[DEC_Object_Identity_And_Typed_Relations]]) binds relations to
   template-declared sections (option E, the documented fallback for a vault
   whose schema signature does not match), so a retitled section silently
   drops out of that binding — the failure is invisible exactly where the
@@ -117,7 +117,7 @@ genuinely never written.
   Both spellings are therefore quoted verbatim in every message instead of
   a claim that only the case differs.
 - **One grouped finding per file per class.** The lesson of the aggregated
-  link feedback in amendment 2026-07-27, and here it carries a second
+  link feedback in amendment 2026-07-27 ([[DEC_E2E_Test_Driven_Hardening]]), and here it carries a second
   weight: `hook_stop` compares per-code counts against the HEAD baseline,
   so a per-heading finding would let a file that *improved* — one absence
   replaced by a qualifier heading — produce more findings of one code than
@@ -135,7 +135,7 @@ genuinely never written.
   heading of every file of that domain.
 - **The new ERROR code is safe against the ratchet.** `hook_post` computes
   the per-file baseline at runtime from `git show HEAD:<file>` with the
-  *running* validator, as amendment 2026-07-28f already recorded, so
+  *running* validator, as amendment 2026-07-28f ([[DEC_Records_Not_Copies_For_Fenced_Blocks]]) already recorded, so
   `section-mismatch` appears in baseline and current run alike and a
   pre-existing one never blocks. The git-backed fixture asserts it rather
   than the reasoning being trusted.
