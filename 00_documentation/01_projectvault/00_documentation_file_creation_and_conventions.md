@@ -209,7 +209,11 @@ escaped — `[[TAE_ADC_Linearity\|linearity proof]]` — otherwise it is read
 as a column separator; the same applies to an embed size. Link the
 responsible file once where it matters —
 do not link every mention (guideline: under ~20 outgoing links per
-file; hub files like ARC and system_overview may carry more).
+file; hub files like ARC and system_overview may carry more). Two further
+link findings sit in the quick reference at the end of this file: the same
+target linked too often in one file (`link-repeat`), and two files sharing
+a basename, which makes every link to that name ambiguous
+(`duplicate-basename`).
 
 A link into the same file (`[[#Heading]]`, `[[#^blockid]]`) is checked
 against that file's own headings and block identifiers and must name one
@@ -268,7 +272,10 @@ yours. In ARC no block is permitted at all, declared or not.
 A file answers ONE question. Above ~150 lines, re-apply the 4-question
 rule: can the filename still fully describe the content? If not, split.
 Above 400 lines the validator blocks — that size is a structural SSOT
-violation, not a formatting issue.
+violation, not a formatting issue. Length is not the only shape the
+validator reads: a long file without a single subheading is reported as
+`structure`, a very short one as `stub` — both in the quick reference at
+the end of this file.
 
 ### Freshness
 Outdated documentation is worse than none: it actively misleads both
@@ -278,22 +285,52 @@ superseded/deprecated in the same work session — never leave a stale
 claim standing. After changing an artifact (code, schematic, parameter),
 search the vault for files referencing it and update them.
 
-## Validator-enforced rules (quick reference)
+### Validator-enforced rules (quick reference)
 
-These findings come from `validate_vault.py`. They are easy to hit on a fresh vault and were under-documented relative to the line limits and link budget.
+Seven findings of `validate_vault.py` that the sections above do not name.
+This is not the tool's whole code list — the rules above produce findings
+of their own, and every message the validator writes names its own code.
 
-| Code | Rule |
-| --- | --- |
-| `stub` | File has fewer than 5 content lines (beyond frontmatter / empty scaffolding). |
-| `structure` | More than 100 lines without a subheading — break long prose with `##` sections. |
-| `duplicate-basename` | The same basename appears twice under the vault root; wikilinks to the short name are ambiguous. Prefer unique basenames or full-path links. |
-| `link-repeat` | The same link target appears 3+ times in one file — usually a copy-paste smell. |
-| `encoding-not-utf8` | File is not valid UTF-8. Save as UTF-8. |
-| `id-scope-mismatch` | Frontmatter ID scope does not match the filename convention for that domain. |
-| `orphan` | Nothing links to the file. Link it from an index/README or from a parent overview. |
+Two scopes appear in the table. A **domain file** is a note in a domain
+folder that is not a `00_` README or template; the `00_` files, the inbox
+and the vault's root files are exempt from the domain-file checks. **Every
+file the validator reads** means the root files, the `00_` files, the
+inbox and the domain files together — but nothing below a folder that is
+not a domain folder, because the validator never descends there.
 
-Also related:
+Three of the seven are vault-wide rather than per-file. The stop gate
+lists those as advisory; the full audit is the pass that counts.
 
-- `impl-leak` (WARN) on DEC files: numbers and implementation detail that belong in ARC can also be flagged in **DEC** section *Context* — not only in ARC. See `02_decisions_(DEC)/00_DEC_README.md`.
-- REQ tables: a missing requirement table is **not** currently a hard validator error; only a present-but-unreadable table is flagged. Treat the REQ table as obligatory by process even when the tool is silent.
+| Code | Severity | Fires on | Rule |
+| --- | --- | --- | --- |
+| `stub` | WARN | domain files | Fewer than 5 non-blank lines below the frontmatter. Fill the file or do not create it yet. |
+| `structure` | WARN | domain files | More than 100 lines, frontmatter included, without a single `##` or `###` heading among them. |
+| `duplicate-basename` | WARN, vault-wide | every `.md` file under `00_documentation` | The same filename stem exists more than once. The scope reaches past the vault: `02_documents` counts, and the shipped template hits this with its two `README.md` files. |
+| `link-repeat` | WARN | every file the validator reads | The same target linked more than three times in one file. An alias, an anchor and an embed all address the same target; a link into the file itself (`[[#Heading]]`, `[[#^blockid]]`) is not counted. |
+| `encoding-not-utf8` | ERROR | every file the validator reads, templates included | The bytes are not UTF-8. Every other finding on that file is a consequence of the encoding — re-save as UTF-8 and read them again. |
+| `id-scope-mismatch` | WARN, vault-wide | REQ files carrying both an `id` and a `(SCOPE)` token | The scope in the frontmatter `id` differs from the token in the filename. The id wins, so every row of the file is addressed under the id's scope. |
+| `orphan` | WARN, vault-wide | domain files | No other file in the vault links to it — reachable by search alone. |
 
+`duplicate-basename` has one remedy here, and it is not the one Obsidian
+teaches. Obsidian tells two notes of the same name apart by their path
+(`[[folder/Note]]`); this vault resolves a wikilink by its basename alone,
+so a path-qualified link is reported as `link-unresolved` instead. Rename
+one of the two files. A collision you decide to keep — two `README.md` in
+two folders is the usual one — stays a standing WARN, and no wikilink may
+address either file by that name while it does.
+
+`impl-leak` is not an ARC rule alone. The rule is that ARC stores no
+values; what the check mechanically catches is a number carrying a unit
+(`3.3 V`, `100 ms`) and a pin or register token (`GPIO4`, `PA7`, `0x2A`),
+outside code fences and outside a References or Sources section. In ARC
+that is an ERROR anywhere in the body. In a DEC file the same detector
+runs over the **Context** section alone and reports a WARN: Context frames
+the problem, so a number that weighs an alternative belongs in Options,
+and a number that says how the thing is built belongs in IMP, CMP or IFC.
+See [[00_DEC_README]].
+
+A REQ file carrying no table at all produces no finding. The requirement
+table is obligatory by process and unenforced by the tool, so a silent run
+is not a statement that the file is complete. What the tool does catch is
+a table that looks like a requirement table and cannot be read as one
+(`req-table-unrecognized`, WARN).
