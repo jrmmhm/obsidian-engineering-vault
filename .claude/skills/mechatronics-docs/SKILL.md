@@ -121,6 +121,14 @@ only blocks when `MECHDOCS_PRECOMMIT_BLOCK=1` is set, and a GitHub
 Actions workflow that runs the test suite and the full vault audit on
 every push and pull request.
 
+Which copy of this skill a session is actually running is a separate
+question, and one a global `~/.claude/skills/` entry cannot answer by
+itself — it may be a symlink carrying a path that only one machine can
+follow. `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py --check-install`
+says whether that entry reaches this copy, reaches a different one, or
+reaches nothing at all. Run it when a rule this file describes appears
+not to be enforced.
+
 Rules that follow from this mechanism:
 
 1. **Never modify vault files through Bash** (`sed -i`, `tee`, heredocs) —
@@ -351,7 +359,7 @@ The most common misplacements. Follow strictly:
    parent ARC allocation tables, 00_glossary.md (new terms).
 
 7. **Full audit before finishing.** Run
-   `python3 ~/.claude/skills/mechatronics-docs/validate_vault.py <VAULT_ROOT>`
+   `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py <VAULT_ROOT>`
    and resolve every ERROR; triage WARNs (fix, or state in one line why
    acceptable — especially `impl-leak` flags: justify the value's location
    or move it to IMP/CMP/IFC).

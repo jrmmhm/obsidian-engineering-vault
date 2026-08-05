@@ -5,7 +5,9 @@
 # a violation vault (~15 seeded rule violations that must each be
 # detected), a German/English twin pair that must produce identical
 # findings, plus hook-mode and crash-mode checks, plus a run against the
-# real baseproject template vault (must contain no ERRORs).
+# real baseproject template vault (must contain no ERRORs), plus scratch
+# HOMEs that pin what --check-install says about each shape the personal
+# skill entry can take.
 set -u
 # -P resolves the ~/.claude/skills symlink to the repo. Without it
 # REAL_VAULT points outside the repo and the template-vault check below
@@ -3648,6 +3650,98 @@ fi
 TESTS=$((TESTS + 1))
 if ! contains "$(python3 "$VALIDATOR" "$V" 2>&1)" "domain-duplicate-folder"; then
   ok x; else fail "a vault with one folder per domain must carry no duplicate-folder finding"; fi
+
+# ==========================================================================
+# Fixture 9: --check-install. The entry under ~/.claude/skills is the only
+# piece of this skill that lives outside the repository, and a symlink there
+# carries a path rather than an identity: replicate it across hosts and it
+# is valid only where it was written (issue #40). The failure is silent -
+# the entry stays in the skill listing and only the invocation fails - so
+# what is asserted here is that each shape says which shape it is.
+#
+# HOME is moved per command with env, never globally: the suite neutralises
+# git the same way and deliberately leaves HOME alone, because a global
+# override would change python's user site and git's identity for every
+# test after it. It also keeps the real ~/.claude out of the suite, which
+# on a CI runner does not exist at all.
+#
+# The trap lists every fixture directory: bash replaces the handler rather
+# than adding to it, so the last one written is the only one that runs.
+# ==========================================================================
+CI_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP" "$SC_TMP" "$PF_TMP" \
+      "$CAP_TMP" "$EX_TMP" "$DUP_TMP" "$CI_TMP"' EXIT
+
+# Sets ci_out/ci_rc in the caller - a command substitution would run the
+# assignment in a subshell and lose the exit code.
+ci() { ci_out=$(env HOME="$1" python3 "$VALIDATOR" --check-install 2>&1); ci_rc=$?; }
+
+# No entry at all. Legitimate: the template ships the skill inside the
+# project, where nothing has to be installed. Not a defect.
+CI_A="$CI_TMP/a"; mkdir -p "$CI_A/.claude/skills"
+ci "$CI_A"
+TESTS=$((TESTS + 1))
+if [ $ci_rc -eq 0 ] && contains "$ci_out" "absent"; then ok x; else
+  fail "a missing personal entry is a setup, not a defect:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
+
+# The entry reaches this copy.
+CI_B="$CI_TMP/b"; mkdir -p "$CI_B/.claude/skills"
+ln -s "$SKILL_DIR" "$CI_B/.claude/skills/mechatronics-docs"
+ci "$CI_B"
+TESTS=$((TESTS + 1))
+if [ $ci_rc -eq 0 ] && contains "$ci_out" "OK - the entry reaches this copy"; then
+  ok x; else fail "a correct entry must pass:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
+
+# Issue #40 itself: the link carries a path this host does not have. The
+# stored path must appear - it is what names the host that wrote it.
+CI_C="$CI_TMP/c"; mkdir -p "$CI_C/.claude/skills"
+ln -s "/nonexistent-host-path/obsidian-engineering-vault/.claude/skills/mechatronics-docs" \
+      "$CI_C/.claude/skills/mechatronics-docs"
+ci "$CI_C"
+TESTS=$((TESTS + 1))
+if [ $ci_rc -eq 1 ] && contains "$ci_out" "DANGLING" \
+   && contains "$ci_out" "/nonexistent-host-path/"; then ok x; else
+  fail "a dangling entry must fail and name the path it stored:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
+
+# ... and it is dangling, not a mismatch. -e is false for a dangling link,
+# so a check that asks about existence before it asks about linkhood
+# reports the wrong shape, or says nothing at all.
+TESTS=$((TESTS + 1))
+if ! contains "$ci_out" "MISMATCH"; then ok x; else
+  fail "a dangling entry is not a mismatch:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
+
+# The link resolves, but to a second copy of the skill. Readability alone
+# calls this green, and the session then runs a version nobody is editing.
+CI_D="$CI_TMP/d"; mkdir -p "$CI_D/.claude/skills" "$CI_TMP/other-clone"
+printf -- '---\nname: mechatronics-docs\n---\n' > "$CI_TMP/other-clone/SKILL.md"
+ln -s "$CI_TMP/other-clone" "$CI_D/.claude/skills/mechatronics-docs"
+ci "$CI_D"
+TESTS=$((TESTS + 1))
+if [ $ci_rc -eq 1 ] && contains "$ci_out" "MISMATCH" \
+   && contains "$ci_out" "other-clone"; then ok x; else
+  fail "an entry reaching a different copy must fail and name it:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
+
+# A real directory instead of a link - the shape that syncing the skill's
+# content rather than a link to it produces on every peer.
+CI_E="$CI_TMP/e"; mkdir -p "$CI_E/.claude/skills/mechatronics-docs"
+printf -- '---\nname: mechatronics-docs\n---\n' \
+  > "$CI_E/.claude/skills/mechatronics-docs/SKILL.md"
+ci "$CI_E"
+TESTS=$((TESTS + 1))
+if [ $ci_rc -eq 1 ] && contains "$ci_out" "MISMATCH"; then ok x; else
+  fail "a real directory in place of the entry must fail:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
 
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
       "/tmp/claude-mechdocs/blocks-$SID"

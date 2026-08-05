@@ -13,6 +13,8 @@ Modes:
   validate_vault.py --file <path>             file-local checks only (root auto-detected)
   validate_vault.py --hook post               PostToolUse hook (JSON on stdin)
   validate_vault.py --hook stop               Stop hook (JSON on stdin)
+  validate_vault.py --check-install           does the personal skill entry
+                                              reach this copy of the skill?
 
 Exit codes: 0 = no errors (warnings allowed), 1 = at least one error,
 2 = validator crash (hooks fail open on 2).
@@ -24,6 +26,7 @@ NOT relax any check.
 
 import codecs
 import json
+import os
 import re
 import subprocess
 import sys
@@ -2420,6 +2423,73 @@ def hook_stop(payload):
 
 
 # --------------------------------------------------------------------------
+# Installation check
+# --------------------------------------------------------------------------
+
+SKILL_NAME = "mechatronics-docs"
+
+
+def check_install():
+    """Report whether the personal skill entry reaches this copy of the skill.
+
+    A `~/.claude/skills/<name>` entry may be a symlink, and a symlink stores
+    a path string rather than an identity. Replicate that entry across
+    machines - a synced dotfile directory does exactly that - and the stored
+    path stays valid only on the host that wrote it. Nothing announces the
+    break: the entry keeps appearing in the skill listing and only the
+    invocation fails, which is what let issue #40 run unnoticed for a week.
+
+    Readability alone is not the check. An entry that resolves to a second
+    clone of the template, or to a synced copy of the skill directory, is
+    just as wrong and just as quiet - it serves a version nobody is editing.
+    So the resolved target is compared against this file's own directory.
+    """
+    own = Path(__file__).resolve().parent
+    entry = Path.home() / ".claude" / "skills" / SKILL_NAME
+    print(f"this copy:      {own}")
+    print(f"personal entry: {entry}")
+
+    # is_symlink() before exists(): exists() follows the link and is False
+    # for a dangling one, which is the very state this check exists for.
+    if not entry.is_symlink() and not entry.exists():
+        print("  absent - the skill is reachable only in projects that carry "
+              "it themselves, which is a legitimate setup. Expected a global "
+              "entry? Recreate the link; a Claude Code update can remove it.")
+        return 0
+
+    if entry.is_symlink():
+        print(f"  link target:    {os.readlink(entry)}")
+        if not entry.exists():
+            print("  DANGLING - that path does not exist on this host. A "
+                  "symlink carries a path, not an identity, so a replicated "
+                  "one is only valid where it was created. Point it at the "
+                  "path this host uses, and keep the entry out of the sync.")
+            return 1
+
+    try:
+        resolved = entry.resolve()
+    except OSError as e:
+        print(f"  UNREADABLE - {e}")
+        return 1
+
+    if resolved != own:
+        kind = ("link" if entry.is_symlink()
+                else "directory" if entry.is_dir() else "path")
+        print(f"  MISMATCH - that {kind} reaches {resolved}, which is not this "
+              "copy of the skill. Two copies drift against each other; make "
+              "the entry reach this one.")
+        return 1
+
+    if not os.access(entry / "SKILL.md", os.R_OK):
+        print("  UNREADABLE - the entry is correct but SKILL.md cannot be "
+              "read; check permissions.")
+        return 1
+
+    print("  OK - the entry reaches this copy")
+    return 0
+
+
+# --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
 
@@ -2429,11 +2499,16 @@ def main(argv):
     ap.add_argument("vault_root", nargs="?", help="path to the project vault root")
     ap.add_argument("--file", help="validate a single file (file-local checks only)")
     ap.add_argument("--hook", choices=["post", "stop"], help="run as Claude Code hook")
+    ap.add_argument("--check-install", action="store_true",
+                    help="report whether the personal skill entry reaches this copy")
     args = ap.parse_args(argv)
 
     if args.hook:
         payload = json.load(sys.stdin)
         return hook_post(payload) if args.hook == "post" else hook_stop(payload)
+
+    if args.check_install:
+        return check_install()
 
     if args.file:
         path = Path(args.file).resolve()
