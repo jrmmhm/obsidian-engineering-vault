@@ -2975,7 +2975,9 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
   {
     printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n'
     printf 'id: ARC-EXP-001\n---\n'
-    printf '## %s\n\nTop module.\n\n' "$CTX"
+    # The abbreviation is the index's sentence rule under test: a dot whose
+    # next word continues in lower case does not end the sentence.
+    printf '## %s\n\nTop module, e.g. the one every submodule hangs from. A second sentence the index must not carry.\n\n' "$CTX"
     printf '## %s\n| Submodule | Description |\n| --- | --- |\n' "$SUB"
     printf '| [[ARC_Export]] | the module under export |\n'
   } > "$V/$AR/ARC_Top.md"
@@ -2984,7 +2986,9 @@ build_export_vault() { # <vault_dir> <req_dir> <arc_dir> <tae_dir> <tmpl> <ctx>
     printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-07-31\nlast-verified: 2026-07-31\n' "$EV"
     printf 'verifies: [%s-EXP-001, %s-EXP-002]\n' "$P" "$P"
     printf 'test-object: [ARC-EXP-001, ARC-EXP-900]\n---\n'
-    printf '## %s\n\nEvidence for the export example.\n' "$CTX"
+    # A context paragraph that never reaches a sentence terminator, so the
+    # index has to apply its own ceiling to it.
+    printf '## %s\n\nEvidence for the export example, recorded on a bench with a deliberately unpunctuated description that runs well past the two hundred and forty character ceiling the index applies, so the cap and its ellipsis are exercised by a file and not by a unit test alone\n' "$CTX"
   } > "$V/$TA/${EV}_Export.md"
 
   # The three shapes in which a requirement row leaves no trace in the graph
@@ -3215,6 +3219,100 @@ if contains "$(head -c 3 "$EN_OUT/traceability_requirements.csv" | od -An -tx1)"
 TESTS=$((TESTS + 1))
 if contains "$(cat "$EN_OUT/traceability_requirements.csv")" '"=1+1"'; then ok x; else
   fail "a formula-shaped cell must be exported verbatim as a record"; fi
+
+# Issue #53: the index an agent reads first. It is a default format, so the
+# determinism assertion below and the CI step that runs the exporter twice
+# both cover it without knowing about it.
+IDX="$EN_OUT/traceability_index.md"
+TESTS=$((TESTS + 1))
+if [ -f "$IDX" ]; then ok x; else
+  fail "the default formats must write traceability_index.md"; fi
+
+TESTS=$((TESTS + 1))
+if python3 - "$IDX" "$EN_OUT/traceability.json" <<'PY'
+import json, sys
+rows = [l for l in open(sys.argv[1], encoding="utf-8").read().splitlines()
+        if l.startswith("- `")]
+d = json.load(open(sys.argv[2]))
+assert len(rows) == len(d["nodes"]) + len(d["requirements"]), \
+    f"{len(rows)} rows for {len(d['nodes'])} objects and {len(d['requirements'])} requirements"
+for key in list(d["nodes"]) + list(d["requirements"]):
+    assert any(l.startswith(f"- `{key}` ") for l in rows), f"no index line for {key}"
+PY
+then ok x; else fail "the index must carry one line per object and per requirement"; fi
+
+sumq() { python3 - "$1" "$2" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1]))["summaries"].get(sys.argv[2], ""), end="")
+PY
+}
+TESTS=$((TESTS + 1))
+if [ "$(sumq "$EN_OUT/traceability.json" "ARC:ARC_Export")" = "The module under export." ]; then
+  ok x; else fail "the sentence must be the first sentence of the bound section, got '$(sumq "$EN_OUT/traceability.json" "ARC:ARC_Export")'"; fi
+# The rule the plan for this feature first got wrong: a dot whose next word
+# continues in lower case does not end a sentence.
+TESTS=$((TESTS + 1))
+if [ "$(sumq "$EN_OUT/traceability.json" "ARC-EXP-001")" = "Top module, e.g. the one every submodule hangs from." ]; then
+  ok x; else fail "an abbreviation must not cut the sentence, got '$(sumq "$EN_OUT/traceability.json" "ARC-EXP-001")'"; fi
+TESTS=$((TESTS + 1))
+if python3 - "$EN_OUT/traceability.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))["summaries"]["TAE:TAE_Export"]
+assert s.endswith("…"), s
+assert len(s) <= 241, len(s)
+PY
+then ok x; else fail "a paragraph without a sentence end must be capped with an ellipsis"; fi
+
+# A section carrying only tables is a legitimate shape - the object keeps its
+# line, the head counts it, and nothing is reported. The Shadowed fixture is
+# asserted at zero findings above, which this must not change.
+TESTS=$((TESTS + 1))
+if python3 - "$EN_OUT/traceability.json" "$IDX" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+text = open(sys.argv[2], encoding="utf-8").read()
+assert "REQ-SHD-000" in d["nodes"], "the shadowed fixture must be an object"
+assert "REQ-SHD-000" not in d["summaries"], "a table-only section yields no sentence"
+line = [l for l in text.splitlines() if l.startswith("- `REQ-SHD-000` ")][0]
+assert line.endswith("·"), repr(line)
+assert "objects without a sentence: 1 of" in text, text.split("\n\n")[2]
+PY
+then ok x; else fail "an object without a sentence must keep its line and be counted, not reported"; fi
+
+# Markdown carries raw HTML, so the payload the report escapes must not walk
+# into the index unescaped either.
+TESTS=$((TESTS + 1))
+if contains "$(cat "$IDX")" '&lt;script&gt;alert' && \
+   ! contains "$(cat "$IDX")" '<script>alert'; then ok x; else
+  fail "a script tag from the vault must reach the index escaped, not raw"; fi
+
+# The German twin binds its own section and loses nothing.
+DE_IDX="$DE_OUT/traceability_index.md"
+en_rows=$(grep -c '^- `' "$IDX"); de_rows=$(grep -c '^- `' "$DE_IDX")
+TESTS=$((TESTS + 1))
+if [ "$en_rows" = "$de_rows" ]; then ok x; else
+  fail "German and English twin must yield the same index rows: $en_rows vs $de_rows"; fi
+TESTS=$((TESTS + 1))
+if contains "$(cat "$DE_IDX")" '`## Kontext`'; then ok x; else
+  fail "the German twin must bind its own context section"; fi
+
+# The index is a format; the sentences are part of the graph document and
+# marked as derived, because a located and truncated sentence is not authored.
+python3 "$EXPORTER" "$EN_V" --output-dir "$EX_TMP/out-json" --no-timestamp \
+  --formats json >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if [ ! -f "$EX_TMP/out-json/traceability_index.md" ] && \
+   [ -f "$EX_TMP/out-json/traceability.json" ]; then ok x; else
+  fail "--formats json must write the graph and no index"; fi
+TESTS=$((TESTS + 1))
+if python3 - "$EX_TMP/out-json/traceability.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert "summaries" in d["field_types"]["derived"], d["field_types"]
+assert "summaries" not in d["field_types"]["authored"], d["field_types"]
+assert all("summary" not in n for n in d["nodes"].values()), "authored nodes gained a derived field"
+PY
+then ok x; else fail "summaries must be declared derived and never written onto a node"; fi
 
 # Determinism: the property, not just the timestamp.
 cp -r "$EN_OUT" "$EX_TMP/out-en-ref"
