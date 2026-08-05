@@ -105,9 +105,15 @@ python3 .claude/skills/mechatronics-docs/export_traceability.py \
         <VAULT_ROOT> --output-dir <DIR outside the vault>
 ```
 
-It produces a self-contained HTML report, two CSV views and a JSON graph.
-Every reverse relation in them is computed, never read from a file. Run
-it when the user asks for a traceability matrix, a coverage overview, or
+It produces a self-contained HTML report, two CSV views, a JSON graph and
+`traceability_index.md`. The index is the one written for you: one line
+per object and per requirement — identifier, domain, file, and the first
+sentence of the section the project's own requirements template binds.
+Generate it and read it once instead of searching the vault for its
+structure, and generate it again rather than trusting a copy from an
+earlier session; nothing about it is stored in the vault.
+Every reverse relation in these artifacts is computed, never read from a
+file. Run it when the user asks for a traceability matrix, a coverage overview, or
 something to hand to a reviewer — and read its findings section as you
 would the validator's: an unbound table, an unresolved requirement ID, an
 unknown domain abbreviation or two folders meaning one domain each mean

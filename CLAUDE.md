@@ -73,6 +73,13 @@ activates on its own. When it is active, follow it over this file.
 
 14. Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`,
     `chore:`), imperative subject under 72 characters, one concern per commit.
+
+15. Read the vault instead of searching it. Before a larger pass, run
+    `python3 .claude/skills/mechatronics-docs/export_traceability.py 00_documentation/01_projectvault --output-dir ../traceability`
+    and read `../traceability/traceability_index.md`: one line per object and
+    per requirement — identifier, domain, file, first sentence of its context.
+    Generate it, then read it; a copy left from an earlier session is only as
+    current as its last run, and the vault is what the export is derived from.
 </rules>
 
 <verification>
