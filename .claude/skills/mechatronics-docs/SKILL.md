@@ -48,6 +48,10 @@ vault rules (`validate_vault.py`, same directory):
   against the git HEAD state). The non-blocking session report also lists
   vault-wide findings (uncovered REQs, orphans, ...) as advisory — they
   never block; the full audit in step 7 remains the authoritative pass.
+  It further names every ERROR code a file carried at git HEAD that did
+  not fire at all this session. Say which of them you fixed: a defect you
+  repaired and a check that stopped reaching the file produce the same
+  absence, and only the session knows which of the two it did.
 
 A vault carrying two folders for one domain — `03_architecture_(ARC)`
 beside `03_Architektur_(ARC)`, which is what a half-finished translation

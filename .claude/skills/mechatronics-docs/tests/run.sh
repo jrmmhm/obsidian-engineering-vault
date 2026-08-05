@@ -1911,6 +1911,47 @@ if contains "$(head -c 2 "$I/03_architecture_(ARC)/ARC_Powershell.md" | od -An -
 # years a file this session created.
 : > "$I/03_architecture_(ARC)/ARC_Empty.md"
 
+# Issue #26. Committed with a heading the template does not know, so
+# template-sections stands in this file's git HEAD baseline. The session
+# further below repairs it and the code stops firing - the case the stop
+# gate could not see at all, because its comparison iterates the findings
+# that exist and a code producing none is never reached.
+cat > "$I/03_architecture_(ARC)/ARC_Resolved.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Kontext
+Architecture note committed with a heading the template does not know, so
+that its template-sections ERROR is part of the state the per-file baseline
+is computed from. The session repairs the heading and nothing else, which
+is the honest half of the ambiguity: the code stops firing because the
+defect is gone. A check made unreachable is indistinguishable from here,
+which is why the gate reports this rather than blocking on it.
+EOF
+
+# The counter-case, and the reason the report asks a yes/no instead of
+# comparing counts. Both targets are missing at HEAD; the session creates
+# exactly one of them, so link-unresolved falls from 2 to 1 in a file whose
+# content nobody touched. Under the phased creation order that is the
+# ordinary mid-pass state, and reporting it would make the channel noise.
+cat > "$I/03_architecture_(ARC)/ARC_Linker.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Kontext
+Architecture note committed with two links whose targets do not exist yet.
+Creating one of them elsewhere in a session lowers this file's
+link-unresolved count without anyone editing this file, which is exactly
+the movement a count-based report would blame on the session:
+[[ARC_Missing_One]] and [[ARC_Missing_Two]].
+EOF
+
 # Unborn HEAD: a repository without a single commit must not crash the
 # validator. Exit 2 would make both hooks fail open - enforcement silently off.
 hgit init -q
@@ -1952,6 +1993,15 @@ rout=$(printf '{"session_id":"%s"}' "$SIDR" | python3 "$VALIDATOR" --hook stop 2
 TESTS=$((TESTS + 1))
 if ! contains "$rout" '"decision": "block"'; then ok x; else
   fail "a pre-existing section-mismatch must not block the stop gate:"
+  printf '%s\n' "$rout" | sed 's/^/    /'
+fi
+# The negative control for issue #26 across a whole session: this file's
+# baseline code still fires, so nothing stopped firing and the section must
+# be absent entirely. An implementation that simply echoes the baseline
+# passes every positive assertion and fails this one.
+TESTS=$((TESTS + 1))
+if ! contains "$rout" "did not fire this session"; then ok x; else
+  fail "an unchanged pre-existing ERROR must not be reported as resolved:"
   printf '%s\n' "$rout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
@@ -2022,9 +2072,26 @@ if ! contains "$fout" '"decision": "block"'; then ok x; else
   fail "repairing the encoding must not block the session that did it:"
   printf '%s\n' "$fout" | sed 's/^/    /'
 fi
+# Asserted on the finding's MESSAGE, not on its code: since issue #26 the
+# code name also appears in the report of what stopped firing, and a
+# code-only assertion would fail on the very report that proves the repair.
+# Not anchored either - a blocking stop hook emits one json.dumps line with
+# escaped newlines, where '^ERROR' can never match and the assertion would
+# pass vacuously on exactly the regression it exists for (issue #31).
 TESTS=$((TESTS + 1))
-if ! contains "$fout" "encoding-not-utf8"; then ok x; else
+if ! contains "$fout" "this vault is UTF-8"; then ok x; else
   fail "the repaired file must not still be reported as non-UTF-8"; fi
+# The other half: the repair has to be NAMED, which is the whole point of
+# issue #26. Both codes the misread produced are gone from the current run,
+# so both are listed - encoding-not-utf8 because the file was re-saved, and
+# frontmatter-missing because a decodable file has readable frontmatter
+# again. template-sections is absent from the list on purpose: it stood at
+# HEAD and still fires, so it is not something this session resolved.
+TESTS=$((TESTS + 1))
+if contains "$fout" "ARC_Powershell\.md \[encoding-not-utf8, frontmatter-missing\]"; then
+  ok x; else fail "the repair must be named as a code that stopped firing:"
+  printf '%s\n' "$fout" | sed 's/^/    /'
+fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
       "/tmp/claude-mechdocs/blocks-$SIDF"
 
@@ -2068,6 +2135,85 @@ if [ $rc -ne 2 ] && ! contains "$out" "REQ-THM-000" && ! contains "$out" "verifi
   fail "a renamed REQ file must keep its identifier and its row identities:"
   printf '%s\n' "$out" | grep -E "REQ-THM|verifies-unknown-req" | sed 's/^/    /'
 fi
+
+# Issue #26, the positive control. The session repairs the heading of a file
+# whose template-sections ERROR was committed, so the code stops firing.
+# Nothing in the old gate reached that state: it compares cur > base while
+# iterating the findings that exist, and this file now produces none of that
+# code. The session ended green and silent, which is the same free pass a
+# change that makes a check UNREACHABLE would have got.
+python3 - "$I/03_architecture_(ARC)" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1]) / "ARC_Resolved.md"
+p.write_text(p.read_text(encoding="utf-8").replace("## Kontext", "## Context"),
+             encoding="utf-8")
+PY
+SIDG="testsession-resolved-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
+      "/tmp/claude-mechdocs/blocks-$SIDG"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDG" \
+  "$I/03_architecture_(ARC)/ARC_Resolved.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+gout=$(printf '{"session_id":"%s"}' "$SIDG" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gout" "ARC_Resolved\.md \[template-sections\]"; then ok x; else
+  fail "a code that stopped firing must be named in the session report:"
+  printf '%s\n' "$gout" | sed 's/^/    /'
+fi
+# Reporting, not blocking: from counts alone a repair and an unreachable
+# check are the same absence, and this layer never blocks on an ambiguity
+# it cannot resolve. Blocking here would punish exactly the session that
+# fixed the defect the gate asked it to fix.
+TESTS=$((TESTS + 1))
+if ! contains "$gout" '"decision": "block"'; then ok x; else
+  fail "a code that stopped firing must not block the session that fixed it:"
+  printf '%s\n' "$gout" | sed 's/^/    /'
+fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
+      "/tmp/claude-mechdocs/blocks-$SIDG"
+
+# ... and the decision that the report asks a yes/no rather than comparing
+# counts, pinned so the next refactor cannot quietly widen it. The session
+# creates one of two missing link targets, which lowers ARC_Linker.md's
+# link-unresolved from 2 to 1 without anyone editing that file. A report on
+# decreasing counts would name it and ask what was fixed there; under the
+# phased creation order that is the ordinary mid-pass state of every vault.
+# The order is load-bearing and mirrors a real session: the file is touched
+# first, so hook_post records its baseline, and the target is created
+# afterwards. Creating it first would prove nothing - hook_post validates
+# the HEAD CONTENT against the CURRENT file set, so a target that already
+# exists when the baseline is taken never counts as unresolved in it, and
+# the assertion below would pass against any implementation at all.
+SIDH="testsession-partial-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
+      "/tmp/claude-mechdocs/blocks-$SIDH"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDH" \
+  "$I/03_architecture_(ARC)/ARC_Linker.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if contains "$(cat "/tmp/claude-mechdocs/baseline-$SIDH")" '"link-unresolved": 2'; then
+  ok x; else fail "the partial-decrease fixture needs both links unresolved at baseline:"
+  printf '%s\n' "$(cat "/tmp/claude-mechdocs/baseline-$SIDH")" | sed 's/^/    /'
+fi
+cat > "$I/03_architecture_(ARC)/ARC_Missing_One.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+One of the two targets ARC_Linker.md points at, created in this session so
+that the other file's unresolved-link count falls without its content
+changing. The file itself is unremarkable on purpose.
+EOF
+pout=$(printf '{"session_id":"%s"}' "$SIDH" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$pout" "ARC_Linker\.md \[link-unresolved\]"; then ok x; else
+  fail "a code that merely fires less often must not be reported as resolved:"
+  printf '%s\n' "$pout" | sed 's/^/    /'
+fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
+      "/tmp/claude-mechdocs/blocks-$SIDH"
 
 # ==========================================================================
 # Fixture 5: the schema itself. The validator reads vault_schema.json from
