@@ -85,6 +85,16 @@ weeks, and the point of a version number is to be believed.
 - **The surrounding project structure** — hardware, software, test data,
   procurement, sources, releases and archive, with [STRUCTURE.md](STRUCTURE.md)
   stating what belongs where and why the two easily-confused folders differ.
+- **An IEC 61508 correspondence** — [IEC_61508_MAPPING.md](IEC_61508_MAPPING.md)
+  places the nine domains and the eight typed relations against the clause
+  structure of IEC 61508 and names the gaps, from hazard analysis and integrity
+  levels through to who approved a note and with what independence. It is a
+  structural correspondence and explicitly not a claim of conformance, cited by
+  clause number and published title only, with a source key recording which
+  document was read, how far and on which day. This is what issue #6 turned
+  into: no domain, relation, field or rule moved, so it is MINOR — the
+  expectation recorded in `DECISIONS.md` amendment 2026-08-05h, that #6 would
+  be MAJOR because it would remap object and relation types, was not borne out.
 - **MIT license.**
 
 [Unreleased]: https://github.com/jrmmhm/obsidian-engineering-vault/commits/main
