@@ -28,6 +28,13 @@ jobs:
       - name: Template vault audit
         run: python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault
 
+      # The method's own decision record is a vault and is audited as one.
+      # Named by path for the same reason as the step above: a relative
+      # discovery would silently skip if the layout moved. Its length WARNs
+      # are the measured cost of 31 real decisions and do not fail the job.
+      - name: Method decision vault audit
+        run: python3 .claude/skills/mechatronics-docs/validate_vault.py .claude/01_methodvault
+
       # An export is evidence only if it is reproducible. Running it twice and
       # diffing is the property itself, not a proxy for it: unsorted iteration
       # is what made Sphinx-Needs' needs.json undiffable until they fixed it.

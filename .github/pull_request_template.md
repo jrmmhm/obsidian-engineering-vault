@@ -20,7 +20,7 @@
 - [ ] `python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault` → `0 error(s)` (the one `duplicate-basename` WARN is the known state)
 - [ ] New behaviour is pinned by an assertion in `tests/run.sh`; a fix carries the assertion that would have caught it
 - [ ] Every document that asserted the old behaviour is corrected in this pull request
-- [ ] Tool behaviour changed, or a design was chosen over an alternative → an amendment in `.claude/skills/mechatronics-docs/DECISIONS.md`
+- [ ] Tool behaviour changed, or a design was chosen over an alternative → a DEC note in `.claude/01_methodvault/02_decisions_(DEC)/`, listed in `system_overview.md`
 - [ ] The method changed → a `CHANGELOG.md` entry under `Unreleased` naming what it costs a derived project
 - [ ] *If this touches `00_documentation/01_projectvault/`:* the vault files were written with `Edit`/`Write`/`MultiEdit`, never through a shell rewrite — the hooks see nothing else
 

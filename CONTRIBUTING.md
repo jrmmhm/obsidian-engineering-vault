@@ -28,11 +28,13 @@ Read in this order. Each answers something the next one assumes.
 3. **`00_documentation/01_projectvault/00_documentation_file_creation_and_conventions.md`**
    — the rules a note follows. This is the authority on the method, above any
    summary of it elsewhere.
-4. **`.claude/skills/mechatronics-docs/DECISIONS.md`** — why the tools work the
-   way they do. It is long and it is append-only; read the amendment that
-   touches your area rather than the whole file. Most "why does the validator do
-   *that*" questions are already answered there, usually with the alternatives
-   that were rejected and the reason.
+4. **`.claude/01_methodvault/system_overview.md`** — why the tools work the way
+   they do. One DEC note per decision; start at the overview and read the note
+   that touches your area. Most "why does the validator do *that*" questions are
+   already answered there, usually with the alternatives that were rejected and
+   the reason. Until 2026-08-05 this record was one appended file,
+   `.claude/skills/mechatronics-docs/DECISIONS.md`; that file now forwards here
+   and maps every amendment date to its note.
 
 ---
 
@@ -47,12 +49,14 @@ matters.
 
 ```bash
 bash .claude/skills/mechatronics-docs/tests/run.sh
-# -> 289 tests, 0 failure(s)
+# -> <n> tests, 0 failure(s)
 #    ALL TESTS PASSED
 ```
 
 The count climbs every time somebody pins a behaviour, so do not read anything
-into the number — `0 failure(s)` and the last line are the whole signal.
+into the number — `0 failure(s)` and the last line are the whole signal. It is
+left as `<n>` here for the same reason: a number quoted in prose is a number
+that goes stale, and this one has already done so once.
 
 **The template vault audit.** CI runs this by name, so that the check cannot
 silently skip if the layout ever moves.
@@ -118,7 +122,7 @@ a fix has three parts and they belong in three commits:
    not removed it.
 
 If the fix changed how a tool behaves, or you chose between designs on the way,
-it also earns an amendment in `DECISIONS.md` — see below.
+it also earns a DEC note in the method vault — see below.
 
 ---
 
@@ -147,13 +151,15 @@ The reason for the issue-first order is that a method change is cheap to write
 and expensive to withdraw. By the time it is a pull request it has templates,
 tests, a schema entry and a vault migration hanging off it.
 
-**A merged method change carries an amendment in
-`.claude/skills/mechatronics-docs/DECISIONS.md`** — Context, Options, Decision,
-Realization, in that shape, appended at the end of the file. Read the last
-amendment for the format. The Options section is not decoration: it records what
-was rejected and why, which is the part that stops the same argument being had
-again in six months. Where a review changed the plan before implementation, say
-so — several amendments do, and they are the more useful ones.
+**A merged method change carries its own DEC note in
+`.claude/01_methodvault/02_decisions_(DEC)/`** — Context, Options, Decision,
+Justification, Consequences, the sections that domain's template requires, plus
+the frontmatter every note in a vault carries. Read a recent note for the
+format and add the file to `system_overview.md`. The Options section is not
+decoration: it records what was rejected and why, which is the part that stops
+the same argument being had again in six months. Where a review changed the plan
+before implementation, say so — several notes do, and they are the more useful
+ones.
 
 ---
 
@@ -299,7 +305,7 @@ characters, and the body only when the "why" is not obvious from the diff.
 One concern per commit — not one file per commit, and not one session per
 commit. Code, tests and documentation go in separate commits, because `git
 bisect` and `git revert` only work as advertised on atomic ones. The existing
-history is the reference: a fix, then the test that pins it, then the amendment
+history is the reference: a fix, then the test that pins it, then the DEC note
 that explains it.
 
 The pull request template's checklist is the set of gates a reviewer would
