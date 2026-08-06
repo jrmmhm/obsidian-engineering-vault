@@ -359,12 +359,18 @@ def sections_with_tables(lines):
     return out
 
 
-def discover_bindings(vault, schema, findings):
+def discover_bindings(vault, schema, roles, findings):
     """Which section of this project's own templates carries which table.
 
     The header row is read once, here, to tell the two four-column ARC
     tables apart; it never decides whether a real file's table is ingested.
     That is what the section title does, and check_sections keeps it honest.
+
+    'roles' is a parameter and no longer a module global. It was one until
+    the validator became a second caller (issue #50): analyse() below runs
+    per vault root, hook_stop loops over several roots in one process, and
+    a global refilled between them binds one vault's tables against the
+    previous vault's roles the moment anything in between raises.
     """
     tb = _dict(schema, "table_bindings")
     status_token = tb.get("status_token") if isinstance(tb.get("status_token"), str) else "status"
@@ -386,7 +392,7 @@ def discover_bindings(vault, schema, findings):
         b["role"] = role
 
     for role_token in ("ARC", "REQ"):
-        abbr = ROLE_CACHE.get(role_token)
+        abbr = roles.get(role_token)
         if not abbr:
             continue
         candidates = []
@@ -412,7 +418,7 @@ def discover_bindings(vault, schema, findings):
                 bindings[target]["template_header"] = header
 
     for name, b in bindings.items():
-        if b.get("role") in ROLE_CACHE and b["section"] is None:
+        if b.get("role") in roles and b["section"] is None:
             findings.append(Finding(
                 "export-no-binding", None, None,
                 f"no section of this project's own templates carries the "
@@ -420,9 +426,6 @@ def discover_bindings(vault, schema, findings):
                 "the template must declare the table the files are expected to "
                 "carry"))
     return bindings
-
-
-ROLE_CACHE = {}
 
 
 def bound_tables(lines, section_title, ncols, every=False):
@@ -1009,6 +1012,31 @@ def assess(graph, back):
     return out
 
 
+def analyse(vault, schema, findings=None):
+    """One vault, read into (roles, bindings, graph, back, coverage).
+
+    The sequence main() used to carry inline, extracted because it has a
+    second caller since issue #50: validate_vault decides requirement
+    coverage on this graph rather than on a substring search, and two
+    callers building the graph in two orders is exactly the drift this
+    project removed from its table readers.
+
+    'findings' is the accumulator the export seeds before anything is
+    read - a schema that could not be parsed is a finding of the export,
+    and it has to be in the list BEFORE resolve_roles appends to it,
+    because main() prepends the whole list to the graph's own findings.
+    A caller that only wants the coverage passes nothing and the list is
+    thrown away with the call.
+    """
+    if findings is None:
+        findings = []
+    roles = resolve_roles(vault, schema, findings)
+    bindings = discover_bindings(vault, schema, roles, findings)
+    graph, _proven = build_graph(vault, schema, roles, bindings)
+    back = reverse_index(graph, schema)
+    return roles, bindings, graph, back, assess(graph, back)
+
+
 # --------------------------------------------------------------------------
 # Writers
 # --------------------------------------------------------------------------
@@ -1356,14 +1384,8 @@ def main(argv):
     if schema_error:
         findings.append(Finding("export-schema-unreadable", None, None, schema_error))
 
-    roles = resolve_roles(vault, schema, findings)
-    ROLE_CACHE.clear()
-    ROLE_CACHE.update(roles)
-    bindings = discover_bindings(vault, schema, findings)
-    graph, _proven = build_graph(vault, schema, roles, bindings)
+    roles, bindings, graph, back, coverage = analyse(vault, schema, findings)
     graph.findings = findings + graph.findings
-    back = reverse_index(graph, schema)
-    coverage = assess(graph, back)
 
     inputs = []
     for p in sorted(root.rglob("*.md")):

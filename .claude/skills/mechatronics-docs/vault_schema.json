@@ -19,7 +19,7 @@
   "enforcement_levels": {
     "schema-driven": "The validator reads this entry from this file. Changing the entry changes what is enforced, with no code change.",
     "validator-internal": "The rule lives in validate_vault.py and this file only describes it. Every occurrence names why it was not moved.",
-    "export-driven": "export_traceability.py reads this entry. It shapes the exported graph and the report, and it never produces a validator finding - the exporter reports, it does not block.",
+    "export-driven": "export_traceability.py reads this entry. It shapes the exported graph and the report. The entry itself is never read by validate_vault.py, and the exporter's own findings never become validator findings - the exporter reports, it does not block. Since issue #50 the validator may CONSULT the graph the exporter builds from these entries: requirement coverage does, and the finding it raises is the validator's own (see consistency_rules.requirement-coverage).",
     "declared-only": "Nothing enforces this. It is declared so that readers - and the undeclared-field check - know the name exists."
   },
 
@@ -388,6 +388,14 @@
   },
 
   "consistency_rules": [
+    {
+      "id": "requirement-coverage",
+      "statement": "A requirement is covered when an allocation row names it AND a TAE names it in 'verifies'. An identifier appearing in the prose, in a heading or in a list of open points of an ARC or TAE file is not coverage.",
+      "why": "The method's promise is a closed REQ->TAE loop. Until issue #50 the validator decided this with a substring search over whole ARC and TAE files, so a sentence explaining why a requirement was dropped counted as its proof.",
+      "enforced": "validator-internal",
+      "owed_to_issue": 50,
+      "enforced_detail": "req-uncovered (WARN), one finding per requirement, at the row that defines it. The 'verifies' half is read from TAE frontmatter by validate_vault.py itself; the allocation half is read from the graph export_traceability.py builds, because an allocation row sits in the section the project's own ARC template declares and only the binding discovery finds it. Where the graph carries no requirement of that identifier - a row outside the bound section, a vault whose REQ role went to a second folder, a project whose templates declare no allocation table - the allocation half is not held against the requirement; the exporter names those cases as export-unbound-table, export-duplicate-role and export-no-binding. WARN and not ERROR: the check cannot tell a requirement nobody has verified yet from one whose vault never adopted the 'verifies' convention, which is the same line verified-needs-evidence draws, and vault-wide findings never reach the stop gate's blocking set in any case."
+    },
     {
       "id": "evidence-covers-allocation",
       "statement": "For every allocation row, the requirements in the 'verifies' frontmatter of the referenced evidence notes should together cover the requirements allocated in that row.",

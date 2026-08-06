@@ -2019,6 +2019,81 @@ def check_domain_folders(vault: Vault, findings):
                 "longer writes to"))
 
 
+def evidence_index(vault: Vault, corpus):
+    """{REQ id: [TAE path, ...]} from the 'verifies' field of every TAE file.
+
+    The half of the coverage rule this file can answer on its own, out of
+    the corpus it has already read. Only files classified as TAE DOMAIN
+    files contribute: a '00_' template carries the field as a placeholder,
+    and a placeholder is not evidence.
+
+    Malformed frontmatter yields nothing rather than an exception - this
+    runs on the hook path, where a crash exits 2 and both hooks swallow it.
+    The file-local checks report that file for what is wrong with it.
+    """
+    out = {}
+    for p, text in corpus.items():
+        if vault.classify(p) != ("domain", "TAE"):
+            continue
+        fm, _, bad = parse_frontmatter(text.splitlines())
+        if bad or not fm:
+            continue
+        ver = fm.get("verifies")
+        if not isinstance(ver, list):
+            continue
+        for rid in ver:
+            if isinstance(rid, str) and rid.strip():
+                out.setdefault(rid.strip(), []).append(p)
+    return out
+
+
+def allocation_index(vault: Vault):
+    """{REQ id: does an allocation row name it} - or None for "cannot say".
+
+    The other half of the coverage rule, and the one this file cannot
+    answer alone: an allocation row lives in the section the PROJECT'S OWN
+    ARC template declares, and discovering that section is the exporter's
+    job. Reusing its graph rather than re-reading the table here is what
+    keeps one definition of an allocation instead of a second one that
+    drifts (issue #50).
+
+    None is a deliberate third answer, distinct from "no allocation". The
+    graph carries a requirement row only when it sits in the bound section
+    of a file the graph reads, so a row under a heading of the author's own
+    making, or every row of a vault mid-translation whose REQ role went to
+    the other folder, is invisible HERE and perfectly fine in the vault.
+    Treating that as "not allocated" would report a closed loop as a gap -
+    measured on the shipped template vault: three such findings on three
+    correct requirements. The exporter names those cases itself
+    (export-unbound-table, export-duplicate-role, export-no-binding).
+
+    Never raises, and never lets the exporter's exit path become this
+    process's: SystemExit is not an Exception, and exit 2 releases both
+    hooks. Where the graph cannot be built the verification half of the
+    rule still runs - the check loses reach, not its voice.
+    """
+    try:
+        # One module, not two. Run as a script this file lives in
+        # sys.modules as '__main__', so the exporter's own
+        # 'from validate_vault import ...' loads a SECOND copy of it - two
+        # Vault classes, two schema caches, and the identity the test suite
+        # asserts between the two tools silently false. Registering this
+        # module under its import name first is what makes the pair one.
+        here = Path(__file__).resolve()
+        sys.modules.setdefault(here.stem, sys.modules[__name__])
+        if str(here.parent) not in sys.path:
+            sys.path.insert(0, str(here.parent))
+        import export_traceability
+
+        _roles, bindings, _graph, _back, coverage = export_traceability.analyse(
+            vault, vault.schema())
+        if not (bindings.get("arc_allocation_table") or {}).get("section"):
+            return None     # no template declares one - no row to read
+        return {rid: "not-allocated" not in c["gaps"] for rid, c in coverage.items()}
+    except (Exception, SystemExit):
+        return None
+
+
 def validate_vault_wide(vault: Vault):
     # First, so it survives hook_stop's 15-line cut of the advisory block:
     # this finding is the explanation for the duplicate-basename and
@@ -2064,14 +2139,46 @@ def validate_vault_wide(vault: Vault):
 
     check_identifiers(vault, all_md, corpus, findings)
 
-    # REQ coverage: every REQ id referenced by some TAE (frontmatter) or ARC table
-    for rid, (f, i) in vault.req_index().items():
-        covered = any(rid in text for p, text in corpus.items()
-                      if p != f and vault.classify(p)[1] in ("TAE", "ARC"))
-        if not covered:
-            findings.append(Finding("WARN", "req-uncovered", str(f), i,
-                                    f"{rid} has no TAE/ARC referencing it - an unverified "
-                                    "REQ is indistinguishable from an unmet one"))
+    # REQ coverage. Until issue #50 this was 'rid in text' over whole ARC and
+    # TAE files: a requirement counted as covered because its identifier
+    # appeared somewhere - in a heading, in a list of open points, in a
+    # sentence explaining why it was dropped. The closed loop the method
+    # promises is two relations, and both are read as relations now: an
+    # allocation row that names the requirement, and a TAE that names it in
+    # 'verifies'. A mention proves neither.
+    #
+    # The two halves come from two places, and only one of them can be
+    # unknown: 'verifies' is frontmatter this validator parses itself, an
+    # allocation row is a table only the exporter's binding discovery can
+    # find. Where the graph cannot see a requirement at all, the allocation
+    # half is not held against it (allocation_index, None) - that is the
+    # precision-over-recall line this project takes everywhere something
+    # cannot tell a mistake from an intention.
+    idx = vault.req_index()
+    if idx:
+        evidence = evidence_index(vault, corpus)
+        allocated = allocation_index(vault)
+        tail = ("coverage is decided on the allocation table and on "
+                "'verifies', never on a mention in prose")
+        for rid, (f, i) in idx.items():
+            notes = evidence.get(rid)
+            alloc = allocated.get(rid) if allocated is not None else None
+            if notes and alloc is not False:
+                continue
+            if notes:
+                by = ", ".join(sorted(p.stem for p in notes))
+                msg = (f"{rid} is verified by {by} but no allocation row "
+                       "allocates it - nothing states which part of the "
+                       f"system owes it; {tail}")
+            elif alloc is False:
+                msg = (f"{rid} has no allocation row naming it and no TAE "
+                       "naming it in 'verifies' - an unverified REQ is "
+                       f"indistinguishable from an unmet one; {tail}")
+            else:
+                msg = (f"{rid} is named by no TAE in 'verifies' - an "
+                       "unverified REQ is indistinguishable from an unmet "
+                       f"one; {tail}")
+            findings.append(Finding("WARN", "req-uncovered", str(f), i, msg))
 
     # system_overview lists every ARC module
     so = vault.root / "system_overview.md"
