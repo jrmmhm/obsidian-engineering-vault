@@ -147,6 +147,10 @@ Defined project states (baseline snapshots). Each release records:
 - git tag reference
 - summary of changes
 
+That is *your project's* release trail. The template's own is
+[CHANGELOG.md](CHANGELOG.md) at the repository root — keep the two apart, or
+your project's first baseline inherits the template's history.
+
 ---
 
 ## 90_administration
@@ -176,5 +180,44 @@ The exporter (`export_traceability.py`) writes outside the vault by design and
 refuses any `--output-dir` inside one, because the vault is Markdown only. A
 revision worth keeping belongs in `00_documentation/02_documents/`.
 
+That holds for `traceability_index.md` too — the compact index an agent reads
+first. It stays generated rather than committed: a stored index is only as
+current as its last run, and the vault is what it is derived from. `CLAUDE.md`
+therefore names the command, not a path.
+
 See the [README](README.md#the-ai-layer) for how to use it, with or without
 Claude Code.
+
+---
+
+## .github
+
+Everything GitHub reads rather than a person: `workflows/validate-vault.yml`
+runs the validator, the template vault audit, the export determinism check and
+the worked example on every push and pull request; `ISSUE_TEMPLATE/` holds the
+bug report and the method change proposal, with `config.yml` for the chooser;
+`pull_request_template.md` carries the checklist of gates a reviewer would
+otherwise re-derive.
+
+This is enforcement that does not depend on one editor being used. The Claude
+Code hooks only see `Edit`, `Write` and `MultiEdit`; the workflow runs no matter
+how a change was authored.
+
+**In a project made from this template**, this directory arrives with it and
+describes the template rather than your project. Delete it, or keep the workflow
+and replace the templates with your own.
+
+---
+
+## AGENTS.md
+
+The rules an AI agent works under live in `CLAUDE.md` at the repository root.
+`AGENTS.md` is the cross-tool convention for the same purpose and holds nothing
+but a pointer to that file, plus one line each for this document and the skill —
+one set of rules, in one place, so a second file cannot drift away from the
+first.
+
+**In a project made from this template**, both travel with it. Keep them
+together: if you rewrite `CLAUDE.md` for your project, `AGENTS.md` keeps
+pointing at it and needs no edit.
+
