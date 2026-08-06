@@ -206,10 +206,27 @@ errors with all of it gone.
 git clone https://github.com/jrmmhm/obsidian-engineering-vault.git my-project
 cd my-project
 
-# 2. Check the vault is intact — expect 0 errors
+# 2. Check the vault is intact
 python3 .claude/skills/mechatronics-docs/validate_vault.py \
         00_documentation/01_projectvault
+# -> 0 error(s), 1 warning(s)
 ```
+
+Zero ERRORs is the gate, and that one warning is the known state of the shipped
+vault rather than something you broke. `01_projectvault/README.md` and
+`02_documents/README.md` both ship under `00_documentation`, and this vault
+resolves a wikilink by its basename alone — Obsidian would tell the two apart by
+their path, this validator does not, so `[[README]]` is ambiguous and
+`[[01_projectvault/README]]` is reported as `link-unresolved` instead. Renaming
+one of them is the only remedy. Keeping both names is a fair choice, and while
+you do, no wikilink may address either file by that name.
+
+That generalises: a WARN advises, it does not fail. A run that reports warnings
+and no ERROR exits 0, so no gate here blocks on one — not CI, not the pre-commit
+hook, not the hooks around a Claude Code session. Each warning is still a
+decision you make once, because the warning nobody triages is the one everybody
+learns to scroll past. If your run shows an ERROR, or a second warning you did
+not expect, that one is yours.
 
 Then open the vault:
 
@@ -290,7 +307,7 @@ it manually or in CI:
 
 ```bash
 python3 .claude/skills/mechatronics-docs/validate_vault.py path/to/01_projectvault
-# -> ERRORs block, WARNs advise, exit code reflects the worst finding
+# -> ERRORs block, WARNs advise, warnings alone still exit 0
 ```
 
 That third hook covers what the editor gates never see — an Obsidian edit, a
