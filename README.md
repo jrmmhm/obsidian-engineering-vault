@@ -153,9 +153,9 @@ logistics and `99_inbox_(INB)` for unclassified raw material.
   on a mention in prose — and implementation details leaking into
   architecture files.
 - **A traceability exporter** that reads the vault into a graph and writes it
-  out as a report, two CSV views and a JSON graph — both directions of the
-  requirement-to-evidence matrix, with what is unproven stated rather than left
-  as an empty cell.
+  out as a report, two CSV views, a JSON graph and a compact Markdown index —
+  both directions of the requirement-to-evidence matrix, with what is unproven
+  stated rather than left as an empty cell.
 - **A Claude Code skill** that writes into the vault under those rules, gated
   by hooks that run the validator after every write.
 - **The surrounding project structure** — hardware, software, test data,
@@ -300,10 +300,12 @@ python3 .claude/skills/mechatronics-docs/export_traceability.py \
         00_documentation/01_projectvault --output-dir ../traceability
 ```
 
-It writes four files: a self-contained `traceability.html` report, a
+It writes five files: a self-contained `traceability.html` report, a
 requirement-centric `traceability_requirements.csv`, an edge-list
-`traceability_edges.csv` that pivots into either direction, and
-`traceability.json` carrying the whole graph. Standard library only, like the
+`traceability_edges.csv` that pivots into either direction, `traceability.json`
+carrying the whole graph, and `traceability_index.md` — one line per object and
+per requirement, written for the agent or the newcomer who wants to know what
+the vault contains before opening anything. Standard library only, like the
 validator.
 
 Three things make it worth reading rather than filing.
@@ -355,8 +357,10 @@ throwaway one.
 ├── 60_releases/            baseline snapshots
 ├── 90_administration/      non-engineering project material
 ├── 99_archive/             superseded content, kept not deleted
-└── .claude/skills/mechatronics-docs/
-                            the documentation skill, validator, exporter and tests
+├── .claude/skills/mechatronics-docs/
+│                           the documentation skill, validator, exporter and tests
+├── .github/                CI workflow, issue forms, pull request template
+└── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md
 ```
 
 Full rules for what belongs where — including the two distinctions that trip
@@ -377,6 +381,22 @@ If your project is pure application software, the domain model will feel heavy �
 
 The vault is language-agnostic. This template ships in English; the domain
 abbreviations are just folder names, and translating them is a rename away.
+
+---
+
+## Contributing
+
+Two kinds of change reach this repository. One fixes a tool — the validator
+misreads a table, the exporter drops an edge. The other changes the method
+itself: what a domain means, which sections a note must have, which rule becomes
+an ERROR. Only the second costs anything to the projects already derived from
+this template, because a repository made from a template shares no history with
+it and cannot pull an update — it copies one in by hand.
+
+So the two are proposed differently and versioned differently.
+**[CONTRIBUTING.md](CONTRIBUTING.md)** says how, including what counts as a
+breaking change for a derived project, and
+**[CHANGELOG.md](CHANGELOG.md)** records what each release costs one.
 
 ---
 

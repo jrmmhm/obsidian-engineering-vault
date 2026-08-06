@@ -4552,3 +4552,316 @@ the TAE body. That is precisely what the old rule accepted as proof.
    the skill complete"; it checks `SKILL.md` and no sibling file.
 
 
+## Amendment 2026-08-05f — The index an agent reads is generated, not committed (Accepted)
+
+### Context
+
+`traceability.json` already is a graph index of the vault, and by design it
+is written outside the vault (`STRUCTURE.md`, section
+`.claude/skills/mechatronics-docs`; `main` refuses any `--output-dir` that
+`find_vault_root` resolves inside a vault). Nothing inside the vault and
+nothing in `CLAUDE.md` names it, so a session working in the vault
+re-derives the structure by search every time instead of reading it once.
+The JSON is also not the artifact for that first read: it carries every
+edge, every finding and every coverage record of the graph.
+
+What is missing is the cheap read - one line per object, `identifier ·
+domain · file · one sentence` - and something in the instructions that
+says it exists.
+
+### Options
+
+- **A — A generated index beside the existing artifacts, plus a pointer
+  from `CLAUDE.md` (chosen).** The index becomes a `--formats` output like
+  the other four files and stays outside the vault; the visibility problem
+  is solved where it is - in the instructions.
+- **B — Commit the index inside the vault, guarded by a CI
+  regenerate-and-diff step.** Rejected on three counts. It contradicts the
+  rule this template teaches (`STRUCTURE.md`) and the refusal the exporter
+  enforces in code and pins in `tests/run.sh`. Every file in the vault is
+  measured by the validator: an index carries no domain prefix, no
+  frontmatter and no template sections, so `filename-prefix` and
+  `template-sections` would fire and the vault would need an exemption list
+  that exists for one generated file. And a committed generate is the drift
+  failure mode this repository exists to prevent: between two commits the
+  file is wrong on disk, and an author editing a note without running the
+  exporter gets a red pipeline for a file they never wrote.
+- **C — Commit it under `00_documentation/02_documents/`.** Rejected.
+  `STRUCTURE.md` describes that folder as documents *not* maintained as
+  Markdown, with a dated revision naming schema; a continuously
+  regenerated file does not fit it, and the drift between commits remains.
+- **D — A symlink into the vault.** Rejected: a symlink is a file in the
+  vault for every reader except the file system, and Obsidian and Windows
+  each make a special case of it.
+
+### Decision
+
+**The index is a `--formats` output named `traceability_index.md`, written
+to the same `--output-dir` as the other artifacts**, and `index` joins the
+default format list so the CI determinism step - which calls the exporter
+without `--formats` - covers it without an edit to the workflow.
+
+**The one sentence per object comes from the section this project's own
+REQ template declares**, which `discover_bindings` already resolves as
+`bindings["req_table"]["section"]` and which `vault_schema.json` records as
+the prose section (`## Context`, `## Kontext`) in every vault measured. No
+second discovery rule, no new finding code, and no set iteration that could
+make the bound title differ between two runs.
+
+**The sentence itself is cut by a stated rule, never by judgement**: the
+first prose paragraph of that section, whitespace collapsed, cut at the
+first `.`, `!` or `?` that is followed by whitespace or the end of the text
+and whose next non-space character is not a lowercase letter, then capped
+at 240 characters on a word boundary. Free text is HTML-escaped, as it is
+in the report, because Markdown carries raw HTML.
+
+**The sentences are a derived field.** They live under a top-level
+`summaries` key listed in `field_types.derived`, not on the authored
+`nodes`, because a located, collapsed, cut and truncated sentence is worked
+out and not written down.
+
+**Visibility is prose, not a file**: one paragraph in `CLAUDE.md` and one
+sentence in the vault README, both naming the command rather than a path to
+trust - a copy on disk is only ever as fresh as its last run.
+
+### Rejected by review, before implementation
+
+The plan first discovered the section itself, as the intersection of the
+H2 titles of every domain template. An adversarial review of the plan
+killed three parts of it against the source. The intersection hangs on a
+single file - `00_CMP_file_template.md` carries no H2 at all and is only
+excluded by `templates_for`'s empty-set rule - and `extract_h2` returns a
+set, whose iteration order is randomised per process, so the display
+spelling of a fold-collision (`Kontext` beside `kontext`) could differ
+between two runs and fail the CI diff. The planned finding for a file
+without a usable sentence broke an existing assertion measurably: the
+shadowed requirements fixture, which `tests/run.sh` pins at zero
+findings, has a context section holding nothing but tables, and a
+prototype of the plan reported it. And the abbreviation rule refuted
+itself - "a preceding word longer than two characters" cuts inside
+`e.g.`, which was the rule's own counterexample, and cuts inside `bzw.`
+and `usw.` in the German half of the corpus. The decision above carries
+all three corrections: the REQ binding instead of a second discovery, a
+counter in the index head instead of a finding, and a terminator that
+ends a sentence only where the next word does not continue it in lower
+case.
+
+### Realization
+
+- `export_traceability.py` - `summary_of` (the bound section, its first
+  prose block, headings, tables, list items, quotes and fenced blocks
+  stepped over), `cut_sentence`, `cap_sentence`, `index_text`,
+  `write_index`, `Graph.summaries`, the `summaries` key and its
+  `field_types.derived` entry in `write_json`, `index` in the
+  `--formats` default, `EXPORT_SCHEMA_VERSION` 1.0 -> 1.1
+- `vault_schema.json` - the `index` entry: the artifact, why the REQ
+  binding rather than a discovery of its own, the sentence rule verbatim,
+  and why a missing sentence is a count and not a finding
+- `CLAUDE.md` - rule 15; `00_documentation/01_projectvault/README.md`,
+  `README.md`, `SKILL.md`, `STRUCTURE.md` - the same artifact from each
+  file's own angle
+- `tests/run.sh` - eleven assertions on the index and the rule behind it,
+  plus two fixture context paragraphs that carry an abbreviation and a
+  sentence that never terminates; 259 to 270 assertions
+
+Observed at the real entry point, the template vault:
+
+    objects: 7  relations: 20  findings: 0
+    index: 7 object lines, 3 requirement lines, 0 objects without a sentence
+    bound req_table -> '## Context'
+
+    - `CMP-BAT-001` · CMP · `04_components_(CMP)/CMP_Battery_Pack.md` ·
+      Rechargeable lithium-polymer battery pack of the host machine, and
+      the supply endpoint of IFC_PWR_DC_LiPo_Pack (IFC-BAT-001) inside
+      the module ARC_Battery_Monitoring (ARC-BAT-001).
+
+Two runs into the same directory with `--no-timestamp` compare byte-equal
+under `diff -r`, which is the property the CI step measures.
+
+
+## Amendment 2026-08-05g — AGENTS.md forwards, it does not duplicate (Accepted)
+
+### Context
+
+This repository is a public template, and its only instruction file is
+named after one vendor. `AGENTS.md` is the cross-tool convention for the
+same purpose - plain Markdown at the repository root, read by a growing set
+of agents (agents.md).
+
+### Options
+
+- **A — A thin `AGENTS.md` that forwards to `CLAUDE.md` (chosen).**
+- **B — Move the rules into `AGENTS.md` and leave `@AGENTS.md` in
+  `CLAUDE.md`,** which is what the Claude Code documentation recommends for
+  repositories that already carry an `AGENTS.md`. Rejected here: it moves
+  the one regular text of a public template and every fork's diff with it,
+  for no gain a forwarder does not also give.
+- **C — `ln -s AGENTS.md CLAUDE.md`.** Rejected: on Windows a symlink needs
+  administrator rights or developer mode, which a template cannot assume.
+
+### Decision
+
+`AGENTS.md` names where the rules are and repeats none of them, so there is
+nothing in it that can drift. It also records why the rules stay in
+`CLAUDE.md`: Claude Code reads `CLAUDE.md` and not `AGENTS.md` (Claude Code
+documentation, *How Claude remembers your project*), so a forwarder is the
+only shape that serves both without duplication.
+
+### Realization
+
+`AGENTS.md` at the repository root: a link to `CLAUDE.md`, one line each
+for `STRUCTURE.md` and `.claude/skills/mechatronics-docs/`, and the
+sentence that explains the file name. Thirteen lines, no rule of its own,
+nothing a later change to `CLAUDE.md` could contradict.
+
+
+## Amendment 2026-08-05h — The method carries a version, and a breaking change is defined (Accepted)
+
+### Context
+
+The method is versioned in two places and as a whole in none.
+`vault_schema.json` declares `schema_version: 0.3`, and
+`export_traceability.py` declares `EXPORT_SCHEMA_VERSION = "1.1"`. Neither
+answers the question a reader of this repository actually has, which is
+whether the method they adopted six months ago still means what it meant.
+
+That question is not academic here, because of how the template is
+consumed. A repository created from a GitHub template starts with a single
+commit and shares no history with the template — unlike a fork, which
+carries the whole commit history. There is no upstream to pull from and no
+merge to resolve. An update is somebody reading a changelog, deciding it is
+worth it, and copying files across.
+
+Under those mechanics a version number is not decoration; it is the only
+channel through which this repository can tell an existing project what a
+change will cost it. Until now the repository carried no tags, no releases
+and no changelog at all (issue #5).
+
+### Options
+
+- **A — Do not version; point at the git log.** Rejected on the mechanics
+  above: a derived project does not have this log. `git log` is exactly the
+  artifact a template-created repository does not inherit, so the one
+  audience that needs the information is the one audience that cannot read
+  it.
+- **B — Promote `schema_version` to the repository version.** Rejected.
+  The two measure different things and move on different schedules: a
+  documentation release moves the method without touching the data model,
+  and `EXPORT_SCHEMA_VERSION` would still be a third number with no
+  relation to either. Collapsing them would force a schema bump for changes
+  that do not touch the schema, which makes the schema number stop meaning
+  anything.
+- **C — Classify by intent: a documented rule that starts firing correctly
+  is a PATCH, a new rule is a MAJOR.** Rejected during review, and it is
+  worth recording why, because it was the plan. Issue #51 documents seven
+  rules the validator enforces that no document in the repository states
+  (`stub`, `structure`, `duplicate-basename`, `link-repeat`,
+  `encoding-not-utf8`, `id-scope-mismatch`, `orphan`). For every one of
+  them the criterion returns no answer. Worse, the answer would depend on
+  whether the pull request that documents them lands first — a versioning
+  rule whose outcome depends on merge order is not a rule.
+- **D — Classify by consequence for an existing vault (chosen).**
+
+### Decision
+
+**Semantic Versioning applies to the method, and the tier is decided by one
+question: does the set of rules itself move?**
+
+MAJOR is a vault that was clean *and correct* no longer conforming, because
+what counts as correct changed — a domain added, removed, renamed or
+redefined; a template-required section changed; a frontmatter field made
+required or its value set changed; the identifier pattern or a scope rule
+changed; a typed relation added, removed or re-sourced; a rule newly
+introduced or a WARN raised to ERROR; a field in `traceability.json` or a
+column in either CSV renamed, removed or given a new meaning.
+
+MINOR is new capability that leaves existing vaults clean. PATCH is the
+rules staying put while a tool starts applying them correctly.
+
+**A PATCH may still make a vault report findings it never reported.** Those
+findings were always true and the tool was blind to them. Rather than
+hiding that behind a tier, the compensating rule is that a PATCH entry in
+the changelog **names the finding code**, so a reader can grep their own
+vault before deciding to update. Whether a rule was documented does not
+enter into the classification at all; that is the subject of issue #51 and
+a documentation defect, not a versioning question.
+
+**Highest tier wins on a multiple hit.** Amendment 2026-08-05d is the
+worked case: it added an optional frontmatter field (MINOR) and changed
+where two typed relations are authored (MAJOR) in one change. Without this
+rule the most recent real merge in this repository is classified two ways.
+
+**A template-section change is MAJOR, and it does not hit a derived project
+passively.** `check_sections` derives the required sections from each
+project's own `00_*file_template*` files, so a project keeping its old
+templates keeps its old required sections and stays clean. The tier prices
+what adopting costs; it does not announce a break that happens to somebody
+who does nothing. This is the one tier in the table that is a statement
+about the future rather than the present, and it is deliberate.
+
+**The first release is 0.1.0, and it is not cut by this change.** SemVer
+reserves major version zero for initial development; `schema_version` is at
+0.3; and the open roadmap issues that would remap object and relation types
+(#6) and move the decision log into the vault (#53) are MAJOR under the
+table above. A 1.0.0 now would be a 2.0.0 within weeks, which is the one
+thing a version number cannot survive.
+
+### Rejected by review, before implementation
+
+An adversarial review of the plan killed four factual claims that would
+have shipped in the changelog, each verified against the source: that the
+schema declares nine typed relations (it declares eight — the ninth
+`relations` key is `note`, a prose explanation, and this file already said
+"eight" in amendment 2026-08-05d); that the skill ships two hooks (`hooks/`
+holds three, and the README sentence claiming two is issue #52); that
+frontmatter carries `domain, status, created, last-verified` on every note
+(DEC carries no `status` — issue #52 again); and that 26 pull requests were
+merged since 2026-01-22 (the first commit is from that date, the earliest
+merged pull request is #7 from 2026-07-28). The review also rejected the
+intent-based tier criterion recorded as option C, found that no tier
+covered the exporter's output contract, and rejected a changelog heading of
+`## [0.1.0] — unreleased` as unparseable under the format the file's own
+header claims to follow — an em dash where Keep a Changelog specifies an
+ASCII hyphen, a version heading with no date, and two sections that both
+mean "unreleased". The release notes are therefore drafted inside
+`## [Unreleased]`, which is the shape every changelog parser already knows.
+
+### Realization
+
+- `CHANGELOG.md` — Keep a Changelog 1.1.0 form, the 0.1.0 notes drafted
+  under `## [Unreleased]`, one link definition that resolves today
+  (`commits/main`); the tag link is added when the tag is cut
+- `CONTRIBUTING.md` — the tool-versus-method split, the local check
+  commands with their real output including the known `duplicate-basename`
+  WARN, the method-change route through an issue, how the vault conventions
+  bind a contribution, the tier table above, the three version numbers and
+  which one a derived project reads, and the release procedure
+- `.github/ISSUE_TEMPLATE/bug_report.yml`,
+  `.github/ISSUE_TEMPLATE/method_change.yml`,
+  `.github/ISSUE_TEMPLATE/config.yml`,
+  `.github/pull_request_template.md` — the method-change form asks for the
+  cost to a project that already adopted the current rule and for the
+  expected tier, because those are the two a reviewer cannot supply
+- `README.md` — a Contributing section, and `.github/` added to the
+  repository layout block it was missing from
+- `STRUCTURE.md` — a `## .github` section, and the note in `60_releases`
+  that a project's baseline trail is not the template's changelog
+
+No tag is created and no GitHub release is published by this change. The
+version number is chosen and justified; cutting it is a separate act,
+described in `CONTRIBUTING.md` under *Cutting a release*.
+
+### Aligned on integration
+
+Rebased onto amendments 2026-08-05e (coverage on the graph) and 05f/05g (the
+generated index and the `AGENTS.md` forwarder); this amendment moved from
+suffix `e` to `h`. Both of those changes then became the tier table's worked
+examples, because they are the two ends of it: coverage moving from a prose
+mention to the allocation row and `verifies:` is a rule redefined, so a
+previously clean vault can report `req-uncovered` with its notes untouched —
+MAJOR. The fifth export artifact and the additive `summaries` key, with
+`EXPORT_SCHEMA_VERSION` at 1.1, break no reader and dirty no vault — MINOR. A
+policy stated against two changes that already happened is harder to argue
+with than one stated in the abstract.
+
+
