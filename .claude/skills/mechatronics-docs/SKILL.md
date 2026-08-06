@@ -54,14 +54,18 @@ vault rules (`validate_vault.py`, same directory):
   absence, and only the session knows which of the two it did.
 
 The two halves of the gate address two readers, and the transcript shows
-which is which. Everything advisory appears as `Stop says: vault
-validator session report: ...` — that line is for the user; it lists
-legacy findings, created files and questions the session owner has to
-answer, and it is not an instruction to you. What the gate wants from
-*you* arrives as `Stop hook feedback:` and names only the ERRORs this
-session introduced. A released gate says so too: `vault validator
-crashed - stop gate released` means the vault rules went unchecked for
-that turn, so verify by hand before finishing.
+which is which. Everything advisory reaches the user as `Stop says: ...`
+— it lists legacy findings, created files and questions the session owner
+has to answer, and it is not an instruction to you. Its first line names
+the turn it belongs to: `vault validator blocked the turn end (attempt
+n/2)` when the gate blocked, `vault validator session report:` when it
+did not — including the turn after two blocked attempts, where the report
+opens with `UNRESOLVED vault ERRORs` and the gate has already released.
+What the gate wants from *you* arrives as `Stop hook feedback:` and names
+only the ERRORs this session introduced. A gate that could not run says
+so as well: `vault validator crashed - stop gate released` means the
+vault rules went unchecked for that turn, so verify by hand before
+finishing.
 
 A vault carrying two folders for one domain — `03_architecture_(ARC)`
 beside `03_Architektur_(ARC)`, which is what a half-finished translation
@@ -133,7 +137,9 @@ itself — it may be a symlink carrying a path that only one machine can
 follow. `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py --check-install`
 says whether that entry reaches this copy, reaches a different one, or
 reaches nothing at all. Run it when a rule this file describes appears
-not to be enforced.
+not to be enforced. Claude Code substitutes `${CLAUDE_SKILL_DIR}` in this
+file before you read it; nothing outside a session expands it, so a
+command typed into a shell takes the path to a copy on disk instead.
 
 Rules that follow from this mechanism:
 
@@ -339,9 +345,10 @@ The most common misplacements. Follow strictly:
 9. **DEC files for discoveries start as Draft.** Never make irreversible
    design decisions autonomously.
 10. **Frontmatter is part of the file.** Fill `domain`, `status`, `created`,
-    `last-verified` (TAE: `verifies`, and `test-object` when the note was
-    measured on a component, an interface or a module) with real values
-    from the template.
+    `last-verified` (DEC: no frontmatter `status` is required — the body
+    `Status:` line carries it, beside the reasoning; TAE: `verifies`, and
+    `test-object` when the note was measured on a component, an interface
+    or a module) with real values from the template.
     Update `last-verified` whenever you confirm a file's content is still
     true. `status: draft` relaxes nothing.
 
