@@ -358,6 +358,15 @@ refuses to write there. `00_documentation/02_documents/` is its home when you
 want to keep a dated revision; anywhere outside the project works for a
 throwaway one.
 
+**Against a safety standard.**
+[IEC_61508_MAPPING.md](IEC_61508_MAPPING.md) places the nine domains and the
+eight typed relations against the clause structure of IEC 61508, and states
+what the standard has titles for that this vault has no home for. It is a
+structural correspondence and explicitly **not** a claim of conformance; the
+file says that first, and says exactly how far the reading behind it went —
+clause numbers and published titles, from previews, with the standard itself
+paywalled.
+
 > **A note on the CSV.** Values are written exactly as the vault spells them,
 > including a cell that begins with `=`. OWASP records that the usual
 > formula-injection prefixes may not survive a spreadsheet round-trip, so a
@@ -384,6 +393,7 @@ throwaway one.
 ├── .claude/skills/mechatronics-docs/
 │                           the documentation skill, validator, exporter and tests
 ├── .github/                CI workflow, issue forms, pull request template
+├── IEC_61508_MAPPING.md    IEC 61508 correspondence — not a conformance claim
 └── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md
 ```
 
