@@ -31,9 +31,10 @@ decision.
 
 ## [Unreleased]
 
-The first tagged release will be **0.1.0**, and what follows is its release
-notes — drafted, not yet cut. [CONTRIBUTING.md](CONTRIBUTING.md#cutting-a-release)
-describes how this heading becomes `## [0.1.0] - YYYY-MM-DD`.
+## [0.1.0] - 2026-08-06
+
+The first tagged release, and the point from which the version number in this
+file starts meaning something to a project that copied the template in.
 
 Major version zero is the honest number. Semantic Versioning reserves it for
 initial development, `vault_schema.json` declares `schema_version: 0.3`, and the
@@ -124,4 +125,5 @@ weeks, and the point of a version number is to be believed.
   gates a reviewer would otherwise have to re-derive.
 - **MIT license.**
 
-[Unreleased]: https://github.com/jrmmhm/obsidian-engineering-vault/commits/main
+[Unreleased]: https://github.com/jrmmhm/obsidian-engineering-vault/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/jrmmhm/obsidian-engineering-vault/releases/tag/v0.1.0
