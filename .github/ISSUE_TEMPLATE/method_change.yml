@@ -17,9 +17,9 @@ body:
         this form asks what your change *costs* somebody who already adopted the
         current rule.
 
-        A merged method change carries an amendment in
-        `.claude/skills/mechatronics-docs/DECISIONS.md`, and the Options section
-        of that amendment is usually built from the discussion in this issue.
+        A merged method change carries its own DEC note in
+        `.claude/01_methodvault/02_decisions_(DEC)/`, and the Options section
+        of that note is usually built from the discussion in this issue.
 
   - type: dropdown
     id: area
