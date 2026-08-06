@@ -115,7 +115,9 @@ and a status. A row only reaches `Verified` when a TAE link actually exists —
 `Draft → Approved → Verified`, per allocation, not per file. That is what turns
 "we tested it" into "these three requirements are still unproven", and it is
 the one rule a tool can check for you: the exporter reads the allocation table
-and names every row that claims more than its evidence cell carries.
+and names every row that claims more than its evidence cell carries, and the
+validator reads the same two relations to decide whether a requirement is
+covered at all.
 
 | Domain | Question it answers | Change rate |
 | ------ | ------------------- | ----------- |
@@ -147,7 +149,9 @@ logistics and `99_inbox_(INB)` for unclassified raw material.
   guess.
 - **A validator** that checks naming, required sections, frontmatter,
   wikilink and artifact-path integrity, requirement-table format, REQ↔TAE
-  coverage, and implementation details leaking into architecture files.
+  coverage — decided on the allocation row and the `verifies:` field, never
+  on a mention in prose — and implementation details leaking into
+  architecture files.
 - **A traceability exporter** that reads the vault into a graph and writes it
   out as a report, two CSV views and a JSON graph — both directions of the
   requirement-to-evidence matrix, with what is unproven stated rather than left

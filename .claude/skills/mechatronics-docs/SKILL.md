@@ -215,11 +215,17 @@ catches numbers in ARC mechanically; every other domain is on you.
 4. **Subfolder needed?** Only if same role AND same change rate AND same
    core object (3-question rule in the conventions file).
 
-**REQ↔TAE coverage.** Every requirement must be answerable by evidence. When
-you create or touch a REQ, ensure at least one TAE names it in its
-`verifies:` frontmatter — create that TAE in the same pass, or record a
-planned/deferred TAE naming the REQ and the reason it is still open. An
-unverified REQ is an incomplete REQ, and the full audit reports it.
+**REQ↔TAE coverage.** Every requirement must be answerable by evidence, and
+the loop closes through two relations, not one: an allocation row in an ARC
+file names the requirement, and a TAE names it in its `verifies:`
+frontmatter. When you create or touch a REQ, write both — create the TAE in
+the same pass, or record a planned/deferred TAE naming the REQ and the
+reason it is still open. Naming the identifier in a paragraph, a heading or
+a list of open points is not coverage and is not counted as any: the
+validator reads the allocation table and the `verifies:` field, never the
+prose around them. An unverified REQ is an incomplete REQ, and the full
+audit reports it as `req-uncovered`, naming which of the two halves is
+missing.
 
 ## Creation Order — Dependencies Matter
 
