@@ -206,7 +206,7 @@ cost is written down in `DEC_The_Decision_Log_Moves_Into_A_Vault`.
 
 Note the difference to `IEC_61508_MAPPING.md` below, which is deliberately *not*
 in a vault: that file is one structural comparison with no alternatives and no
-chosen option, so it is not a decision. These 32 notes each are.
+chosen option, so it is not a decision. These notes each are.
 
 It sits beside `skills/` rather than inside it so that a derived project can
 delete the history of the method while keeping the tooling, and one level under
