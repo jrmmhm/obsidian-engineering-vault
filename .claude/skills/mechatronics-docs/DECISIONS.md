@@ -55,15 +55,17 @@ All notes below are in `.claude/01_methodvault/02_decisions_(DEC)/`.
 | 2026-08-05j | DEC-MTH-030 | `DEC_Safety_Standard_Correspondence_Is_Structural` |
 | — (the migration itself) | DEC-MTH-032 | `DEC_The_Decision_Log_Moves_Into_A_Vault` |
 
-**One date resolves to nothing: `2026-07-28g`.** No amendment ever carried it.
-It is cited four times: twice in this repository's own sources
+**One date used to resolve to nothing: `2026-07-28g`.** No amendment ever
+carried it. It was cited four times: twice in this repository's own sources
 (`validate_vault.py`, `tests/run.sh`) and twice inside the record migrated as
 `DEC_A_Non_UTF8_File_Says_Which_Encoding` — always for the condition under which
 `section-mismatch` became the first ERROR to enter the stop gate's blocking set.
 That condition is stated in `DEC_A_Near_Miss_Is_Not_An_Absence` (2026-07-31),
 the amendment that introduced the code. The migration left the wrong date
 standing wherever it was written, because correcting it inside a record would be
-editing the record; it is named here instead, and in DEC-MTH-032's residuals.
+editing the record; on 2026-08-08 all four citations were retargeted to
+`2026-07-31` (issue #74, DEC-MTH-035), so every date the tools cite now
+resolves to a row above.
 
 The ID order is the order the log appended in, which is why `2026-08-04e` holds
 DEC-MTH-018 while `2026-08-04d` holds DEC-MTH-019: the suffixes were assigned

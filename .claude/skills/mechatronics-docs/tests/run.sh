@@ -2147,7 +2147,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR"
 # Issue #31 at the gate. A file that was already UTF-16 at HEAD must not
 # block the session that opens it: its baseline is computed from the blob
 # by the running validator, so encoding-not-utf8 stands in baseline and
-# current run alike - the condition amendment 2026-07-28g stated when
+# current run alike - the condition amendment 2026-07-31 stated when
 # section-mismatch became the first ERROR to enter the blocking set.
 # Asserting "does not block" alone would pass against the old code too
 # (which knows no such code at all), so the report has to NAME it as

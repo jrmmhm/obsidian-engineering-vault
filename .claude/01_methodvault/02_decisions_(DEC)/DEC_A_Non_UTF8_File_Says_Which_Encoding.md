@@ -2,11 +2,12 @@
 domain: DEC
 id: DEC-MTH-017
 created: 2026-08-04
-last-verified: 2026-08-05
+last-verified: 2026-08-08
 ---
 Date: 2026-08-04
 Status: Accepted
-Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04c — A file that is not UTF-8 says which encoding it is (Accepted)".
+Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04c — A file that is not UTF-8 says which encoding it is (Accepted)". Corrected 2026-08-08 (issue #74): the source's two citations of "amendment 2026-07-28g" — a date no record ever carried — read "amendment 2026-07-31" here, the record that states the cited condition.
+Corrected by: [[DEC_A_Phantom_Citation_Is_Retargeted]]
 
 ## Context
 
@@ -91,12 +92,12 @@ runtime behaviour rather than the corpus.
   intention, and a Markdown file of a UTF-8 vault written in UTF-16 is
   never anybody's intention. `template-unreadable` is the standing
   precedent for "cannot be read at all" being an ERROR.
-- **I — ERROR (chosen)**, under the condition amendment 2026-07-28g
-  stated when `section-mismatch` became the first ERROR to enter the
-  blocking set: the code has to appear in the HEAD baseline as well, or
-  the gate blocks a session on a file nobody touched. That is why
-  `git_head_content` hands out the blob as bytes and why both halves
-  ship in one commit.
+- **I — ERROR (chosen)**, under the condition amendment 2026-07-31
+  ([[DEC_A_Near_Miss_Is_Not_An_Absence]]) stated when `section-mismatch`
+  became the first ERROR to enter the blocking set: the code has to
+  appear in the HEAD baseline as well, or the gate blocks a session on a
+  file nobody touched. That is why `git_head_content` hands out the blob
+  as bytes and why both halves ship in one commit.
 
 ## Decision
 
@@ -124,7 +125,7 @@ of a revision rather than its text, and `encoding-not-utf8` (ERROR, line
   working-tree half in place, a file committed as UTF-16 reports a code
   its own baseline does not carry and the gate blocks a session that
   touched nothing — one assertion catches it. This is the test amendment
-  2026-07-28g asked for, in the form it asked for it.
+  2026-07-31 asked for, in the form it asked for it.
 - **The newline translation had to be restored explicitly.**
   `Path.read_text` opens in text mode and translates `\r\n` and a lone
   `\r`; decoding bytes does not, and 16 of the 1091 files carry CRLF.
