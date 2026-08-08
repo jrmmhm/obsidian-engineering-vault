@@ -4988,6 +4988,196 @@ fi
 # END TUTORIAL.md
 # ==========================================================================
 
+# ==========================================================================
+# BEGIN tools/new_project.py --minimal - the three-domain profile (issue #79)
+# ==========================================================================
+# A project starts with REQ, ARC and TAE, and the other six domain folders
+# are MOVED to a parking folder beside the vault rather than deleted, so a
+# domain joins later by moving its folder back with its template (DEC-MTH-041).
+#
+# Two assertions carry this block, and both can fail on a --minimal that does
+# nothing: the reduced vault's domain folders are named exactly, and the
+# tutorial's own closed loop - the three files a reader writes - is replayed
+# INSIDE the reduced vault and must print the numbers TUTORIAL.md pins for the
+# full profile. That is what makes "REQ, ARC and TAE are enough" a measurement
+# rather than a claim. It reuses the tut helper of the block above, which is
+# why this one comes after it and before the summary - and, like the block
+# above, it cleans up with an explicit rm instead of a trap: traps in this
+# file overwrite rather than accumulate.
+# ==========================================================================
+MIN_PARK="00_documentation/03_vault_domains_not_in_use"
+if [ -f "$NP" ]; then
+  MIN_TMP=$(mktemp -d)
+  MD="$MIN_TMP/minproj"
+  minout=$(python3 "$NP" "$MD" --minimal 2>&1); minrc=$?
+  TESTS=$((TESTS + 1))
+  if [ $minrc -eq 0 ]; then ok x; else
+    fail "--minimal derivation must exit 0, got $minrc:"
+    printf '%s\n' "$minout" | tail -5 | sed 's/^/    /'
+  fi
+
+  # The reduced vault, named exactly. A --minimal that parked nothing, or
+  # parked the wrong folders, fails here and not three assertions later.
+  minvault="$MD/00_documentation/01_projectvault"
+  mindirs=$(ls -1 "$minvault" 2>/dev/null | grep '(' | tr '\n' ' ')
+  TESTS=$((TESTS + 1))
+  if [ "$mindirs" = "01_requirements_(REQ) 03_architecture_(ARC) 07_testing_and_evidence_(TAE) 98_administration_(ADM) 99_inbox_(INB) " ]; then
+    ok x; else fail "minimal vault must carry REQ, ARC, TAE, ADM, INB - has: $mindirs"; fi
+
+  for d in "02_decisions_(DEC)" "04_components_(CMP)" "05_interfaces_(IFC)" \
+      "06_implementation_(IMP)" "08_operation_and_usage_(OAU)" "09_references_(REF)"; do
+    TESTS=$((TESTS + 1))
+    if [ -d "$MD/$MIN_PARK/$d" ] && [ ! -e "$minvault/$d" ]; then ok x; else
+      fail "$d must be parked in $MIN_PARK, not in the vault"; fi
+    # Parked WITH its template: a domain that returns without one has no
+    # enforced sections, which is the whole reason this moves and not deletes.
+    TESTS=$((TESTS + 1))
+    if ls "$MD/$MIN_PARK/$d"/00_*file_template*.md >/dev/null 2>&1 \
+        || ls "$MD/$MIN_PARK/$d"/00_*README*.md >/dev/null 2>&1; then ok x; else
+      fail "$d was parked without its README and file template"; fi
+  done
+
+  # The parking lot's own marker must NOT be called README.md: a third README
+  # stem under 00_documentation makes --rename-docs-readme's warning-free
+  # state unreachable.
+  TESTS=$((TESTS + 1))
+  if [ -f "$MD/$MIN_PARK/00_domains_not_in_use_README.md" ] \
+      && [ ! -e "$MD/$MIN_PARK/README.md" ]; then ok x; else
+    fail "the parking folder's marker must be 00_domains_not_in_use_README.md"; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "move the folder back" "$MD/$MIN_PARK/00_domains_not_in_use_README.md" 2>/dev/null \
+      && grep -q "do not create a fresh folder" "$MD/$MIN_PARK/00_domains_not_in_use_README.md" 2>/dev/null; then
+    ok x; else fail "the parking marker must say to move the folder back, not recreate it"; fi
+
+  # The state the script predicts is the state the validator reports - the
+  # same bar the default derivation is held to.
+  minval=$(python3 "$MD/.claude/skills/mechatronics-docs/validate_vault.py" \
+    "$minvault" 2>&1); minvrc=$?
+  TESTS=$((TESTS + 1))
+  if [ $minvrc -eq 0 ] && contains "$minval" "0 error(s), 1 warning(s)" \
+      && contains "$minval" "duplicate-basename"; then ok x; else
+    fail "minimal vault must report exactly the known WARN:"
+    printf '%s\n' "$minval" | sed 's/^/    /'
+  fi
+  minexp=$(python3 "$MD/.claude/skills/mechatronics-docs/export_traceability.py" \
+    "$minvault" --output-dir "$MIN_TMP/tr" --no-timestamp 2>&1)
+  TESTS=$((TESTS + 1))
+  if contains "$minexp" "findings: 0"; then ok x; else
+    fail "the export of a minimal vault must carry no finding:"
+    printf '%s\n' "$minexp" | sed 's/^/    /'
+  fi
+
+  # The prose that would be false in a three-domain project is corrected,
+  # and the anchor it depends on is pinned by its result.
+  TESTS=$((TESTS + 1))
+  if grep -q "03_vault_domains_not_in_use" "$MD/STRUCTURE.md" \
+      && ! grep -q "Two subfolders that share the same nine-domain" "$MD/STRUCTURE.md"; then
+    ok x; else fail "STRUCTURE.md still describes a nine-domain vault in a minimal project"; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "## Minimal profile" "$MD/README.md" \
+      && grep -q "$MIN_PARK" "$MD/README.md"; then ok x; else
+    fail "the generated README must explain the minimal profile and name the parking folder"; fi
+
+  # The growth path: one move, no migration, same reported state - and the
+  # folder is gone from the parking lot rather than copied out of it.
+  mv "$MD/$MIN_PARK/02_decisions_(DEC)" "$minvault/" 2>/dev/null
+  grownval=$(python3 "$MD/.claude/skills/mechatronics-docs/validate_vault.py" \
+    "$minvault" 2>&1)
+  TESTS=$((TESTS + 1))
+  if [ -d "$minvault/02_decisions_(DEC)" ] && [ ! -e "$MD/$MIN_PARK/02_decisions_(DEC)" ] \
+      && contains "$grownval" "0 error(s), 1 warning(s)"; then ok x; else
+    fail "a domain moved back into the vault must need no migration:"
+    printf '%s\n' "$grownval" | sed 's/^/    /'
+  fi
+
+  # The negative control, derived here because the block above removes its
+  # own target: without --minimal nothing is parked and nothing is renamed.
+  python3 "$NP" "$MIN_TMP/defctl" >/dev/null 2>&1
+  TESTS=$((TESTS + 1))
+  if [ -d "$MIN_TMP/defctl/00_documentation/01_projectvault/02_decisions_(DEC)" ] \
+      && [ ! -e "$MIN_TMP/defctl/$MIN_PARK" ] \
+      && ! grep -q "## Minimal profile" "$MIN_TMP/defctl/README.md"; then ok x; else
+    fail "the default derivation must keep every domain folder in the vault"; fi
+
+  # --minimal composes with the flags beside it.
+  min2out=$(python3 "$NP" "$MIN_TMP/mr" --minimal --rename-docs-readme \
+    --name "Tiny Rig" 2>&1); min2rc=$?
+  min2val=$(python3 "$MIN_TMP/mr/.claude/skills/mechatronics-docs/validate_vault.py" \
+    "$MIN_TMP/mr/00_documentation/01_projectvault" 2>&1)
+  TESTS=$((TESTS + 1))
+  if [ $min2rc -eq 0 ] && contains "$min2val" "0 error(s), 0 warning(s)" \
+      && [ "$(head -n 1 "$MIN_TMP/mr/README.md")" = "# Tiny Rig" ]; then ok x; else
+    fail "--minimal --rename-docs-readme --name must derive warning-free (rc=$min2rc):"
+    printf '%s\n' "$min2val" | sed 's/^/    /'
+  fi
+
+  # A clone whose vault already documents something is refused BEFORE the
+  # first write: parking a populated domain would take its notes out of the
+  # vault the validator reads, and the validator would stay green.
+  cp -r "$NP_ROOT" "$MIN_TMP/src" 2>/dev/null
+  printf -- '---\ndomain: DEC\n---\n' \
+    > "$MIN_TMP/src/00_documentation/01_projectvault/02_decisions_(DEC)/DEC_Mine.md"
+  refout=$(python3 "$MIN_TMP/src/tools/new_project.py" "$MIN_TMP/refused" --minimal 2>&1)
+  refrc=$?
+  TESTS=$((TESTS + 1))
+  if [ $refrc -ne 0 ] && contains "$refout" "DEC_Mine.md" \
+      && [ ! -e "$MIN_TMP/refused" ]; then ok x; else
+    fail "--minimal must refuse a populated domain folder before writing (rc=$refrc):"
+    printf '%s\n' "$refout" | tail -3 | sed 's/^/    /'
+  fi
+
+  # The reduced profile can close the method's loop on day one: the
+  # tutorial's own three files, replayed inside the minimal vault, must
+  # print the numbers TUTORIAL.md pins for the full one.
+  if [ -f "$TUT_MD" ]; then
+    MTUT="$MIN_TMP/tutproj"
+    python3 "$NP" "$MTUT" --minimal >/dev/null 2>&1
+    MTV="$MTUT/00_documentation/01_projectvault"
+    if [ -d "$MTV" ]; then
+      for i in 0 1 2; do
+        tut get-file "$i" > "$MTV/$(tut path "$i")"
+      done
+      python3 - "$MTV/system_overview.md" "$(tut get 'tutorial-row: overview')" <<'PY'
+import sys
+path, row = sys.argv[1], sys.argv[2].rstrip("\n")
+old = "| *Add your modules here* | *Brief description of the module* |"
+text = open(path, encoding="utf-8").read()
+if text.count(old) != 1:
+    sys.exit("placeholder row not found exactly once in system_overview.md")
+open(path, "w", encoding="utf-8").write(text.replace(old, row))
+PY
+      python3 - "$MTV/$(tut path 1)" "$(tut get 'tutorial-row: allocation')" <<'PY'
+import sys
+path, row = sys.argv[1], sys.argv[2].rstrip("\n")
+prefix = "| [[ARC_Documentation_Check]] (ARC-DOC-001) |"
+lines = open(path, encoding="utf-8").read().splitlines(True)
+hits = [i for i, l in enumerate(lines) if l.startswith(prefix)]
+if len(hits) != 1:
+    sys.exit("allocation row not found exactly once in the ARC note")
+lines[hits[0]] = row + "\n"
+open(path, "w", encoding="utf-8").writelines(lines)
+PY
+      mtv=$(cd "$MTUT" && python3 .claude/skills/mechatronics-docs/validate_vault.py \
+        00_documentation/01_projectvault 2>&1)
+      tut_diff "tutorial-output: validator-final" "$(printf '%s\n' "$mtv" | tail -n 1)" \
+        "a closed loop in a MINIMAL vault must report what the tutorial shows"
+      mte=$(cd "$MTUT" && python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        00_documentation/01_projectvault --output-dir "$MIN_TMP/mtr" 2>&1)
+      tut_diff "tutorial-output: export-final" \
+        "$(printf '%s\n' "$mte" | grep -v '^vault: ' | grep -v '^written to: ')" \
+        "a closed loop in a MINIMAL vault must export what the tutorial shows"
+    else
+      TESTS=$((TESTS + 1))
+      fail "the minimal derivation for the tutorial replay produced no vault"
+    fi
+  fi
+
+  rm -rf "$MIN_TMP"
+fi
+# ==========================================================================
+# END tools/new_project.py --minimal
+# ==========================================================================
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"

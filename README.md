@@ -289,6 +289,9 @@ cd my-project
 # Starting a real project instead of exploring? Derive one in one command:
 #   python3 tools/new_project.py ../my-real-project
 # (see "The worked example" above for what it removes)
+# Add --minimal to start with three domains instead of nine — REQ, ARC and
+# TAE carry the loop; the other six wait beside the vault until they are due
+# (the vault README's "Start With Three, Grow Into Nine" says when).
 
 # 2. Check the vault is intact
 python3 .claude/skills/mechatronics-docs/validate_vault.py \

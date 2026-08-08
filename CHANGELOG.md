@@ -33,6 +33,34 @@ decision.
 
 ### Added
 
+- **A project starts with three domains and grows into nine** — the vault
+  README gains the section "Start With Three, Grow Into Nine": REQ, ARC and
+  TAE carry the loop the tools decide on, and one table row per domain names
+  the day the other six typically join, with the rule, README or template
+  section each trigger comes from. Every domain README states its own trigger
+  in one sentence; the conventions file points at the section rather than
+  repeating it. `tools/new_project.py` gains `--minimal`, which derives that
+  profile: the vault keeps `01_requirements_(REQ)`, `03_architecture_(ARC)`
+  and `07_testing_and_evidence_(TAE)` beside ADM and INB, and the other six
+  domain folders **move** — they are not deleted — to
+  `00_documentation/03_vault_domains_not_in_use/`, where each waits with its
+  README and file template. A domain joins later by moving its folder back:
+  one command, no migration, and the validator and the export report the same
+  state before and after. The flag composes with `--name` and
+  `--rename-docs-readme`, refuses before writing anything when a folder it
+  would park already carries notes, and leaves the default derivation
+  untouched — the tutorial replay is the witness. This is issue #79, and two
+  of its premises are corrected in the process: the minimal trio is REQ, ARC
+  and TAE rather than REQ, IMP and TAE, because all five coverage gap classes
+  are decided on an ARC allocation row or a TAE `verifies:` field and none on
+  IMP; and `is_vault_root` never required *exactly* three domain folders, but
+  at least three with template files below them, counting `98_administration_(ADM)`
+  and `99_inbox_(INB)`. The reasoning is
+  [`DEC_A_Project_Starts_With_Three_Domains`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Project_Starts_With_Three_Domains.md).
+  New capability and new documentation; no domain is added, removed, renamed
+  or redefined, `vault_schema.json` and the templates are untouched, and a
+  derived project's predicted validator state is unchanged: MINOR.
+
 - **`tools/new_project.py` — deriving a project is one command** — it copies
   the template into a fresh target, strips everything the repository already
   names as template-only (`CONTRIBUTING.md`, this file, the issue forms and

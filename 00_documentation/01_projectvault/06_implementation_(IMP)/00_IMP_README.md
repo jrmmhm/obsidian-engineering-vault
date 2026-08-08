@@ -3,6 +3,8 @@ They form the bridge between the documentation and the real implementation (hard
 
 IMP describes how it is implemented and where relevant files are located – not why and not how the system is architecturally structured.
 
+**This domain joins with the first artifact outside the vault** – code, a schematic, a CAD file, a configuration – that somebody else has to find. That is the moment your ARC module's Implementation section stops reading "None yet."
+
 
 ## Goal
 - Record concrete implementations unambiguously

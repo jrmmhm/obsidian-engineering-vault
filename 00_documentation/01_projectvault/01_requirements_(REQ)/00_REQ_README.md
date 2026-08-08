@@ -1,6 +1,8 @@
 
 REQ files document which requirements are placed on the system. The file template can be found at [[00_REQ_file_template]]. Each requirement exists exactly once and is linked to a requirement ID. The explanation of the requirement ID and the table columns can be found in this file.
 
+**This domain joins on day one.** Every coverage statement the tools make is computed per requirement, so a project without REQ has nothing to allocate and nothing to prove.
+
 ## IMPORTANT
 
 IF the statement:
