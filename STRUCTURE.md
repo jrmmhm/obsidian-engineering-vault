@@ -191,7 +191,7 @@ that own them, plus an index of every finding code. It answers where a check
 lives, where the vault conventions answer what a rule is and the method vault
 answers why it exists.
 
-See the [README](README.md#the-ai-layer) for how to use it, with or without
+See [METHOD.md](METHOD.md#the-ai-layer) for how to use it, with or without
 Claude Code.
 
 ---
