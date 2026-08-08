@@ -55,8 +55,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from validate_vault import (  # noqa: E402
     Vault, _dict, _strlist, fold_key, is_separator,
-    is_vault_root, load_schema, parse_frontmatter, req_tables, split_cells,
-    template_files,
+    is_vault_root, load_schema, parse_frontmatter, req_tables,
+    resolve_role_map, split_cells, template_files,
 )
 
 EXPORT_SCHEMA_VERSION = "1.1"
@@ -365,31 +365,33 @@ def duplicate_role_finding(role, kept_abbr, kept_dir, dropped_abbr, dropped_dir)
 def resolve_roles(vault, schema, findings):
     """-> {canonical role token: folder abbreviation present in this vault}.
 
-    The alias map is the reason a German vault yields a graph at all. An
-    abbreviation the map does not know is reported and excluded rather than
-    guessed at, and so is a folder whose role another folder already holds.
+    The alias map is the reason a German vault yields a graph at all. The
+    derivation itself is validate_vault.resolve_role_map - ONE rule for
+    both tools since issue #66, so the folder this graph is built from is
+    the folder the validator's coverage checks read. What stays here is
+    the reporting: an abbreviation the map does not know is reported and
+    excluded rather than guessed at, and so is a folder whose role another
+    folder already holds.
 
     The kept one is the first in sorted order - among two abbreviations
-    here, and among the folders of one abbreviation in pick_domain_dir,
-    where the folders holding files of the domain come first. It is a
-    rule and not a judgement: the alternatives - the fuller folder, or
-    both - each decide something only the author knows. Counting files
-    moves every identifier
+    in resolve_role_map, and among the folders of one abbreviation in
+    pick_domain_dir, where the folders holding files of the domain come
+    first. It is a rule and not a judgement: the alternatives - the fuller
+    folder, or both - each decide something only the author knows. Counting
+    files moves every identifier
     of the export a second time, at whatever unrelated edit tips the count;
     ingesting both writes every already-translated requirement into the
     graph twice and reports its untranslated twin as unallocated. What the
     export owes the reader is that the choice is visible, which is the
-    finding below.
+    finding below. Only the emission ORDER differs from the old inline
+    loop - dropped abbreviations first, then the winners' namesake folders
+    - and no consumer reads order: the JSON writer and main() sort every
+    finding list, and the suite queries findings structurally.
     """
-    aliases = _dict(schema, "domain_aliases")
-    amap = _dict(aliases, "map")
-    identity = _strlist(aliases, "identity") or [
-        "REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"]
-    roles = {}
-    for abbr, dirs in sorted(domain_dirs(vault).items()):
-        if abbr in ID_EXCLUDED_DOMAINS:
-            continue
-        role = abbr if abbr in identity else amap.get(abbr)
+    roles, dropped = resolve_role_map(vault, schema)
+    dd = domain_dirs(vault)
+    for abbr, role in dropped:
+        dirs = dd[abbr]
         if role is None:
             findings.append(Finding(
                 "export-unknown-domain", dirs[0], None,
@@ -397,13 +399,15 @@ def resolve_roles(vault, schema, findings):
                 "listed in domain_aliases - its files are not part of the graph; "
                 "add the alias to vault_schema.json"))
             continue
-        if role in roles:
-            kept = roles[role]
-            for d in dirs:
-                findings.append(duplicate_role_finding(
-                    role, kept, vault.domains[kept], abbr, d))
-            continue
-        roles[role] = abbr
+        # roles[role] is never reassigned after it is won, so this names
+        # the same kept folder the old inline loop saw at iteration time.
+        kept = roles[role]
+        for d in dirs:
+            findings.append(duplicate_role_finding(
+                role, kept, vault.domains[kept], abbr, d))
+    for role in sorted(roles):
+        abbr = roles[role]
+        dirs = dd[abbr]
         # The one Vault indexed is the one build_graph reads; its namesakes
         # are excluded by that indexing, which is pick_domain_dir's rule and
         # no longer readdir's (amendment 2026-08-04g).
