@@ -90,6 +90,20 @@ decision.
   input it already had an opinion on. Why:
   `DEC_One_Reverse_Key_Derivation_For_Both_Readers` in the method vault.
 
+- **No cited amendment date resolves to nothing anymore** — "amendment
+  2026-07-28g" was cited four times (`validate_vault.py`, `tests/run.sh`, and
+  twice inside the migrated record `DEC_A_Non_UTF8_File_Says_Which_Encoding`)
+  for the condition under which `section-mismatch` became the first ERROR to
+  enter the stop gate's blocking set, but no record ever carried that date.
+  All four citations now read `amendment 2026-07-31` —
+  `DEC_A_Near_Miss_Is_Not_An_Absence`, the record that states the condition —
+  and the sites that documented the phantom as an open defect (the forwarding
+  map in `DECISIONS.md`, residual 5 of the migration decision) record the
+  correction instead of describing it as open. This is issue #74:
+  documentation and comments only, no rule moves and no vault gains a
+  finding, so it is MINOR. Why: `DEC_A_Phantom_Citation_Is_Retargeted` in the
+  method vault.
+
 ## [0.1.0] - 2026-08-06
 
 The first tagged release, and the point from which the version number in this
