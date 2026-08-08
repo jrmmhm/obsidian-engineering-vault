@@ -1028,13 +1028,39 @@ def _report_unbound(g, f, lines, bound_lines):
             "graph"))
 
 
+def relation_reverse_key(schema, kind):
+    """The key one kind's computed reverse edges are filed under.
+
+    One derivation for the writer and the reader (issue #67): reverse_index
+    files reverse edges under this key and assess reads the coverage's
+    evidence half through it, so the two cannot disagree about the name -
+    a rename of relations.verifies.reverse_key used to move the edges
+    while assess kept reading the old literal, and every requirement
+    silently lost its evidence half. Anything absent - the relations
+    block, the kind's entry, the reverse_key field - falls back to the
+    Sphinx-Needs '<kind>_back' convention the schema declares as its
+    default. A reverse_key that is DECLARED but is not a non-empty string
+    is refused instead: the old inline `or` fallback silently overrode ''
+    and null, and a silent guess is how an export starts describing a
+    vault it did not understand.
+    """
+    spec = _dict(_dict(schema, "relations"), kind)
+    if "reverse_key" not in spec:
+        return f"{kind}_back"
+    key = spec["reverse_key"]
+    if not isinstance(key, str) or not key:
+        raise ValueError(
+            f"relations.{kind}.reverse_key is {key!r} in vault_schema.json - "
+            "a reverse key is a non-empty string; fix the entry or remove it "
+            f"to fall back to '{kind}_back'")
+    return key
+
+
 def reverse_index(graph, schema):
     """Every reverse edge, computed. Nothing here is ever read from a file."""
-    rels = _dict(schema, "relations")
     back = {}
     for e in graph.edges:
-        spec = _dict(rels, e["kind"])
-        key = spec.get("reverse_key") or f"{e['kind']}_back"
+        key = relation_reverse_key(schema, e["kind"])
         back.setdefault(e["target"], {}).setdefault(key, [])
         if e["source"] not in back[e["target"]][key]:
             back[e["target"]][key].append(e["source"])
@@ -1066,13 +1092,25 @@ GAP_CLASSES = {
 OPEN_QUESTION_CLASSES = ("no-evidence-note", "evidence-disagrees")
 
 
-def assess(graph, back):
+def assess(graph, back, schema):
     """Coverage per requirement, in this project's own vocabulary."""
+    # The coverage report is defined on the verifies relation. A relations
+    # block that no longer declares it means the schema and this tool
+    # disagree about the vocabulary itself - refused, never guessed around
+    # (issue #67). An absent block is the minimal-schema path and falls
+    # back to '<kind>_back' everywhere, like every reverse_index kind.
+    rels = _dict(schema, "relations")
+    if rels and not isinstance(rels.get("verifies"), dict):
+        raise ValueError(
+            "vault_schema.json declares relations but no usable "
+            "relations.verifies entry - the coverage report is defined on "
+            "that relation; restore the entry or remove the relations block")
+    verifies_key = relation_reverse_key(schema, "verifies")
     out = {}
     for rid in sorted(graph.requirements):
         req = graph.requirements[rid]
         allocs = req.get("allocations", [])
-        verified_by = back.get(rid, {}).get("verifies_back", [])
+        verified_by = back.get(rid, {}).get(verifies_key, [])
         gaps = []
         all_verified = bool(allocs) and all(a["proven"] for a in allocs)
         all_linked = bool(allocs) and all(a["evidence"] for a in allocs)
@@ -1123,7 +1161,7 @@ def analyse(vault, schema, findings=None):
     bindings = discover_bindings(vault, schema, roles, findings)
     graph, _proven = build_graph(vault, schema, roles, bindings)
     back = reverse_index(graph, schema)
-    return roles, bindings, graph, back, assess(graph, back)
+    return roles, bindings, graph, back, assess(graph, back, schema)
 
 
 # --------------------------------------------------------------------------
@@ -1547,7 +1585,13 @@ def main(argv):
     if schema_error:
         findings.append(Finding("export-schema-unreadable", None, None, schema_error))
 
-    roles, bindings, graph, back, coverage = analyse(vault, schema, findings)
+    try:
+        roles, bindings, graph, back, coverage = analyse(vault, schema, findings)
+    except ValueError as e:
+        # A schema the coverage report cannot be honestly derived from is a
+        # refusal, not a crash - same exit as the other refused outputs.
+        print(f"ERROR - {e}", file=sys.stderr)
+        return 2
     graph.findings = findings + graph.findings
 
     inputs = []
