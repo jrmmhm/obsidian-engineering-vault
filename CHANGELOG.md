@@ -31,6 +31,19 @@ decision.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The worked example's deletion instructions now name the whole example** —
+  the old paragraph said "the seven notes named `*_Battery_*`", a glob that
+  matches six: the interface note `IFC_PWR_DC_LiPo_Pack.md` was never deleted,
+  and following the instructions left `[[ARC_Battery_Monitoring]]` unresolved
+  in the conventions file — a second warning the quick start does not predict.
+  The paragraph now lists all seven notes by name, has the reader remove the
+  conventions sentence that carried the last link, and says what the validator
+  reports before and after the removal is committed. This is issue #70:
+  documentation only, no rule moves and no vault gains a finding, so it is
+  MINOR.
+
 ## [0.1.0] - 2026-08-06
 
 The first tagged release, and the point from which the version number in this

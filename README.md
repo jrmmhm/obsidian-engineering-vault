@@ -190,12 +190,21 @@ What those identifiers and relations mean is declared in
 `.claude/skills/mechatronics-docs/vault_schema.json`.
 
 **Deleting it.** The example is illustration, not infrastructure. Remove the
-seven notes named `*_Battery_*` under `01_projectvault`, the
+seven notes of the example under `01_projectvault` —
+`REQ_Battery_Monitoring (BAT)`, `DEC_Battery_Log_Acceptance_Check`,
+`ARC_Battery_Monitoring`, `CMP_Battery_Pack`, `IFC_PWR_DC_LiPo_Pack`,
+`IMP_Battery_Log_Evaluation` and `TAE_Battery_Log_Acceptance` — the
 `2026-07-28_battery_monitoring` folders under `30_testdata`,
-`20_software/data_analysis/`, and the `ARC_Battery_Monitoring` row in
-`system_overview.md`. Drop the evaluator step from
-`.github/workflows/validate-vault.yml` as well. The validator returns to zero
-errors with all of it gone.
+`20_software/data_analysis/`, the `ARC_Battery_Monitoring` row in
+`system_overview.md`, and the sentence "The worked example under
+[[ARC_Battery_Monitoring]] shows all of this in one thread." in
+`00_documentation_file_creation_and_conventions.md`, which would otherwise be
+the one wikilink left pointing at the example. Drop the evaluator step from
+`.github/workflows/validate-vault.yml` as well. Commit the removal, and the
+validator returns to zero errors with all of it gone — and to the single
+warning the quick start below explains. Until the commit it also reports each
+of the example's identifiers as `id-vanished`, exactly as the conventions file
+says it does for an identifier that was present at git HEAD.
 
 ---
 
