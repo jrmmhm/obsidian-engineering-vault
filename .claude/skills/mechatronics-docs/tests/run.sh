@@ -4460,6 +4460,7 @@ if [ -f "$NP" ]; then
       ".claude/skills/mechatronics-docs/hooks/stop_gate.sh" \
       ".claude/skills/mechatronics-docs/DECISIONS.md" \
       ".claude/skills/mechatronics-docs/SKILL.md" \
+      ".claude/skills/mechatronics-docs/ARCHITECTURE.md" \
       ".github/workflows/validate-vault.yml" "IEC_61508_MAPPING.md" \
       "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "LICENSE" \
       "00_documentation/.obsidian/app.json"; do
@@ -4546,6 +4547,109 @@ fi
 # ==========================================================================
 # END tools/new_project.py
 # ==========================================================================
+
+# ==========================================================================
+# ARCHITECTURE.md - the finding-code index is complete in both directions
+# ==========================================================================
+# The map beside the validator is the only document naming which function
+# owns which check (issue #81), and prose about code rots silently. The one
+# part of it that can be derived from the source IS derived, on every run:
+# a code the validator can emit and the map does not name fails here, and so
+# does a code the map names that the validator can no longer emit - the
+# second direction is what catches a rename, which is the likelier defect.
+#
+# The assertion is the exit status, not a parse of the output. A guard that
+# prints nothing when it cannot read its input and is then compared against
+# the empty string passes green on a deleted map - the switched-off gate
+# this suite exists to prevent. Every failure path below exits non-zero.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import ast, json, re, sys
+from pathlib import Path
+
+skill = Path(sys.argv[1])
+# A finding code: lowercase words joined by hyphens. Drops the schema's own
+# field_keys documentation sentences, which sit under the same "code" key.
+SHAPE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+emitted, dynamic, opaque = set(), set(), []
+
+
+def add(v):
+    if isinstance(v, str) and SHAPE.match(v):
+        emitted.add(v)
+
+
+tree = ast.parse((skill / "validate_vault.py").read_text(encoding="utf-8-sig"))
+for n in ast.walk(tree):
+    if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "Finding":
+        arg = n.args[1] if len(n.args) >= 2 else None
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and SHAPE.match(arg.value):
+            emitted.add(arg.value)
+        elif isinstance(arg, ast.Name):
+            # Resolved below, out of the assignment to that name.
+            dynamic.add(arg.id)
+        else:
+            # Keyword form, an f-string, a call - a shape this reader does not
+            # follow. Reported, never skipped: a code that silently stops being
+            # extracted makes the map look complete while it is not.
+            opaque.append(f"validate_vault.py:{n.lineno}: the Finding() code argument is "
+                          "neither a literal code nor a name this check can follow")
+    if isinstance(n, ast.Dict):
+        # FALLBACK_SCHEMA and any other descriptor written in Python.
+        for k, v in zip(n.keys, n.values):
+            if isinstance(k, ast.Constant) and k.value in ("code", "empty_code") \
+                    and isinstance(v, ast.Constant):
+                add(v.value)
+for n in ast.walk(tree):
+    # code = desc.get("code") or "frontmatter-value" - the literal is a direct
+    # child of the BoolOp. Walking the whole assignment instead would pick up
+    # the "code" string inside desc.get("code") as if it were a finding code.
+    if isinstance(n, ast.Assign) and {t.id for t in n.targets if isinstance(t, ast.Name)} & dynamic:
+        for s in ast.walk(n.value):
+            if isinstance(s, ast.BoolOp):
+                for o in s.values:
+                    if isinstance(o, ast.Constant):
+                        add(o.value)
+
+
+def walk(x):
+    if isinstance(x, dict):
+        for k, v in x.items():
+            if k in ("code", "empty_code"):
+                add(v)
+            if k == "codes" and isinstance(v, dict):
+                add_keys = v.keys()      # code_fences.codes names its codes as keys
+                for c in add_keys:
+                    add(c)
+            walk(v)
+    elif isinstance(x, list):
+        for v in x:
+            walk(v)
+
+
+walk(json.loads((skill / "vault_schema.json").read_text(encoding="utf-8-sig")))
+
+# The map's side: the first column of the table between the two markers.
+# Deliberately NOT every code span in the region - the scope and severity
+# columns carry backticked field names and scope words that are not codes.
+region = re.search(r"<!-- finding-codes:begin -->(.*?)<!-- finding-codes:end -->",
+                   (skill / "ARCHITECTURE.md").read_text(encoding="utf-8-sig"), re.S)
+if region is None:
+    sys.exit("ARCHITECTURE.md: the finding-codes markers are gone - the index cannot be read")
+mapped = set(re.findall(r"^\|\s*`([a-z0-9-]+)`\s*\|", region.group(1), re.M))
+
+bad = []
+if emitted - mapped:
+    bad.append("emitted by the validator, absent from ARCHITECTURE.md: "
+               + " ".join(sorted(emitted - mapped)))
+if mapped - emitted:
+    bad.append("named in ARCHITECTURE.md, no longer emitted: "
+               + " ".join(sorted(mapped - emitted)))
+bad += opaque
+if bad:
+    sys.exit("\n".join(bad))
+PY
+then ok x; else fail "ARCHITECTURE.md and the validator disagree about the finding codes"; fi
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
