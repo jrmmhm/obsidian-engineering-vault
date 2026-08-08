@@ -190,6 +190,7 @@ REPLACEMENTS = [
 # Cut a whole STRUCTURE.md section: [start marker, end marker).
 CUTS = [
     ("STRUCTURE.md", "## .claude/01_methodvault", "## .github"),
+    ("STRUCTURE.md", "## tools", "## AGENTS.md"),
 ]
 
 RENAME_TARGET = "00_documentation/02_documents/README.md"
@@ -207,8 +208,7 @@ WARN_PARAGRAPH = """\
 reports one `duplicate-basename` WARN for this layout. It is advisory: keeping
 both names is fine as long as no wikilink addresses either file as
 `[[README]]`. Renaming `00_documentation/02_documents/README.md` (for example
-to `00_documents_README.md`, which is what the derivation script's
-`--rename-docs-readme` flag does) is the only remedy.
+to `00_documents_README.md`) is the only remedy.
 
 """
 
