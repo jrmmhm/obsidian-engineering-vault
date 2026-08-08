@@ -1,6 +1,8 @@
 OAU notes describe the workflow for operation and usage as a reproducible runbook/tutorial.
 OAU is written for humans: clear steps, clear checks, clear abort rules.
 
+**This domain joins with the first procedure somebody repeats** – including you, coming back to it after six months.
+
 OAU describes how the system is operated — not how it is structured (ARC), not why decisions were made (DEC) and not how something is implemented (IMP).
 
 ## Goal

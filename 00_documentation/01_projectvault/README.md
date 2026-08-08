@@ -14,6 +14,59 @@ To ensure consistent high-quality documentation, rules and guidelines have been 
 
 **Important:** The files under 03_architecture_(ARC) represent the individual project modules and combine files into an overall picture. The central starting point for the project and its architecture can be found at [[system_overview]].
 
+## Start With Three, Grow Into Nine
+
+Nine domains is where a project ends up, not where it starts. Three of them
+carry the loop the tools decide on: a requirement in `01_requirements_(REQ)`,
+an allocation row in `03_architecture_(ARC)` that gives that requirement an
+owner and a status, and an evidence note in `07_testing_and_evidence_(TAE)`
+naming it in `verifies:`. Every coverage statement the validator and the
+traceability export make is decided on those three. A project can start
+there, close a real loop on its first day, and meet the rest when they
+become due.
+
+The other six are not optional in the long run — they are *not yet due*.
+Each row below names the day its domain typically joins and where that
+trigger comes from, so the question is never "do I need this folder?" but
+"has this happened yet?".
+
+| Domain | Joins when | Where the trigger comes from |
+| ------ | ---------- | ---------------------------- |
+| `01_requirements_(REQ)` | Day one. Everything else is defined on requirements. | The coverage report is computed per requirement; a traceability export armed against a vault carrying none fails on purpose. |
+| `03_architecture_(ARC)` | Day one. The allocation row is where a requirement gets an owner, a verification link and a status. | `00_ARC_README`, the Allocation and Verification table; a requirement no row names is reported as not allocated. |
+| `07_testing_and_evidence_(TAE)` | Day one — filled the first time you actually check something. | `00_TAE_README` and the `verifies:` field; a requirement no evidence note names is reported as uncovered. |
+| `02_decisions_(DEC)` | The first time a choice had a real alternative and you would otherwise argue it again in six months. | `00_DEC_README`: "represents a choice between alternatives", "could have been different"; a REQ row's Source column asking for a `DEC` link. |
+| `06_implementation_(IMP)` | The first artifact outside the vault — code, schematic, CAD, a configuration — that someone has to find. | `00_IMP_README`: IMP files are pointers, not duplicates; your ARC module's Implementation section stops reading "None yet." |
+| `04_components_(CMP)` | The first part you buy or build whose datasheet decides something in more than one place. | `00_CMP_README`'s decision rule: a manufacturer datasheet and no further decomposition make an individual part; parts with a boundary make an assembly. |
+| `05_interfaces_(IFC)` | The first contract between two parts that must keep holding while the parts on either side change. | `00_IFC_README`: a contract type without endpoints; your ARC module's Interfaces table stops reading "None yet." |
+| `08_operation_and_usage_(OAU)` | The first procedure somebody repeats — including you, after six months away from it. | `00_OAU_README`: "actions a human takes", "procedures that repeat over system lifetime". |
+| `09_references_(REF)` | The first external source — datasheet, standard, paper — that decides something and gets quoted a second time. | `00_REF_README`: the project-relevant extract of external truth; the PDF itself belongs in `50_sources`. |
+
+Three things are worth knowing before a domain joins late, because a start
+of three is only honest if the growth path is.
+
+**The rules of a domain live in that domain's own README.** A folder you have
+not started is also a set of conventions you have not read — what belongs in
+the file, what must not, which sections its template requires. Read
+`00_<ABBR>_README.md` on the day the row above says the domain is due, not on
+the day you first need the note. The table exists so that day is a
+recognisable event rather than a surprise.
+
+**A late domain costs no migration.** Nothing you already wrote is renumbered,
+retitled or re-linked when a domain joins. The folder arrives with its own
+file template, and the validator derives the required sections from that
+template, so the new domain brings its rules with it and the notes around it
+are untouched. If this project was derived with the minimal profile, the
+waiting folders are in `00_documentation/03_vault_domains_not_in_use/` and a
+domain joins by moving its folder back — move it rather than creating a fresh
+one beside it, or the two folders collide on their file names.
+
+**Your ARC notes keep all their sections meanwhile.** The ARC template asks
+for Decisions, Components, Interfaces and Implementation even in a project
+that has none of those domains yet. Answer them `None yet.` — that is what
+the tutorial's own module does, and it is an honest empty compartment rather
+than a missing one.
+
 ## Understanding
 
 A deep understanding of the documentation method is achieved by reading all _00_filename_ files.
