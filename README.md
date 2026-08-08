@@ -312,6 +312,12 @@ decision you make once, because the warning nobody triages is the one everybody
 learns to scroll past. If your run shows an ERROR, or a second warning you did
 not expect, that one is yours.
 
+That was a check, though, not a result. **[Your first closed loop](TUTORIAL.md)**
+is the same method at working size, in roughly ten minutes: you derive a project
+of your own, write one requirement, one evidence note and one allocation row,
+and the exporter reads them back as `proven: 1  not proven: 0` — your loop, out
+of your own three files. First the aha, then the theory.
+
 CI adds exactly one check that is stricter than a session, and it is not this
 one. The traceability export names, per requirement, what is unproven; the
 workflow runs it with `--fail-on not-allocated,no-evidence-note` and fails when
@@ -508,6 +514,7 @@ paywalled.
 │                           audited by the same validator
 ├── .github/                CI workflow, issue forms, pull request template
 ├── tools/                  new_project.py — derives a clean project, strips itself
+├── TUTORIAL.md             ten minutes to your own first closed REQ→TAE loop
 ├── IEC_61508_MAPPING.md    IEC 61508 correspondence — not a conformance claim
 └── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md
 ```
