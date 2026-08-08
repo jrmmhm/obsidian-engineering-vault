@@ -52,6 +52,24 @@ decision.
   first push is green. The reasoning is
   [`DEC_Deriving_A_Project_Is_One_Command`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Deriving_A_Project_Is_One_Command.md).
   New capability, no rule moves, no existing vault gains a finding: MINOR.
+- **An architecture map of the validator, for whoever maintains it** —
+  [`.claude/skills/mechatronics-docs/ARCHITECTURE.md`](.claude/skills/mechatronics-docs/ARCHITECTURE.md).
+  It states the validator's three stages in execution order behind their five
+  entry points, one row per check family with the function that owns it and
+  whether it runs per file or across the vault, what the stop gate can
+  actually block on, and an index of every finding code the tool can emit.
+  Until now nothing said where a check lived, so changing one rule meant
+  re-deriving the architecture by reading — the defect issue #81 reports. The
+  index is not prose: the test suite derives the codes from
+  `validate_vault.py` and `vault_schema.json` on every run and fails in both
+  directions, on a code the map does not name and on a code the map still
+  names after the validator stopped emitting it. Issue #81 puts the number of
+  finding codes at 37; that figure was already wrong when the issue was
+  filed, and the count of record is now the map's index, which a test keeps
+  true. Pointers from `CONTRIBUTING.md`, `SKILL.md` and `STRUCTURE.md`; the
+  reasoning is
+  [`DEC_Tool_Internals_Are_Documented_Beside_The_Tool`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Tool_Internals_Are_Documented_Beside_The_Tool.md).
+  New and corrected documentation, no rule moves: MINOR.
 
 ### Changed
 
