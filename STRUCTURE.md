@@ -252,7 +252,11 @@ template — it copies the tree into a fresh target, strips the template-only
 material this document marks with "In a project made from this template" along
 with the worked example, rewrites the CI workflow to the steps that hold in a
 derived project, and finishes by running the derived vault's validator against
-the state it predicts. `python3 tools/new_project.py --help` lists the options.
+the state it predicts. `--minimal` derives the three-domain profile: the vault
+starts with REQ, ARC and TAE, and the other six domain folders move to
+`00_documentation/03_vault_domains_not_in_use/`, where each waits with its
+README and file template until the project grows into it.
+`python3 tools/new_project.py --help` lists the options.
 
 **In a project made from this template**, this folder does not arrive at all —
 a derivation script is template-repo-only by its own definition, so the script
