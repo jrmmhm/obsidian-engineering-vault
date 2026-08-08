@@ -251,7 +251,19 @@ requirement counts as proven — `not-allocated`, `not-proven` and
 reported as open questions and deliberately do not decide, because a vault that
 never adopted the `verifies:` convention would otherwise have every requirement
 declared unproven. The validator raises `req-uncovered` as a WARN on the same
-question. The exporter reports; it never blocks.
+question, for the same reason.
+
+That reason is about a vault whose conventions the reader owns and the tool does
+not. It does not hold where both are the same party: this repository authors the
+vault under `00_documentation/01_projectvault` and guarantees that its evidence
+notes carry `verifies:`, so its CI runs the exporter with
+`--fail-on not-allocated,no-evidence-note` and fails on either. Two things
+follow, and neither should be read as more than it is. The exporter still
+reports by default — the exit code changes only where a caller names the classes
+it refuses, and no session, hook or derived project does. And a check armed
+against one vault says nothing about any other: a project made from this
+template inherits the option switched off, because it will have requirements
+long before it can have evidence.
 
 If you actually need conformance rather than a resemblance, the honest next
 steps are to buy the parts that apply to your project, decide with a competent

@@ -19,7 +19,7 @@
   "enforcement_levels": {
     "schema-driven": "The validator reads this entry from this file. Changing the entry changes what is enforced, with no code change.",
     "validator-internal": "The rule lives in validate_vault.py and this file only describes it. Every occurrence names why it was not moved.",
-    "export-driven": "export_traceability.py reads this entry. It shapes the exported graph and the report. The entry itself is never read by validate_vault.py, and the exporter's own findings never become validator findings - the exporter reports, it does not block. Since issue #50 the validator may CONSULT the graph the exporter builds from these entries: requirement coverage does, and the finding it raises is the validator's own (see consistency_rules.requirement-coverage).",
+    "export-driven": "export_traceability.py reads this entry. It shapes the exported graph and the report. The entry itself is never read by validate_vault.py, and the exporter's own findings never become validator findings - the exporter reports, it does not block. A finding never changes its exit code at all; a COVERAGE GAP changes it only where a caller names the gap classes it refuses with --fail-on, which no hook and no session does and this repository's CI does for its own vault (issue #68). Since issue #50 the validator may CONSULT the graph the exporter builds from these entries: requirement coverage does, and the finding it raises is the validator's own (see consistency_rules.requirement-coverage).",
     "declared-only": "Nothing enforces this. It is declared so that readers - and the undeclared-field check - know the name exists."
   },
 
