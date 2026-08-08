@@ -31,6 +31,35 @@ decision.
 
 ## [Unreleased]
 
+### Changed
+
+- **The validator's coverage checks now reach translated vaults:
+  `req-uncovered`, `verifies-unknown-req` and `req-duplicate-global`.** The
+  requirement index resolved its domain by the literal folder abbreviation
+  `REQ`, so a vault spelling its requirements folder `01_Anforderungen_(ANF)`
+  had an empty index and the three checks never fired there — measured on a
+  real 313-file vault: 162 requirements in the exporter's graph, 0 visible to
+  the validator. Both tools now resolve domain roles through the schema's
+  `domain_aliases` map in one shared derivation
+  (`validate_vault.resolve_role_map`), and requirement identifiers are indexed
+  under the vault's own prefix (`ANF-BAK-001`), which is what the schema's
+  `requirement_id_prefix` rule always promised. This is **PATCH**: no rule
+  moved — the coverage definition and the alias contract are unchanged, the
+  tool's blindness ended — and per the versioning table's PATCH rule the codes
+  are named here so a translated vault can grep before updating. What such a
+  vault may newly see: a `verifies:` entry naming a requirement that does not
+  exist is an ERROR (`verifies-unknown-req`), a requirement number defined in
+  two files is an ERROR (`req-duplicate-global`), and a requirement no
+  evidence note verifies is a WARN (`req-uncovered`). In a vault
+  mid-translation carrying both folders, both tools now read the folder that
+  wins the role — first in sorted order, `export-duplicate-role` names the
+  loser — where the validator previously read the English one on its own. The
+  row-grammar checks (`req-class`, `req-nnn`, `req-criterion`,
+  `req-duplicate`) and the requiredness of `verifies` deliberately stay on the
+  English domains: extending blocking checks to translated files would be a
+  rule change, not a repaired blind spot. Decision record:
+  `DEC_Requirement_Index_Follows_The_Role_Map` (issue #66).
+
 ### Fixed
 
 - **The worked example's deletion instructions now name the whole example** —
