@@ -4443,6 +4443,19 @@ if [ -f "$NP" ]; then
     printf '%s\n' "$npout" | tail -5 | sed 's/^/    /'
   fi
 
+  # Exit 0 is not the whole signal. The script's own warnings - a REPLACEMENTS
+  # or CUTS anchor whose text moved, a strip path that no longer exists - are
+  # printed under a "WARNINGS" heading and then dropped: the success predicate
+  # reads the VALIDATOR's warning count, not len(warnings). So a stale anchor
+  # derives a project with template-only prose still in it, at exit 0, green.
+  # This assertion is what pins every anchor the script carries, which the
+  # comment above REPLACEMENTS claimed and nothing enforced (DEC-MTH-042).
+  TESTS=$((TESTS + 1))
+  if contains "$npout" "WARNINGS"; then
+    fail "derivation printed warnings - an anchor or strip path went stale:"
+    printf '%s\n' "$npout" | sed -n '/WARNINGS/,/^$/p' | sed 's/^/    /'
+  else ok x; fi
+
   # Template-repo-only material and the worked example must be gone; the
   # method's tooling and the files STRUCTURE.md says travel must remain.
   for gone in "CONTRIBUTING.md" "CHANGELOG.md" "TUTORIAL.md" "tools" ".claude/01_methodvault" \
@@ -4462,11 +4475,22 @@ if [ -f "$NP" ]; then
       ".claude/skills/mechatronics-docs/SKILL.md" \
       ".claude/skills/mechatronics-docs/ARCHITECTURE.md" \
       ".github/workflows/validate-vault.yml" "IEC_61508_MAPPING.md" \
-      "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "LICENSE" \
+      "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "METHOD.md" "LICENSE" \
       "00_documentation/.obsidian/app.json"; do
     TESTS=$((TESTS + 1))
     if [ -e "$ND/$kept" ]; then ok x; else fail "derived project lost $kept"; fi
   done
+
+  # METHOD.md ships because it argues the method a derived project inherits,
+  # not the template (DEC-MTH-042). Two things have to hold for that: it may
+  # carry no prose about stripped material, and something in the project has
+  # to link it - a file nothing points at is left behind, not shipped.
+  TESTS=$((TESTS + 1))
+  if grep -q "tests/run.sh" "$ND/METHOD.md"; then
+    fail "derived METHOD.md still points at the stripped test suite"; else ok x; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "METHOD.md" "$ND/README.md" && grep -q "METHOD.md" "$ND/STRUCTURE.md"; then
+    ok x; else fail "derived README.md and STRUCTURE.md must both name METHOD.md"; fi
 
   # The derived workflow is the #85 fix: no template self-test, no worked
   # example, but the vault audit still named by path.
