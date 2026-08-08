@@ -100,7 +100,12 @@ REQ_ID_RE = re.compile(r"REQ-[A-Z]{2,4}-\d{3}")
 # constant for the three places that ask the question - check_req_table,
 # Vault.req_index and the global duplicate scan - because the unrecognised-
 # table WARN states that the index reads a row no check reads, and that
-# claim is only true while both sides ask it the same way.
+# claim is only true while both sides ask it the same way. The exception
+# is a vault whose requirements role is aliased (ANF): the index and the
+# duplicate scan follow the role map since issue #66, while check_req_table
+# stays on the literal REQ folder - extending four blocking row codes to
+# translated vaults is a rollout, not a fix - so there the index reads
+# rows no row check reads, and the WARN stays dark on purpose.
 ROW_NNN_RE = re.compile(r"\d{3}")
 # Columns a requirement table carries. A table may be wider - a project that
 # appends a column keeps the five positional roles the row checks read - and
@@ -247,6 +252,16 @@ FALLBACK_SCHEMA = {
                                         "enforced": "schema-driven"}}},
         "REQ": {"rows": {"class_values": ["M", "S", "O"]}},
     },
+    # In the essentials since issue #66: the role map feeds the coverage
+    # checks, and without it every translated vault's requirement index
+    # would switch off silently behind the single schema-unreadable WARN -
+    # the exact path this fallback exists to keep honest. Asserted against
+    # the packaged schema in tests/run.sh like the field profiles above.
+    "domain_aliases": {
+        "map": {"ANF": "REQ", "ENT": "DEC", "KMP": "CMP",
+                "SST": "IFC", "TUE": "TAE", "BUN": "OAU"},
+        "identity": ["REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"],
+    },
     "editor_fields": {
         "values": ["tags", "aliases", "cssclasses", "publish", "permalink",
                    "description", "image", "cover"],
@@ -388,6 +403,47 @@ def pick_domain_dir(abbr, dirs):
     return next((d for d in dirs if has_domain_files(d, abbr)), dirs[0])
 
 
+def resolve_role_map(vault, schema):
+    """-> ({canonical role token: folder abbreviation}, dropped abbreviations).
+
+    The ONE derivation of which folder holds which domain role, shared by
+    both tools (issue #66): export_traceability.resolve_roles renders its
+    findings from it, and Vault.roles() feeds the validator's coverage
+    path - req_index, check_tae_verifies and the global duplicate scan.
+    Two resolvers would disagree exactly where it costs the most, a vault
+    mid-translation.
+
+    An abbreviation is its own role when the schema's identity list names
+    it, and is translated through domain_aliases.map otherwise (ANF ->
+    REQ). The first in sorted order wins a contested role - the exporter's
+    rule, unchanged. 'dropped' lists every non-excluded abbreviation that
+    took no role: (abbr, None) for a token the schema does not know,
+    (abbr, role) for a role another folder already holds. The exporter
+    turns those into export-unknown-domain and export-duplicate-role; the
+    validator reports nothing for them and simply follows the same choice
+    the graph makes.
+
+    Never raises - this feeds both hook paths, where an exception exits 2
+    and fails the gates open.
+    """
+    aliases = _dict(schema, "domain_aliases")
+    amap = _dict(aliases, "map")
+    identity = _strlist(aliases, "identity") or [
+        "REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"]
+    roles, dropped = {}, []
+    for abbr in sorted(vault.domain_dirs):
+        if abbr in ID_EXCLUDED_DOMAINS:
+            continue
+        role = abbr if abbr in identity else amap.get(abbr)
+        if role is None:
+            dropped.append((abbr, None))
+        elif role in roles:
+            dropped.append((abbr, role))
+        else:
+            roles[role] = abbr
+    return roles, dropped
+
+
 def is_vault_root(d: Path) -> bool:
     """A vault root has >=3 domain dirs AND template files below them.
 
@@ -452,6 +508,7 @@ class Vault:
         self._md_names = None
         self._all_names = None
         self._req_index = None
+        self._roles = None
         self._git_root = None
         self._schema = None
         self._schema_error = None
@@ -492,6 +549,18 @@ class Vault:
         """(names, prefixes) of keys the editor and its plugins own."""
         ef = _dict(self.schema(), "editor_fields")
         return set(_strlist(ef, "values")), tuple(_strlist(ef, "prefixes"))
+
+    def roles(self):
+        """{canonical role token: folder abbreviation} of this vault.
+
+        The exporter's role resolution, cached per vault: one shared
+        derivation (resolve_role_map), so the folder the coverage checks
+        read is the folder the graph is built from - never two answers
+        (issue #66).
+        """
+        if self._roles is None:
+            self._roles = resolve_role_map(self, self.schema())[0]
+        return self._roles
 
     def git_root(self):
         """Repo root enclosing the vault, or None outside version control.
@@ -576,10 +645,18 @@ class Vault:
         return self._all_names
 
     def req_index(self):
-        """All full REQ IDs defined in REQ domain files: id -> (path, line)."""
+        """All requirement row IDs of the requirements domain: id -> (path, line).
+
+        The domain is resolved through the role map, and the keys carry
+        THIS vault's requirements abbreviation - ANF-BAK-001 in a German
+        vault - per domain_aliases.requirement_id_prefix. That is the
+        exporter's spelling, so 'verifies' entries and the graph's
+        requirements meet this index under one vocabulary (issue #66).
+        """
         if self._req_index is None:
             self._req_index = {}
-            reqdir = self.domains.get("REQ")
+            abbr = self.roles().get("REQ")
+            reqdir = self.domains.get(abbr) if abbr else None
             if reqdir:
                 for f in sorted(reqdir.rglob("*.md")):
                     if f.name.startswith("00_"):
@@ -588,12 +665,12 @@ class Vault:
                         lines = read_lines(f)
                     except OSError:
                         continue
-                    dom = req_scope(f, lines)
+                    dom = req_scope(f, lines, abbr)
                     if not dom:
                         continue
                     for i, row in req_rows(lines):
                         if len(row) >= 2 and ROW_NNN_RE.fullmatch(row[1]):
-                            self._req_index.setdefault(f"REQ-{dom}-{row[1]}", (f, i))
+                            self._req_index.setdefault(f"{abbr}-{dom}-{row[1]}", (f, i))
         return self._req_index
 
     def classify(self, path: Path):
@@ -1111,19 +1188,28 @@ def frontmatter_required_message(vault: Vault, abbr: str) -> str:
     return "domain files need YAML frontmatter (" + ", ".join(required) + ")"
 
 
-def req_scope(path: Path, lines):
-    """Scope token of a REQ file: its own id first, its filename second.
+def req_scope(path: Path, lines, abbr="REQ"):
+    """Scope token of a requirements file: its own id first, its filename second.
 
     Identity lives in the frontmatter (DECISIONS.md, amendment 2026-07-28b),
     so a renamed REQ file keeps the identity of its rows. The filename
     fallback keeps every vault that predates the identifier rollout working
     unchanged - which is every vault except this template today.
+
+    'abbr' is the abbreviation of the vault's own requirements domain (the
+    role map), so a German vault's 'id: ANF-BAK-000' resolves the same way
+    - the exporter's req_scope_of rule since issue #66. For abbr='REQ' the
+    accepted set is exactly what frontmatter_id + REQ_FILE_ID_RE accepted
+    before: every REQ_FILE_ID_RE match is an ID_RE match, so the old
+    intersection IS REQ_FILE_ID_RE, which is this pattern.
     """
-    fid = frontmatter_id(lines)
-    if fid:
-        m = REQ_FILE_ID_RE.match(fid)
-        if m:
-            return m.group(1)
+    fm, _, bad = parse_frontmatter(lines)
+    if not bad and fm:
+        v = fm.get("id")
+        if isinstance(v, str):
+            m = re.match(rf"^{re.escape(abbr)}-([A-Z]{{2,4}})-\d{{3}}$", v.strip())
+            if m:
+                return m.group(1)
     m = DOM_IN_NAME_RE.search(path.stem)
     return m.group(1) if m else None
 
@@ -1217,7 +1303,12 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     check_paths(vault, path, lines, fm_end, findings)
     if abbr == "REQ":
         check_req_table(vault, path, lines, findings)
-    if abbr == "TAE":
+    # The evidence trigger follows the role map (issue #66): a German
+    # vault's TUE notes carry 'verifies' too, and a dangling entry there is
+    # the same defect. The REQ trigger above stays literal on purpose -
+    # four blocking row-grammar codes on translated files would be a
+    # convention rollout, not a fix.
+    if abbr == (vault.roles().get("TAE") or "TAE"):
         check_tae_verifies(vault, fm, path, findings)
     if abbr == "DEC":
         check_dec_status(vault, path, lines, findings)
@@ -1792,6 +1883,13 @@ def check_req_table_silence(path, unread, recognized, findings):
     meant as a requirement table from one that drifted into being unreadable,
     and that is this project's line for anything that blocks. One grouped
     finding per file, as every per-file class here is aggregated.
+
+    Both cases are asked in REQ domain files only. A vault whose
+    requirements role is aliased (ANF) has the first shape everywhere by
+    construction - the index follows the role map since issue #66, the row
+    checks stay on the literal REQ folder - and this WARN deliberately
+    stays dark there: firing on every translated file would be a
+    convention rollout, not a defect report.
     """
     hits = [(line, width) for line, width, indexed in unread
             if indexed or (width >= REQ_ROW_COLUMNS and not recognized)]
@@ -1814,10 +1912,18 @@ def check_tae_verifies(vault, fm, path, findings):
     if not isinstance(ver, list):
         return
     index = vault.req_index()
+    # What counts as a requirement id here is spelled with the vault's own
+    # requirements abbreviation (issue #66) - homelab's evidence notes
+    # write ANF-BAK-001, and the index is keyed that way. Without a
+    # requirements domain the English prefix keeps today's contract: a
+    # REQ-shaped entry in a vault that defines no requirement anywhere is
+    # a dangling reference either way.
+    abbr = vault.roles().get("REQ") or "REQ"
+    rid_re = re.compile(rf"{re.escape(abbr)}-[A-Z]{{2,4}}-\d{{3}}")
     for rid in ver:
-        if REQ_ID_RE.fullmatch(rid) and rid not in index:
+        if rid_re.fullmatch(rid) and rid not in index:
             findings.append(Finding("ERROR", "verifies-unknown-req", str(path), 1,
-                                    f"{rid} is not defined in any REQ file"))
+                                    f"{rid} is not defined in any {abbr} file"))
 
 
 def check_dec_status(vault, path, lines, findings):
@@ -2029,17 +2135,19 @@ def evidence_index(vault: Vault, corpus):
     """{REQ id: [TAE path, ...]} from the 'verifies' field of every TAE file.
 
     The half of the coverage rule this file can answer on its own, out of
-    the corpus it has already read. Only files classified as TAE DOMAIN
-    files contribute: a '00_' template carries the field as a placeholder,
-    and a placeholder is not evidence.
+    the corpus it has already read. Only DOMAIN files of the evidence role
+    contribute - resolved through the role map, so a German vault's TUE
+    notes count (issue #66) - because a '00_' template carries the field
+    as a placeholder, and a placeholder is not evidence.
 
     Malformed frontmatter yields nothing rather than an exception - this
     runs on the hook path, where a crash exits 2 and both hooks swallow it.
     The file-local checks report that file for what is wrong with it.
     """
     out = {}
+    tae_abbr = vault.roles().get("TAE") or "TAE"
     for p, text in corpus.items():
-        if vault.classify(p) != ("domain", "TAE"):
+        if vault.classify(p) != ("domain", tae_abbr):
             continue
         fm, _, bad = parse_frontmatter(text.splitlines())
         if bad or not fm:
@@ -2066,12 +2174,16 @@ def allocation_index(vault: Vault):
     None is a deliberate third answer, distinct from "no allocation". The
     graph carries a requirement row only when it sits in the bound section
     of a file the graph reads, so a row under a heading of the author's own
-    making, or every row of a vault mid-translation whose REQ role went to
-    the other folder, is invisible HERE and perfectly fine in the vault.
-    Treating that as "not allocated" would report a closed loop as a gap -
-    measured on the shipped template vault: three such findings on three
-    correct requirements. The exporter names those cases itself
-    (export-unbound-table, export-duplicate-role, export-no-binding).
+    making, or every row of a project whose templates declare no allocation
+    table, is invisible HERE and perfectly fine in the vault. Treating that
+    as "not allocated" would report a closed loop as a gap - measured on
+    the shipped template vault: three such findings on three correct
+    requirements. The exporter names those cases itself
+    (export-unbound-table, export-no-binding). A vault mid-translation is
+    no longer on this list: since issue #66 the requirement index follows
+    the same role map the graph is built from, so both tools read one
+    requirements folder and the ids agree by construction
+    (export-duplicate-role still names the folder that lost).
 
     Never raises, and never lets the exporter's exit path become this
     process's: SystemExit is not an Exception, and exit 2 releases both
@@ -2112,8 +2224,10 @@ def validate_vault_wide(vault: Vault):
                     if ".obsidian" not in p.parts and ".git" not in p.parts)
     domain_files = [p for p in all_md if vault.classify(p)[0] == "domain"]
 
-    # duplicate REQ ids across files
-    reqdir = vault.domains.get("REQ")
+    # duplicate requirement ids across files. Folder and id prefix follow
+    # the role map - the same choice req_index makes (issue #66).
+    req_abbr = vault.roles().get("REQ")
+    reqdir = vault.domains.get(req_abbr) if req_abbr else None
     if reqdir:
         ids = {}
         for f in sorted(reqdir.rglob("*.md")):
@@ -2123,12 +2237,12 @@ def validate_vault_wide(vault: Vault):
                 lines = read_lines(f)
             except OSError:
                 continue
-            dom = req_scope(f, lines)
+            dom = req_scope(f, lines, req_abbr)
             if not dom:
                 continue
             for i, row in req_rows(lines):
                 if len(row) >= 2 and ROW_NNN_RE.fullmatch(row[1]):
-                    rid = f"REQ-{dom}-{row[1]}"
+                    rid = f"{req_abbr}-{dom}-{row[1]}"
                     if rid in ids and ids[rid][0] != f:
                         findings.append(Finding("ERROR", "req-duplicate-global", str(f), i,
                                                 f"{rid} already defined in "
