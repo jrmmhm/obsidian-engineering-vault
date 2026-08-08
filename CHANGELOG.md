@@ -134,6 +134,25 @@ decision.
   documentation and comments only, no rule moves and no vault gains a
   finding, so it is MINOR. Why: `DEC_A_Phantom_Citation_Is_Retargeted` in the
   method vault.
+- **CI fails on an open evidence chain in the template vault** — the exporter
+  gained `--fail-on <classes>`, and `.github/workflows/validate-vault.yml`
+  arms it for `not-allocated` and `no-evidence-note` on
+  `00_documentation/01_projectvault`. Without the option nothing changes: a
+  coverage gap is still data and still leaves the exit code at 0, and the
+  validator still raises `req-uncovered` as a WARN, so no session is blocked
+  by an evidence chain that is merely still open. What changes is that the
+  closed REQ→TAE loop is now in a blocking path somewhere — until now it
+  existed only in a tool that reports. A class name the tool does not know,
+  and an empty class list, are refused before anything is read (exit 2, valid
+  names printed); an armed run against a graph carrying no requirement fails
+  rather than passing, because a gate that cannot fail proves nothing. A
+  derived project inherits the option and not the arming — it starts with
+  requirements and without evidence, so `tools/new_project.py` names the flag
+  in the workflow it generates and leaves it off. This is issue #68 (proposed
+  as Alt B in the #50 review): no domain, relation, field, template section
+  or rule moves, no vault that was clean becomes unclean, and the default
+  path of every existing caller is unchanged, so it is MINOR. Why:
+  `DEC_CI_Blocks_On_What_A_Session_Only_Warns_About` in the method vault.
 
 ## [0.1.0] - 2026-08-06
 

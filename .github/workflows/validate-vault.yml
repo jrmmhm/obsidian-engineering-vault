@@ -65,3 +65,28 @@ jobs:
             echo "negative control passed - the acceptance checks are not falsifiable" >&2
             exit 1
           fi
+
+      # The one step here that is stricter than a working session, and
+      # deliberately so. Locally the validator raises the same question as
+      # 'req-uncovered' and leaves it a WARN, because it cannot tell a
+      # requirement nobody has verified yet from one whose vault never
+      # adopted the 'verifies:' convention - blocking on that would stop a
+      # session over an evidence chain that is merely still open
+      # (DEC_Coverage_Is_Decided_On_The_Graph). That argument does not
+      # reach here: CI sees the whole vault at once, this repository
+      # authors the vault below and guarantees its conventions, and a red
+      # check costs nobody a session.
+      #
+      # Reading a red run: the exporter names the class and the
+      # requirements on stderr, and it writes the full export anyway -
+      # open traceability.html from the run for the file and line. Green
+      # locally and red here is therefore not a contradiction, it is this
+      # step and only this step. Two classes are armed: a requirement no
+      # allocation row names, and one no evidence note names in
+      # 'verifies:'. A derived project inherits the option and not the
+      # arming - see DERIVED_WORKFLOW in tools/new_project.py.
+      - name: Template vault evidence chains are closed
+        run: |
+          python3 .claude/skills/mechatronics-docs/export_traceability.py \
+            00_documentation/01_projectvault --output-dir "$RUNNER_TEMP/tr-armed" \
+            --no-timestamp --fail-on not-allocated,no-evidence-note
