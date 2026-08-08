@@ -1607,13 +1607,18 @@ done
 # language-independence fix governs must behave identically in both, so the
 # finding-code multisets are compared directly.
 #
-# Only ARC, IMP and REF are used: those three keep the same (ABBR) in both
-# languages, which isolates the file-naming variable. Deliberately NOT
-# covered here, because they are out of scope by decision (DECISIONS.md,
-# amendment 2026-07-28): German domain abbreviations (ANF/ENT/KMP/SST/TUE/
-# BUN) never reach the REQ/DEC/TAE checks, and the English-only heuristics
-# (system_overview.md, "References"/"Sources" section names) stay dark - the
-# twins therefore carry no overview file, and both are equally unaffected.
+# ARC, IMP and REF keep the same (ABBR) in both languages, which isolates
+# the file-naming variable. Since issue #66 the coverage path resolves the
+# requirements and evidence roles through the schema's alias map, so the
+# twins also carry a requirements domain (REQ / ANF) and an evidence
+# domain (TAE / TUE), identical up to those tokens: req-uncovered,
+# verifies-unknown-req and req-duplicate-global must fire identically in
+# both, which the multiset assertion below and the issue #66 block at the
+# end of this file pin. Still out of scope by decision: the row-grammar
+# checks (req-class/req-nnn/req-criterion/req-duplicate) stay on the
+# literal REQ folder, and the English-only heuristics (system_overview.md,
+# "References"/"Sources" section names) stay dark - the twins therefore
+# carry no overview file, and both are equally unaffected.
 #
 # Separate mktemp roots on purpose: check_paths probes project_root.parent,
 # so a shared root would let one twin resolve the other twin's artifacts.
@@ -1623,8 +1628,9 @@ EN_TMP=$(mktemp -d)
 trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP"' EXIT
 
 build_twin() { # build_twin <vault_dir> <arc_dir> <imp_dir> <ref_dir> <template_infix>
-  local V="$1" A="$2" I="$3" R="$4" T="$5"
-  mkdir -p "$V/$A" "$V/$I" "$V/$R"
+               #            <req_dir> <tae_dir> <req_abbr> <tae_abbr>
+  local V="$1" A="$2" I="$3" R="$4" T="$5" RQ="$6" TA="$7" P="$8" EV="$9"
+  mkdir -p "$V/$A" "$V/$I" "$V/$R" "$V/$RQ" "$V/$TA"
 
   cat > "$V/$A/00_ARC_$T.md" <<'EOF'
 ## Kontext
@@ -1722,14 +1728,78 @@ Externe Quelle zur Linearitaetsangabe der Wandlerstufe.
 ### Kapitel Spezifikationen
 - Linearitaetsangabe stuetzt die Genauigkeitsforderung
 EOF
+
+  # Requirements and evidence domain (issue #66): identical content up to
+  # the domain tokens. Seeded: verifies-unknown-req (id 999), req-uncovered
+  # (row 002), req-duplicate-global (row 001 defined again in *_Doppelt,
+  # which sorts FIRST and takes the index slot - the finding fires at
+  # *_Messung naming it). Constraints that keep the twin finding multisets
+  # identical: every row stays well-formed with a three-digit number (the
+  # row-grammar checks run only on the English side), no file here carries
+  # a frontmatter id (an English REQ-MES-000 would enter the identifier
+  # checks while a German ANF-MES-000 would not), and 'verifies' is present
+  # and non-empty (its requiredness, format and empty-list WARN are
+  # enforced only in the English TAE domain).
+  printf '## Kontext\n\n| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n| --- | --: | --- | --- | --- |\n|  |  |  |  |  |\n' \
+    > "$V/$RQ/00_${P}_$T.md"
+  printf '## Kontext\n' > "$V/$TA/00_${EV}_$T.md"
+
+  cat > "$V/$RQ/${P}_Messung (MES).md" <<EOF
+---
+domain: $P
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Kontext
+Anforderungen der Messkette: eine gedeckte und eine ungedeckte Zeile.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| --- | --: | --- | --- | --- |
+| M | 001 | Gedeckte Anforderung | Pass wenn gemessen | keine |
+| M | 002 | Ungedeckte Anforderung | Pass wenn gemessen | keine |
+EOF
+
+  cat > "$V/$RQ/${P}_Doppelt (MES).md" <<EOF
+---
+domain: $P
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Kontext
+Zweite Anforderungsdatei desselben Geltungsbereichs. Ihre Zeile 001
+kollidiert absichtlich mit der Zeile 001 der Messungsdatei.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| --- | --: | --- | --- | --- |
+| M | 001 | Doppelt vergebene Nummer | Pass wenn gemessen | keine |
+EOF
+
+  cat > "$V/$TA/${EV}_Nachweis.md" <<EOF
+---
+domain: $EV
+status: active
+created: 2026-01-10
+last-verified: 2026-07-01
+verifies: [$P-MES-001, $P-MES-999]
+---
+## Kontext
+Nachweis der Messkette: er loest eine Anforderung auf und nennt eine,
+die nirgends definiert ist. Die gedeckte Zeile 001 bleibt dadurch ohne
+Befund, Zeile 002 wird als ungedeckt gemeldet, und die unbekannte
+Nummer 999 ist der gesaete verifies-unknown-req.
+EOF
 }
 
 DE_V="$DE_TMP/Deproj/00_Dokumentation/01_Projektvault"
 EN_V="$EN_TMP/Enproj/00_documentation/01_projectvault"
 build_twin "$DE_V" "03_Architektur_(ARC)" "06_Implementierung_(IMP)" \
-           "09_Referenzen_(REF)" "Dateitemplate"
+           "09_Referenzen_(REF)" "Dateitemplate" \
+           "01_Anforderungen_(ANF)" "07_Test_und_Evidenz_(TUE)" "ANF" "TUE"
 build_twin "$EN_V" "03_architecture_(ARC)" "06_implementation_(IMP)" \
-           "09_references_(REF)" "file_template"
+           "09_references_(REF)" "file_template" \
+           "01_requirements_(REQ)" "07_testing_and_evidence_(TAE)" "REQ" "TAE"
 
 # 02_Dokumente mirror: same German domain folder names, NO template files.
 # It must stay unrecognized - link resolution depends on that distinction.
@@ -4098,11 +4168,14 @@ if contains "$cve_out" "\[req-uncovered\] REQ-COV-002" && \
   fail "without the exporter the verification half must still decide alone"; fi
 
 # (d) A vault mid-translation: the requirements folder exists twice, and
-# 'ANF' sorts before 'REQ', so the graph gives the REQ role to the German
-# folder and excludes the English one. The validator's own index still
-# reads the English folder, so every identifier is unknown to the graph -
-# and a state this project explicitly supports must not turn into a
-# vault-wide sweep of findings on correct requirements.
+# 'ANF' sorts before 'REQ', so the role map gives the REQ role to the
+# German folder and excludes the English one - for BOTH tools, because the
+# validator's index follows the same derivation since issue #66. The
+# English rows leave the coverage path together with the role, so a state
+# this project explicitly supports must not turn into a vault-wide sweep
+# of findings on correct requirements; the handoff itself stays visible as
+# the exporter's export-duplicate-role finding. The issue #66 block at the
+# end of this file pins both halves of that statement.
 CV_D="$CV_TMP/Trans/00_documentation/01_projectvault"
 build_coverage_vault "$CV_D"
 mkdir -p "$CV_D/01_Anforderungen_(ANF)"
@@ -4266,6 +4339,90 @@ TESTS=$((TESTS + 1))
 if contains "$cvf_out" "\[req-uncovered\] REQ-COV-002" && \
    ! contains "$cvf_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
   fail "under a refused schema the verification half must still decide alone"; fi
+# Issue #66: the coverage checks fire in translated vaults. Fixture 3's
+# twin pair carries a requirements and an evidence domain since this
+# issue; the multiset parity there already holds both twins to one set of
+# finding codes, and the assertions here pin the German spellings - the
+# codes must fire with the vault's OWN requirement prefix, which is what
+# domain_aliases.requirement_id_prefix promises.
+# ==========================================================================
+TW_DE="$DE_TMP/Deproj/00_Dokumentation/01_Projektvault"
+TW_EN="$EN_TMP/Enproj/00_documentation/01_projectvault"
+de66_out=$(python3 "$VALIDATOR" "$TW_DE" 2>&1)
+en66_out=$(python3 "$VALIDATOR" "$TW_EN" 2>&1)
+
+TESTS=$((TESTS + 1))
+if contains "$de66_out" "\[verifies-unknown-req\] ANF-MES-999 is not defined in any ANF file"; then ok x; else
+  fail "a dangling 'verifies' id in a German vault must be reported with its own prefix:"
+  printf '%s\n' "$de66_out" | grep -i "verifies" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$de66_out" "\[req-uncovered\] ANF-MES-002"; then ok x; else
+  fail "an unverified requirement in a German vault must be reported as uncovered:"
+  printf '%s\n' "$de66_out" | grep "ANF-MES" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$de66_out" "\[req-duplicate-global\].*ANF-MES-001"; then ok x; else
+  fail "a requirement number defined in two German files must be reported"; fi
+# The verified row stays silent - a check that fires on everything would
+# also satisfy the three assertions above.
+TESTS=$((TESTS + 1))
+if ! contains "$de66_out" "\[req-uncovered\] ANF-MES-001"; then ok x; else
+  fail "a verified requirement must not be reported as uncovered"; fi
+# The English twin fires the same three codes under its own prefix; the
+# fixture 3 multiset assertion compares the whole runs code by code.
+TESTS=$((TESTS + 1))
+if contains "$en66_out" "\[verifies-unknown-req\] REQ-MES-999" && \
+   contains "$en66_out" "\[req-uncovered\] REQ-MES-002" && \
+   contains "$en66_out" "\[req-duplicate-global\].*REQ-MES-001"; then ok x; else
+  fail "the English twin must fire the same three codes under its own prefix"; fi
+
+# Fixture 10(d) revisited: the validator's index follows the role map the
+# graph is built from, so the mid-translation vault's requirements are the
+# German folder's rows for both tools. The German row - verified by
+# nothing the vault contains - is reported; the English rows left the
+# index together with the role, so their old findings are gone. The
+# handoff itself is the exporter's export-duplicate-role finding, and the
+# absence asserted in fixture 10(d) still holds beside these.
+TESTS=$((TESTS + 1))
+if contains "$cvd_out" "\[req-uncovered\] ANF-COV-001"; then ok x; else
+  fail "the mid-translation vault's own German row must be reported as uncovered:"
+  printf '%s\n' "$cvd_out" | grep "ANF-COV" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! contains "$cvd_out" "\[req-uncovered\] REQ-COV-002"; then ok x; else
+  fail "English rows of a mid-translation vault leave the coverage path with the role"; fi
+
+# The fallback must not switch the role map off silently: FALLBACK_SCHEMA
+# carries the alias map since issue #66, pinned against the packaged
+# schema the same way the field profiles are pinned above.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+real, err = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+assert err is None, err
+assert real["domain_aliases"]["map"] == vv.FALLBACK_SCHEMA["domain_aliases"]["map"], \
+    "alias map drift between vault_schema.json and FALLBACK_SCHEMA"
+assert real["domain_aliases"]["identity"] == vv.FALLBACK_SCHEMA["domain_aliases"]["identity"], \
+    "identity list drift between vault_schema.json and FALLBACK_SCHEMA"
+PY
+then ok x; else fail "FALLBACK_SCHEMA domain_aliases and vault_schema.json have drifted apart"; fi
+
+# One derivation, two readers: the roles the exporter resolves for the
+# German twin must be exactly what Vault.roles() says - and the German
+# folders must actually hold the English role tokens.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$TW_DE" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv, export_traceability as ex
+from pathlib import Path
+v = vv.Vault(Path(sys.argv[2]))
+assert ex.resolve_roles(v, v.schema(), []) == v.roles(), \
+    "the two tools derive different role maps"
+assert v.roles().get("REQ") == "ANF" and v.roles().get("TAE") == "TUE", v.roles()
+PY
+then ok x; else fail "validator and exporter must share one role derivation"; fi
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
