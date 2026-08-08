@@ -34,9 +34,13 @@ yields exists; a status counts as proven only on an exact match. Where
 the vault is ambiguous the export says so and carries the author's own
 words forward.
 
-Exit codes: 0 = artifacts written, 2 = not a vault, or output refused.
-Coverage gaps are data and never change the exit code - this tool
-reports, it does not block.
+Exit codes: 0 = artifacts written, 1 = artifacts written and a gap class
+the caller armed with --fail-on was found, 2 = not a vault, or output
+refused. A --fail-on name this tool does not know is refused before
+anything is read, ahead of both other refusals, so the message names the
+flag the caller got wrong. Without --fail-on nothing changes: coverage
+gaps are data and never change the exit code - this tool reports, it does
+not block (issue #68, DEC-MTH-039).
 """
 
 import argparse
@@ -1095,6 +1099,82 @@ GAP_CLASSES = {
 # notes carry an empty 'verifies' list, which is a convention it never adopted.
 OPEN_QUESTION_CLASSES = ("no-evidence-note", "evidence-disagrees")
 
+# How many identifiers one armed class prints before the line is cut. The
+# homelab counterfactual in DEC-MTH-026 is 162 requirements at once, and a
+# line nobody can read is a line nobody reads - the same reason the
+# validator caps its report and this file caps a summary sentence.
+GAP_REPORT_CAP = 20
+
+
+def parse_fail_on(value):
+    """-> (armed classes in the caller's order, refusal message or None).
+
+    Deduplicated but not sorted: the report reads back in the words the
+    caller wrote. Matching is exact, because a class name is an identifier
+    of this tool and not prose.
+
+    '--fail-on' with nothing usable behind it is a refusal rather than a
+    no-op. A CI step that arms nothing and passes is the switched-off gate
+    this option exists to prevent, and an empty value reaches that state
+    without anyone noticing (issue #68).
+    """
+    if value is None:
+        return [], None
+    names, seen = [], set()
+    for raw in value.split(","):
+        name = raw.strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    valid = ", ".join(sorted(GAP_CLASSES))
+    unknown = [n for n in names if n not in GAP_CLASSES]
+    if unknown:
+        return [], (f"--fail-on names no gap class of this tool: "
+                    f"{', '.join(unknown)}. Valid classes are {valid}")
+    if not names:
+        return [], ("--fail-on was given without a usable class name. Valid "
+                    f"classes are {valid}")
+    return names, None
+
+
+def report_armed_gaps(coverage, armed):
+    """-> the exit code of a run armed with --fail-on; prints its own reason.
+
+    Called after the artifacts are written, on purpose: a run that blocks
+    has to hand over the evidence of why it blocked, or the reader of a red
+    check is left with a verdict and no report.
+
+    An empty graph FAILS here rather than passing. assess() iterates the
+    requirements the graph carries, so a vault the exporter read as empty
+    yields no gap of any class, and a gate over it is a check that cannot
+    fail - the shape vault_schema.json calls the one output this tool must
+    not produce, and the shape the workflow's worked example already ships
+    a negative control against.
+    """
+    if not coverage:
+        print("FAIL - --fail-on was armed against a graph that carries no "
+              "requirement at all. Nothing could have been found, so nothing "
+              "was: fix what the graph failed to read, or drop the flag.",
+              file=sys.stderr)
+        return 1
+    total = 0
+    for cls in armed:
+        rids = sorted(rid for rid, cov in coverage.items() if cls in cov["gaps"])
+        if not rids:
+            continue
+        total += len(rids)
+        shown = ", ".join(rids[:GAP_REPORT_CAP])
+        if len(rids) > GAP_REPORT_CAP:
+            shown += f", ... +{len(rids) - GAP_REPORT_CAP} more"
+        print(f"FAIL - {cls}: {GAP_CLASSES[cls]}", file=sys.stderr)
+        print(f"       {len(rids)} requirement(s): {shown}", file=sys.stderr)
+    if not total:
+        return 0
+    print(f"FAIL - {total} gap(s) of the armed classes. The export written "
+          "beside this message says which requirement and which file.",
+          file=sys.stderr)
+    return 1
+
 
 def assess(graph, back, schema):
     """Coverage per requirement, in this project's own vocabulary."""
@@ -1561,7 +1641,20 @@ def main(argv):
     ap.add_argument("--formats", default="json,csv,html,index")
     ap.add_argument("--no-timestamp", action="store_true",
                     help="omit the generation time so two runs compare equal")
+    ap.add_argument("--fail-on", metavar="CLASSES",
+                    help="comma-separated gap classes that make this run exit "
+                         "1 after the artifacts are written; without it a gap "
+                         "never changes the exit code")
     args = ap.parse_args(argv)
+
+    # Ahead of both refusals below: a class name this tool does not know
+    # would arm nothing and exit 0, and a caller who mistyped it would read
+    # that as a clean vault. Refusing first also means the message names the
+    # flag that is wrong rather than the next thing that happens to fail.
+    armed, refusal = parse_fail_on(args.fail_on)
+    if refusal:
+        print(f"ERROR - {refusal}", file=sys.stderr)
+        return 2
 
     root = Path(args.vault_root).resolve()
     if not is_vault_root(root):
@@ -1635,6 +1728,9 @@ def main(argv):
         if b.get("section"):
             print(f"bound {name} -> '## {b['section']}'")
     print(f"written to: {out}")
+
+    if armed:
+        return report_armed_gaps(coverage, armed)
     return 0
 
 

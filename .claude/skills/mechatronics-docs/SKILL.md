@@ -122,6 +122,13 @@ something to hand to a reviewer — and read its findings section as you
 would the validator's: an unbound table, an unresolved requirement ID, an
 unknown domain abbreviation or two folders meaning one domain each mean
 the export understood less of the vault than it looks like it did. The exporter never blocks a turn.
+It can block a caller that asks it to: `--fail-on <classes>` exits 1 when
+a requirement carries one of the named coverage gaps. No hook uses it and
+no session does — it exists for a CI job, which sees the whole vault at
+once and costs nobody a working session. This repository's own workflow
+arms `not-allocated` and `no-evidence-note` on its template vault, so a
+missing allocation row or a missing `verifies:` entry there is a red
+check rather than a WARN you scroll past.
 
 Two further tiers run the same validator without Claude Code, so a change
 authored in Obsidian or by hand is covered too: a pre-commit hook

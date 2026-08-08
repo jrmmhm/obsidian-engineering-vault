@@ -112,6 +112,18 @@ jobs:
             00_documentation/01_projectvault --output-dir "$RUNNER_TEMP/tr" \\
             --no-timestamp
           diff -r "$RUNNER_TEMP/tr-ref" "$RUNNER_TEMP/tr"
+
+      # When your evidence chain stands, you can make CI refuse an open
+      # one. Add --fail-on to the export above, or as a step of its own:
+      #
+      #   --fail-on not-allocated,no-evidence-note
+      #
+      # It exits 1 when a requirement is allocated by no row, or named by
+      # no evidence note in 'verifies:'. Left off here on purpose: a
+      # project starts with requirements and without evidence, and a check
+      # that goes red at your first requirement row teaches you to ignore
+      # it. Arm it once the loop closes - the template repository does
+      # (DEC-MTH-039).
 """
 
 # Exact-string edits applied to the derived copy: every surviving sentence
