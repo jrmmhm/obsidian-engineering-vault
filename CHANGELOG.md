@@ -84,6 +84,15 @@ decision.
 
 ### Fixed
 
+- **The frontmatter-missing message is built from the domain schema** — a file
+  without YAML frontmatter was told it needs `(domain, status, created,
+  last-verified)` for every domain, but DEC carries no frontmatter `status`
+  (the body Status line owns it) and TAE also requires `verifies`. The message
+  now lists exactly what the file's own domain requires. This is issue #69,
+  fixed in the template's first outside code contribution (#84, thanks to
+  @slegarraga): a tool message corrected, no rule moves, so it is PATCH — and
+  the only text that changes is the one shown beside an already-firing ERROR.
+
 - **The worked example's deletion instructions now name the whole example** —
   the old paragraph said "the seven notes named `*_Battery_*`", a glob that
   matches six: the interface note `IFC_PWR_DC_LiPo_Pack.md` was never deleted,
