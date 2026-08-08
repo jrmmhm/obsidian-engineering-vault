@@ -148,6 +148,11 @@ not to be enforced. Claude Code substitutes `${CLAUDE_SKILL_DIR}` in this
 file before you read it; nothing outside a session expands it, so a
 command typed into a shell takes the path to a copy on disk instead.
 
+None of that is needed to write vault notes, and neither is
+`ARCHITECTURE.md` beside this file — it maps the validator's checks onto
+the functions that own them, for whoever maintains the tool rather than
+the vault.
+
 Rules that follow from this mechanism:
 
 1. **Never modify vault files through Bash** (`sed -i`, `tee`, heredocs) —
