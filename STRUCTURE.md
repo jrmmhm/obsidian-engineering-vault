@@ -228,11 +228,11 @@ not your project.
 ## .github
 
 Everything GitHub reads rather than a person: `workflows/validate-vault.yml`
-runs the validator, the template vault audit, the export determinism check and
-the worked example on every push and pull request; `ISSUE_TEMPLATE/` holds the
-bug report and the method change proposal, with `config.yml` for the chooser;
-`pull_request_template.md` carries the checklist of gates a reviewer would
-otherwise re-derive.
+runs the validator, the template vault audit, the export determinism check, the
+README traceability excerpt and the worked example on every push and pull
+request; `ISSUE_TEMPLATE/` holds the bug report and the method change proposal,
+with `config.yml` for the chooser; `pull_request_template.md` carries the
+checklist of gates a reviewer would otherwise re-derive.
 
 This is enforcement that does not depend on one editor being used. The Claude
 Code hooks only see `Edit`, `Write` and `MultiEdit`; the workflow runs no matter
