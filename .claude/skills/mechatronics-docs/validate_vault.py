@@ -1104,6 +1104,13 @@ def frontmatter_id(lines):
     return v if ID_RE.match(v) else None
 
 
+def frontmatter_required_message(vault: Vault, abbr: str) -> str:
+    """List the fields this domain requires in YAML frontmatter."""
+    fields = vault.fields_for(abbr)
+    required = [name for name, desc in fields.items() if desc.get("required")]
+    return "domain files need YAML frontmatter (" + ", ".join(required) + ")"
+
+
 def req_scope(path: Path, lines):
     """Scope token of a REQ file: its own id first, its filename second.
 
@@ -1198,8 +1205,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         fm = {}
     elif fm is None:
         findings.append(Finding("ERROR", "frontmatter-missing", str(path), 1,
-                                "domain files need YAML frontmatter "
-                                "(domain, status, created, last-verified)"))
+                                frontmatter_required_message(vault, abbr)))
         fm, fm_end = {}, 0
     else:
         check_frontmatter(vault, fm, abbr, path, findings)

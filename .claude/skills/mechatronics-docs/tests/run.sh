@@ -510,6 +510,16 @@ line
 line
 EOF
 
+cat > "$W/02_decisions_(DEC)/DEC_NoFrontmatter.md" <<'EOF'
+No frontmatter here.
+
+## Context
+## Options
+## Decision
+## Justification
+## Consequences
+EOF
+
 # 'crated' is the silent defect class the undeclared check exists for: the
 # key looks present and takes effect nowhere. 'owner' is a deliberate-looking
 # foreign field. Both must be named, and in ONE line - a file with several
@@ -1191,6 +1201,10 @@ echo "old inbox note" > "$W/99_inbox_(INB)/old_note.md"
 touch -t 202601010000 "$W/99_inbox_(INB)/old_note.md"
 
 out=$(python3 "$VALIDATOR" "$W" 2>&1); rc=$?
+TESTS=$((TESTS + 1))
+dec_missing=$(printf '%s' "$out" | grep "DEC_NoFrontmatter.*frontmatter-missing") || true
+if [ -n "$dec_missing" ] && ! contains "$dec_missing" "status"; then ok x; else
+  fail "DEC frontmatter-missing must not name the frontmatter status field"; fi
 TESTS=$((TESTS + 1))
 if [ $rc -eq 1 ]; then ok x; else fail "violation vault must exit 1, got $rc"; fi
 for code in filename-prefix frontmatter-missing frontmatter-malformed \
