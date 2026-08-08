@@ -52,6 +52,22 @@ decision.
   first push is green. The reasoning is
   [`DEC_Deriving_A_Project_Is_One_Command`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Deriving_A_Project_Is_One_Command.md).
   New capability, no rule moves, no existing vault gains a finding: MINOR.
+- **The README shows what the export produces, and CI proves it is current** —
+  the first section of [README.md](README.md) is now the shipped worked
+  example read back out of the vault: the exporter's two count lines and the
+  tail of `traceability_index.md`, stored between two marker comments. Nothing
+  in it is hand-written or drawn, and a new workflow step regenerates the
+  export on every push and fails when the block has drifted, naming the
+  command that repairs it. Only the machine-independent lines are stored — the
+  index's provenance head carries an absolute path and a digest and would
+  differ on every runner. This is the one place in this repository where
+  generated content is committed, and the four conditions that bound the
+  exception are
+  [`DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It.md);
+  it does not amend the decision that keeps the index itself generated. This is
+  issue #78. A derived project inherits neither the block nor the step —
+  `tools/new_project.py` writes its own README and its own workflow — so no
+  rule moves and no existing vault gains a finding: MINOR.
 
 ### Changed
 
