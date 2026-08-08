@@ -52,8 +52,10 @@ jobs:
             --no-timestamp
           diff -r "$RUNNER_TEMP/tr-ref" "$RUNNER_TEMP/tr"
 
-      # The README stores the export's own output, which is the one place in
-      # this repository where generated content is committed (DEC-MTH-037).
+      # The README stores the export's own output. Generated content is
+      # committed in exactly two places here, each with a mechanism that
+      # proves it current: this block (DEC-MTH-037) and the quoted output
+      # of TUTORIAL.md, replayed by the self-test above (DEC-MTH-040).
       # That is only defensible while something proves it current, so the
       # export runs again here and the block between the two marker comments
       # is diffed against it. The vault is the source; a change to the worked
