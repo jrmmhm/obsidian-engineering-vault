@@ -49,6 +49,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-032 | 2026-08-05 | [[DEC_The_Decision_Log_Moves_Into_A_Vault]] — the decision log moves into a vault of its own |
 | DEC-MTH-033 | 2026-08-08 | [[DEC_One_Reverse_Key_Derivation_For_Both_Readers]] — one reverse-key derivation for both readers of the graph |
 | DEC-MTH-034 | 2026-08-08 | [[DEC_Requirement_Index_Follows_The_Role_Map]] — the requirement index follows the role map |
+| DEC-MTH-035 | 2026-08-08 | [[DEC_A_Phantom_Citation_Is_Retargeted]] — a citation that resolves to no record is retargeted, not preserved |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather

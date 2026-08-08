@@ -2371,7 +2371,7 @@ def git_head_content(vault: Vault, path: Path):
     Bytes, not text: decoded here, a file committed as UTF-16 would carry
     encoding-not-utf8 in the current run and not in its own baseline, and
     the stop gate would block a session on a file nobody touched - the
-    failure mode amendment 2026-07-28g named when section-mismatch became
+    failure mode amendment 2026-07-31 named when section-mismatch became
     the first ERROR to enter the blocking set. git show hands out the
     stored blob unfiltered, so what arrives here is what was committed;
     decode_source applies the BOM rule and the newline translation the

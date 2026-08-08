@@ -2,7 +2,7 @@
 domain: DEC
 id: DEC-MTH-032
 created: 2026-08-05
-last-verified: 2026-08-05
+last-verified: 2026-08-08
 ---
 Date: 2026-08-05
 Status: Accepted
@@ -183,6 +183,10 @@ itself here.
    All four are left standing and unlinked: correcting the two in the record
    would be editing the record, and the two in the code are Group C, which this
    change does not touch. Found by this migration, and worth its own issue.
+   Closed 2026-08-08: all four citations were retargeted to `2026-07-31`,
+   decided in [[DEC_A_Phantom_Citation_Is_Retargeted]] (issue #74) — the
+   corrected record now carries a second declared deviation from its source,
+   beyond the one byte-level change counted above.
 6. **Bare cross-references stay unlinked.** "follow-up 7", "residual 3 there" and
    a date reached only through a continuation (`amendments 2026-07-31b,
    2026-08-01`) carry no link — linking mid-sentence there would be a text edit.
