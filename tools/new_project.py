@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Derive a clean project from the obsidian-engineering-vault template.
 
-    python3 tools/new_project.py <target-dir> [--name NAME] [--rename-docs-readme]
+    python3 tools/new_project.py <target-dir> [--name NAME] [--minimal]
+                                              [--rename-docs-readme]
 
 Copies the template this script lives in into a fresh target directory,
 strips everything the repository names as template-repo-only, removes the
@@ -18,6 +19,12 @@ notes, the README's worked-example section); the reasoning is recorded in the
 method vault as DEC-MTH-036. Standard library only. The script never writes
 outside the target it creates, refuses a non-empty target, and removes a
 partially written target when the derivation itself fails.
+
+--minimal derives the reduced profile of issue #79: the vault starts with the
+three domains the tools close a loop over - REQ, ARC, TAE - and the other six
+domain folders are moved, not deleted, to a parking folder beside the vault so
+a domain joins later by moving its folder back. The reasoning, including why
+the parked folders keep their templates, is DEC-MTH-041.
 """
 
 import argparse
@@ -73,6 +80,92 @@ OBSIDIAN_KEEP = {"app.json", "core-plugins.json"}
 
 VAULT_REL = "00_documentation/01_projectvault"
 VALIDATOR_REL = ".claude/skills/mechatronics-docs/validate_vault.py"
+
+# --minimal: the six domain folders a project does not start with (issue #79).
+# The three that stay - REQ, ARC, TAE - are the ones the coverage rule is
+# decided on: an allocation row lives in ARC, a 'verifies:' field in TAE, and
+# both are about a REQ. ADM and INB stay too; they are not engineering domains.
+MINIMAL_PARKED_DOMAINS = [
+    "02_decisions_(DEC)",
+    "04_components_(CMP)",
+    "05_interfaces_(IFC)",
+    "06_implementation_(IMP)",
+    "08_operation_and_usage_(OAU)",
+    "09_references_(REF)",
+]
+# Moved, never deleted: a folder recreated by hand later would arrive without
+# its file template, and the validator enforces no section at all for a domain
+# that has none - the domain would come back with its rules switched off
+# (DEC-MTH-041). Parked under 00_documentation so every wikilink still
+# resolves: the name index is built over the whole documentation root.
+PARK_REL = "00_documentation/03_vault_domains_not_in_use"
+# Not 'README.md'. That name exists twice under 00_documentation already, and a
+# third one would make the warning-free state of --rename-docs-readme
+# unreachable - measured as the difference between one warning and none.
+PARK_README_NAME = "00_domains_not_in_use_README.md"
+
+PARK_README = """\
+# Domain folders this project has not started
+
+The vault next door carries the three domains a project starts with:
+`01_requirements_(REQ)` (what must hold), `03_architecture_(ARC)` (where it is
+allocated and how it is verified) and `07_testing_and_evidence_(TAE)` (what
+proves it). These six wait here with their READMEs and their file templates
+until the project grows into them.
+
+`00_documentation/01_projectvault/README.md` says when each one typically
+joins. When that day comes, **move the folder back** into the vault:
+
+    mv "00_documentation/03_vault_domains_not_in_use/02_decisions_(DEC)" \\
+       00_documentation/01_projectvault/
+
+Move it — do not create a fresh folder of the same name beside it. Two folders
+for one domain collide on their file names, and the validator reports the
+collision rather than choosing for you.
+
+Nothing here is validated while it waits: the audit runs on the vault by path.
+A folder is checked again the moment it moves back in.
+"""
+
+# Applied only with --minimal: every surviving sentence that describes a
+# nine-domain vault would be false in a project that starts with three.
+MINIMAL_REPLACEMENTS = [
+    ("STRUCTURE.md",
+     "All engineering documentation. Two subfolders that share the same nine-domain\n"
+     "structure.\n",
+     "All engineering documentation. Three subfolders: the vault, the document\n"
+     "folder mirroring its domains, and the domain folders this project has not\n"
+     "started yet.\n"
+     "\n"
+     "This project was derived with the minimal profile, so its vault carries\n"
+     "`01_requirements_(REQ)`, `03_architecture_(ARC)` and\n"
+     "`07_testing_and_evidence_(TAE)`. The other six domain folders wait in\n"
+     "`00_documentation/03_vault_domains_not_in_use/` and join by moving the\n"
+     "folder back — the vault's `README.md` says when each one typically does.\n"),
+]
+
+MINIMAL_PARAGRAPH = """\
+## Minimal profile
+
+This project was derived with `--minimal`. Its vault starts with the three
+domains the tools close a loop over: `01_requirements_(REQ)` — what must hold,
+`03_architecture_(ARC)` — where it is allocated and how it is verified, and
+`07_testing_and_evidence_(TAE)` — what proves it.
+
+The other six domain folders are not gone. They wait, with their READMEs and
+file templates, in `00_documentation/03_vault_domains_not_in_use/`. When a
+domain joins, move its folder back:
+
+```bash
+mv "00_documentation/03_vault_domains_not_in_use/02_decisions_(DEC)" \\
+   00_documentation/01_projectvault/
+```
+
+Move it rather than creating a fresh one beside it, and read that domain's
+`00_*_README.md` before writing in it. The vault's own
+`README.md` says when each domain typically joins.
+
+"""
 
 DERIVED_WORKFLOW = """\
 name: vault
@@ -262,7 +355,7 @@ python3 .claude/skills/mechatronics-docs/export_traceability.py \\
         00_documentation/01_projectvault --output-dir ../traceability
 ```
 
-{warn_paragraph}## First steps
+{minimal_paragraph}{warn_paragraph}## First steps
 
 - Update the copyright line in `LICENSE`.
 - Describe the project in
@@ -319,7 +412,57 @@ def make_ignore(source, strip_set):
     return ignore
 
 
-def apply_text_edits(target, rename_readme, warnings):
+def populated_parked_domains(source):
+    """-> [(relative folder, [note names])] for parked domains carrying notes.
+
+    Checked in the SOURCE, before anything is copied. The script copies a
+    working tree rather than the git index, so a clone whose vault already
+    documents something is a legal input - and parking such a domain would
+    cut its notes out of the graph while the validator, which reads the
+    vault by path, stays green. A refusal before the first write beats a
+    half-derived target (DEC-MTH-041).
+
+    Counted are the notes that would SURVIVE the derivation: the worked
+    example lives in four of these six folders and is stripped by name, so
+    counting it would make --minimal refuse in the template repository
+    itself, which is the one clone every derivation starts from.
+    """
+    stripped = set(STRIP_PATHS)
+    found = []
+    for rel in MINIMAL_PARKED_DOMAINS:
+        d = source / VAULT_REL / rel
+        if not d.is_dir():
+            continue
+        notes = []
+        for p in sorted(d.rglob("*.md")):
+            if p.name.startswith("00_"):
+                continue
+            if p.relative_to(source).as_posix() in stripped:
+                continue
+            notes.append(p.name)
+        if notes:
+            found.append((rel, notes))
+    return found
+
+
+def park_minimal_domains(target, warnings):
+    """Move the six non-starting domain folders out of the derived vault."""
+    park = target / PARK_REL
+    park.mkdir(parents=True, exist_ok=True)
+    (park / PARK_README_NAME).write_text(PARK_README, encoding="utf-8")
+    parked = []
+    for rel in MINIMAL_PARKED_DOMAINS:
+        src = target / VAULT_REL / rel
+        if not src.is_dir():
+            warnings.append(f"{rel}: expected domain folder not found in the "
+                            "vault - template layout changed?")
+            continue
+        shutil.move(str(src), str(park / rel))
+        parked.append(rel)
+    return parked
+
+
+def apply_text_edits(target, rename_readme, minimal, warnings):
     def edit(relpath, transform, what):
         path = target / relpath
         try:
@@ -334,7 +477,7 @@ def apply_text_edits(target, rename_readme, warnings):
             return
         path.write_text(new, encoding="utf-8")
 
-    for relpath, old, new in REPLACEMENTS:
+    for relpath, old, new in REPLACEMENTS + (MINIMAL_REPLACEMENTS if minimal else []):
         edit(relpath,
              lambda t, old=old, new=new:
                  t.replace(old, new, 1) if t.count(old) == 1 else None,
@@ -384,6 +527,11 @@ def main():
                         "(must not exist, or be an empty directory)")
     parser.add_argument("--name", help="project name for the generated "
                         "README (default: the target directory's name)")
+    parser.add_argument("--minimal", action="store_true",
+                        help="start the vault with REQ, ARC and TAE and move "
+                        "the other six domain folders to "
+                        f"{PARK_REL}, where they wait until the project grows "
+                        "into them")
     parser.add_argument("--rename-docs-readme", action="store_true",
                         help="rename 00_documentation/02_documents/README.md "
                         f"to {RENAMED_NAME}, resolving the known "
@@ -397,6 +545,17 @@ def main():
     if not (source / VAULT_REL).is_dir() or not (source / VALIDATOR_REL).is_file():
         die(f"{source} does not look like the template repository - run the "
             "script from inside a clone (tools/new_project.py)")
+
+    if args.minimal:
+        populated = populated_parked_domains(source)
+        if populated:
+            listed = "; ".join(f"{rel}: {', '.join(names)}"
+                               for rel, names in populated)
+            die("--minimal would park domain folders that already carry "
+                f"notes in {source} - {listed}. Parking them would take "
+                "those notes out of the vault the validator reads. Derive "
+                "without --minimal, or move the notes out of the template "
+                "clone first.")
 
     target = Path(args.target)
     if target.exists():
@@ -422,16 +581,23 @@ def main():
                             "template layout changed?")
 
     target_pre_existed = target.exists()
+    parked = []
     try:
         shutil.copytree(source, target, ignore=make_ignore(source, strip_set),
                         dirs_exist_ok=True)
         (target / ".github/workflows/validate-vault.yml").write_text(
             DERIVED_WORKFLOW, encoding="utf-8")
-        apply_text_edits(target, args.rename_docs_readme, warnings)
+        # Inside the try with everything else: a move that fails half way
+        # through must leave no target behind, or the non-empty guard refuses
+        # the next run over a tree this script wrote.
+        if args.minimal:
+            parked = park_minimal_domains(target, warnings)
+        apply_text_edits(target, args.rename_docs_readme, args.minimal, warnings)
         warn_paragraph = "" if args.rename_docs_readme else WARN_PARAGRAPH
         (target / "README.md").write_text(
-            README_TEMPLATE.format(name=name, version=version,
-                                   warn_paragraph=warn_paragraph),
+            README_TEMPLATE.format(
+                name=name, version=version, warn_paragraph=warn_paragraph,
+                minimal_paragraph=MINIMAL_PARAGRAPH if args.minimal else ""),
             encoding="utf-8")
     except BaseException:
         # Never leave a half-derived target that the non-empty check would
@@ -463,6 +629,16 @@ def main():
           "and the vault.")
     if args.rename_docs_readme:
         print(f"Renamed {RENAME_TARGET} -> {RENAMED_NAME}.")
+    if parked:
+        print()
+        print("Minimal profile: the vault starts with REQ, ARC and TAE. Moved "
+              f"to {PARK_REL}/,")
+        print("where each folder waits with its README and file template:")
+        for rel in parked:
+            print(f"  - {rel}")
+        print("Move a folder back into the vault when its domain joins - the "
+              "vault's README")
+        print("says when that typically is.")
     print()
     print("Copied from the working tree, not the git index - untracked files "
           "travel along.")
