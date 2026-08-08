@@ -124,6 +124,13 @@ a fix has three parts and they belong in three commits:
 If the fix changed how a tool behaves, or you chose between designs on the way,
 it also earns a DEC note in the method vault — see below.
 
+Where a check lives is written down:
+[`.claude/skills/mechatronics-docs/ARCHITECTURE.md`](.claude/skills/mechatronics-docs/ARCHITECTURE.md)
+maps the validator's three stages and their five entry points onto the
+functions that own them, and indexes every finding code. Read it before you go
+looking, and add a row to its index when you add a code — the test suite fails
+if you forget, and tells you which code is missing.
+
 ---
 
 ## Proposing a change to the method
