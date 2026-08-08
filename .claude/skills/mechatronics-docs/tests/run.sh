@@ -4460,6 +4460,7 @@ if [ -f "$NP" ]; then
       ".claude/skills/mechatronics-docs/hooks/stop_gate.sh" \
       ".claude/skills/mechatronics-docs/DECISIONS.md" \
       ".claude/skills/mechatronics-docs/SKILL.md" \
+      ".claude/skills/mechatronics-docs/ARCHITECTURE.md" \
       ".github/workflows/validate-vault.yml" "IEC_61508_MAPPING.md" \
       "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "LICENSE" \
       "00_documentation/.obsidian/app.json"; do
@@ -4545,6 +4546,250 @@ if [ -f "$NP" ]; then
 fi
 # ==========================================================================
 # END tools/new_project.py
+# ==========================================================================
+
+# ==========================================================================
+# ARCHITECTURE.md - the finding-code index is complete in both directions
+# ==========================================================================
+# The map beside the validator is the only document naming which function
+# owns which check (issue #81), and prose about code rots silently. The one
+# part of it that can be derived from the source IS derived, on every run:
+# a code the validator can emit and the map does not name fails here, and so
+# does a code the map names that the validator can no longer emit - the
+# second direction is what catches a rename, which is the likelier defect.
+#
+# The assertion is the exit status, not a parse of the output. A guard that
+# prints nothing when it cannot read its input and is then compared against
+# the empty string passes green on a deleted map - the switched-off gate
+# this suite exists to prevent. Every failure path below exits non-zero.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import ast, json, re, sys
+from pathlib import Path
+
+skill = Path(sys.argv[1])
+# A finding code: lowercase words joined by hyphens. Drops the schema's own
+# field_keys documentation sentences, which sit under the same "code" key.
+SHAPE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+emitted, dynamic, opaque = set(), set(), []
+
+
+def add(v):
+    if isinstance(v, str) and SHAPE.match(v):
+        emitted.add(v)
+
+
+tree = ast.parse((skill / "validate_vault.py").read_text(encoding="utf-8-sig"))
+for n in ast.walk(tree):
+    if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "Finding":
+        arg = n.args[1] if len(n.args) >= 2 else None
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and SHAPE.match(arg.value):
+            emitted.add(arg.value)
+        elif isinstance(arg, ast.Name):
+            # Resolved below, out of the assignment to that name.
+            dynamic.add(arg.id)
+        else:
+            # Keyword form, an f-string, a call - a shape this reader does not
+            # follow. Reported, never skipped: a code that silently stops being
+            # extracted makes the map look complete while it is not.
+            opaque.append(f"validate_vault.py:{n.lineno}: the Finding() code argument is "
+                          "neither a literal code nor a name this check can follow")
+    if isinstance(n, ast.Dict):
+        # FALLBACK_SCHEMA and any other descriptor written in Python.
+        for k, v in zip(n.keys, n.values):
+            if isinstance(k, ast.Constant) and k.value in ("code", "empty_code") \
+                    and isinstance(v, ast.Constant):
+                add(v.value)
+for n in ast.walk(tree):
+    # code = desc.get("code") or "frontmatter-value" - the literal is a direct
+    # child of the BoolOp. Walking the whole assignment instead would pick up
+    # the "code" string inside desc.get("code") as if it were a finding code.
+    if isinstance(n, ast.Assign) and {t.id for t in n.targets if isinstance(t, ast.Name)} & dynamic:
+        for s in ast.walk(n.value):
+            if isinstance(s, ast.BoolOp):
+                for o in s.values:
+                    if isinstance(o, ast.Constant):
+                        add(o.value)
+
+
+def walk(x):
+    if isinstance(x, dict):
+        for k, v in x.items():
+            if k in ("code", "empty_code"):
+                add(v)
+            if k == "codes" and isinstance(v, dict):
+                add_keys = v.keys()      # code_fences.codes names its codes as keys
+                for c in add_keys:
+                    add(c)
+            walk(v)
+    elif isinstance(x, list):
+        for v in x:
+            walk(v)
+
+
+walk(json.loads((skill / "vault_schema.json").read_text(encoding="utf-8-sig")))
+
+# The map's side: the first column of the table between the two markers.
+# Deliberately NOT every code span in the region - the scope and severity
+# columns carry backticked field names and scope words that are not codes.
+region = re.search(r"<!-- finding-codes:begin -->(.*?)<!-- finding-codes:end -->",
+                   (skill / "ARCHITECTURE.md").read_text(encoding="utf-8-sig"), re.S)
+if region is None:
+    sys.exit("ARCHITECTURE.md: the finding-codes markers are gone - the index cannot be read")
+mapped = set(re.findall(r"^\|\s*`([a-z0-9-]+)`\s*\|", region.group(1), re.M))
+
+bad = []
+if emitted - mapped:
+    bad.append("emitted by the validator, absent from ARCHITECTURE.md: "
+               + " ".join(sorted(emitted - mapped)))
+if mapped - emitted:
+    bad.append("named in ARCHITECTURE.md, no longer emitted: "
+               + " ".join(sorted(mapped - emitted)))
+bad += opaque
+if bad:
+    sys.exit("\n".join(bad))
+PY
+then ok x; else fail "ARCHITECTURE.md and the validator disagree about the finding codes"; fi
+
+# ==========================================================================
+# BEGIN --fail-on: the exporter's gap classes as a blocking check (issue
+# #68, DEC-MTH-039). Self-contained and appended last for the same reason
+# the block above is: concurrent branches append here too.
+#
+# No new trap. Traps in this file OVERWRITE rather than accumulate, so a
+# fresh one would have to re-list all eleven directories or silently drop
+# them from cleanup. Everything below writes under $EX_TMP, which the last
+# trap already covers.
+#
+# The two positive assertions are paired with negative halves on purpose.
+# The fixture's gap sets are 002/003/004 = not-allocated + no-evidence-
+# note, 005 = not-proven + no-evidence-note, 006 = not-allocated, 001 =
+# none - so "names REQ-COV-006" alone passes against an implementation
+# that ignores the armed set and prints every requirement carrying any
+# gap. Only the exclusions tell the two apart.
+# ==========================================================================
+FO_OUT="$EX_TMP/fail-on"
+
+# The clean template vault, armed exactly as CI arms it.
+TESTS=$((TESTS + 1))
+if [ -d "$REAL_VAULT" ]; then
+  python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FO_OUT/real" --no-timestamp \
+    --fail-on not-allocated,no-evidence-note >/dev/null 2>&1
+  if [ $? -eq 0 ]; then ok x; else
+    fail "the shipped template vault must survive the armed classes"; fi
+else
+  fail "real template vault not found at $REAL_VAULT"
+fi
+
+# not-allocated: 006 is the requirement nothing allocates. 005 IS allocated
+# (its row carries prose instead of a link) and must not appear here.
+fo_na=$(python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/na" --no-timestamp \
+  --fail-on not-allocated 2>&1 >/dev/null); fo_na_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fo_na_rc -eq 1 ]; then ok x; else
+  fail "an armed run over an open evidence chain must exit 1, got $fo_na_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fo_na" "REQ-COV-006"; then ok x; else
+  fail "not-allocated must name REQ-COV-006:"
+  printf '%s\n' "$fo_na" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! contains "$fo_na" "REQ-COV-005" && ! contains "$fo_na" "REQ-COV-001"; then
+  ok x; else
+  fail "not-allocated named a requirement of another class:"
+  printf '%s\n' "$fo_na" | sed 's/^/    /'; fi
+
+# no-evidence-note: the mirror image. 005 is named by no TAE; 006 is.
+fo_ne=$(python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/ne" --no-timestamp \
+  --fail-on no-evidence-note 2>&1 >/dev/null); fo_ne_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fo_ne_rc -eq 1 ]; then ok x; else
+  fail "no-evidence-note must exit 1 on the coverage fixture, got $fo_ne_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fo_ne" "REQ-COV-005"; then ok x; else
+  fail "no-evidence-note must name REQ-COV-005:"
+  printf '%s\n' "$fo_ne" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! contains "$fo_ne" "REQ-COV-006" && ! contains "$fo_ne" "REQ-COV-001"; then
+  ok x; else
+  fail "no-evidence-note named a requirement of another class:"
+  printf '%s\n' "$fo_ne" | sed 's/^/    /'; fi
+
+# A run that blocks still hands over the evidence of why it blocked.
+TESTS=$((TESTS + 1))
+if [ -f "$FO_OUT/ne/traceability.json" ] && [ -f "$FO_OUT/ne/traceability.html" ]; then
+  ok x; else fail "a blocking armed run must still write its artifacts"; fi
+
+# The default contract, on the very vault the armed runs above fail on.
+# This is the load-bearing assertion of the whole block: local behaviour
+# is unchanged, and only a caller that asks for it ever gets blocked.
+TESTS=$((TESTS + 1))
+python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/plain" --no-timestamp >/dev/null 2>&1
+if [ $? -eq 0 ]; then ok x; else
+  fail "without --fail-on a gap must not change the exit code"; fi
+
+# A class name this tool does not know is refused before anything is read:
+# exit 2, the valid names printed (that message IS the recovery path), and
+# no output directory created.
+fo_bad=$(python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/typo" --no-timestamp \
+  --fail-on no_evidence_note 2>&1); fo_bad_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fo_bad_rc -eq 2 ]; then ok x; else
+  fail "an unknown gap class must be refused with exit 2, got $fo_bad_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fo_bad" "not-allocated" && contains "$fo_bad" "no-evidence-note" \
+   && contains "$fo_bad" "evidence-disagrees" && contains "$fo_bad" "not-proven" \
+   && contains "$fo_bad" "evidence-is-prose"; then ok x; else
+  fail "the refusal must list every valid class name:"
+  printf '%s\n' "$fo_bad" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ ! -e "$FO_OUT/typo" ]; then ok x; else
+  fail "a refused --fail-on must not have written anything"; fi
+
+# An empty or whitespace-only value arms nothing, which is the same
+# switched-off gate as a typo and is refused the same way.
+for fo_empty in "" "  ,  "; do
+  TESTS=$((TESTS + 1))
+  python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/empty" --no-timestamp \
+    --fail-on "$fo_empty" >/dev/null 2>&1
+  if [ $? -eq 2 ]; then ok x; else
+    fail "--fail-on '$fo_empty' must be refused, not treated as unarmed"; fi
+done
+
+# Whitespace around a name is trimmed and a repeated name is read once.
+TESTS=$((TESTS + 1))
+python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FO_OUT/dedup" --no-timestamp \
+  --fail-on "not-allocated, not-allocated , no-evidence-note" >/dev/null 2>&1
+if [ $? -eq 0 ]; then ok x; else
+  fail "--fail-on must trim and deduplicate its class list"; fi
+
+# A gate over a graph with no requirement cannot fail, so it fails. The
+# method vault is the shipped vault of exactly that shape.
+TESTS=$((TESTS + 1))
+if [ -d "$METHOD_VAULT" ]; then
+  fo_empty_out=$(python3 "$EXPORTER" "$METHOD_VAULT" --output-dir "$FO_OUT/none" \
+    --no-timestamp --fail-on not-allocated 2>&1 >/dev/null)
+  if [ $? -eq 1 ] && contains "$fo_empty_out" "no requirement at all"; then
+    ok x; else
+    fail "an armed run over a graph without requirements must fail:"
+    printf '%s\n' "$fo_empty_out" | sed 's/^/    /'; fi
+else
+  fail "method vault not found at $METHOD_VAULT"
+fi
+
+# Precedence: the flag is validated ahead of the vault-root refusal, so the
+# message names the flag the caller got wrong rather than the next thing to
+# fail. Both are exit 2, so only the message can tell them apart.
+fo_prec=$(python3 "$EXPORTER" "$EX_TMP" --output-dir "$FO_OUT/prec" \
+  --fail-on typo 2>&1); fo_prec_rc=$?
+TESTS=$((TESTS + 1))
+# Matched without the leading dashes: 'contains' passes the pattern to grep
+# unguarded, and a pattern starting with '-' is read as an option there.
+if [ $fo_prec_rc -eq 2 ] && contains "$fo_prec" "fail-on names no gap class"; then
+  ok x; else
+  fail "a bad --fail-on must be refused before the vault-root check:"
+  printf '%s\n' "$fo_prec" | sed 's/^/    /'; fi
+# ==========================================================================
+# END --fail-on
 # ==========================================================================
 
 echo "$TESTS tests, $FAILURES failure(s)"

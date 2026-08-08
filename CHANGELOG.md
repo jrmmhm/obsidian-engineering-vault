@@ -52,6 +52,24 @@ decision.
   first push is green. The reasoning is
   [`DEC_Deriving_A_Project_Is_One_Command`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Deriving_A_Project_Is_One_Command.md).
   New capability, no rule moves, no existing vault gains a finding: MINOR.
+- **An architecture map of the validator, for whoever maintains it** —
+  [`.claude/skills/mechatronics-docs/ARCHITECTURE.md`](.claude/skills/mechatronics-docs/ARCHITECTURE.md).
+  It states the validator's three stages in execution order behind their five
+  entry points, one row per check family with the function that owns it and
+  whether it runs per file or across the vault, what the stop gate can
+  actually block on, and an index of every finding code the tool can emit.
+  Until now nothing said where a check lived, so changing one rule meant
+  re-deriving the architecture by reading — the defect issue #81 reports. The
+  index is not prose: the test suite derives the codes from
+  `validate_vault.py` and `vault_schema.json` on every run and fails in both
+  directions, on a code the map does not name and on a code the map still
+  names after the validator stopped emitting it. Issue #81 puts the number of
+  finding codes at 37; that figure was already wrong when the issue was
+  filed, and the count of record is now the map's index, which a test keeps
+  true. Pointers from `CONTRIBUTING.md`, `SKILL.md` and `STRUCTURE.md`; the
+  reasoning is
+  [`DEC_Tool_Internals_Are_Documented_Beside_The_Tool`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Tool_Internals_Are_Documented_Beside_The_Tool.md).
+  New and corrected documentation, no rule moves: MINOR.
 - **The README shows what the export produces, and CI proves it is current** —
   the first section of [README.md](README.md) is now the shipped worked
   example read back out of the vault: the exporter's two count lines and the
@@ -150,6 +168,25 @@ decision.
   documentation and comments only, no rule moves and no vault gains a
   finding, so it is MINOR. Why: `DEC_A_Phantom_Citation_Is_Retargeted` in the
   method vault.
+- **CI fails on an open evidence chain in the template vault** — the exporter
+  gained `--fail-on <classes>`, and `.github/workflows/validate-vault.yml`
+  arms it for `not-allocated` and `no-evidence-note` on
+  `00_documentation/01_projectvault`. Without the option nothing changes: a
+  coverage gap is still data and still leaves the exit code at 0, and the
+  validator still raises `req-uncovered` as a WARN, so no session is blocked
+  by an evidence chain that is merely still open. What changes is that the
+  closed REQ→TAE loop is now in a blocking path somewhere — until now it
+  existed only in a tool that reports. A class name the tool does not know,
+  and an empty class list, are refused before anything is read (exit 2, valid
+  names printed); an armed run against a graph carrying no requirement fails
+  rather than passing, because a gate that cannot fail proves nothing. A
+  derived project inherits the option and not the arming — it starts with
+  requirements and without evidence, so `tools/new_project.py` names the flag
+  in the workflow it generates and leaves it off. This is issue #68 (proposed
+  as Alt B in the #50 review): no domain, relation, field, template section
+  or rule moves, no vault that was clean becomes unclean, and the default
+  path of every existing caller is unchanged, so it is MINOR. Why:
+  `DEC_CI_Blocks_On_What_A_Session_Only_Warns_About` in the method vault.
 
 ## [0.1.0] - 2026-08-06
 
