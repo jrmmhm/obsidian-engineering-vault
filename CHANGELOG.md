@@ -31,6 +31,28 @@ decision.
 
 ## [Unreleased]
 
+### Added
+
+- **`tools/new_project.py` — deriving a project is one command** — it copies
+  the template into a fresh target, strips everything the repository already
+  names as template-only (`CONTRIBUTING.md`, this file, the issue forms and
+  pull request template, `.claude/01_methodvault/`, the skill's test suite,
+  the script's own `tools/` folder), removes the worked example along the
+  README's deletion path, rewrites `.github/workflows/validate-vault.yml` to
+  the two steps that hold in a derived project — project vault audit and
+  export determinism — and generates a project README carrying the project
+  name and the method version it derived from. It ends by running the derived
+  vault's validator and exits nonzero unless the output matches its
+  prediction: zero ERRORs and the one known `duplicate-basename` WARN, or
+  none at all with `--rename-docs-readme`, which renames
+  `02_documents/README.md` instead of keeping the collision. This is issue
+  #76, and it also closes issue #85: the derived workflow no longer runs the
+  template's self-test suite, whose worked-example and method-vault
+  assertions cannot hold outside this repository, so a derived project's
+  first push is green. The reasoning is
+  [`DEC_Deriving_A_Project_Is_One_Command`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Deriving_A_Project_Is_One_Command.md).
+  New capability, no rule moves, no existing vault gains a finding: MINOR.
+
 ### Changed
 
 - **The validator's coverage checks now reach translated vaults:

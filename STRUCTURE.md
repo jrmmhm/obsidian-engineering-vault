@@ -238,6 +238,22 @@ and replace the templates with your own.
 
 ---
 
+## tools
+
+Scripts that operate on this template repository as a whole rather than on a
+vault. Currently one: `new_project.py` derives a clean project from the
+template — it copies the tree into a fresh target, strips the template-only
+material this document marks with "In a project made from this template" along
+with the worked example, rewrites the CI workflow to the steps that hold in a
+derived project, and finishes by running the derived vault's validator against
+the state it predicts. `python3 tools/new_project.py --help` lists the options.
+
+**In a project made from this template**, this folder does not arrive at all —
+a derivation script is template-repo-only by its own definition, so the script
+strips it.
+
+---
+
 ## AGENTS.md
 
 The rules an AI agent works under live in `CLAUDE.md` at the repository root.

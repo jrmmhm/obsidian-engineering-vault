@@ -189,18 +189,36 @@ export reads, and a link that could be one and is not annotated is reported.
 What those identifiers and relations mean is declared in
 `.claude/skills/mechatronics-docs/vault_schema.json`.
 
-**Deleting it.** The example is illustration, not infrastructure. Remove the
-seven notes of the example under `01_projectvault` —
-`REQ_Battery_Monitoring (BAT)`, `DEC_Battery_Log_Acceptance_Check`,
-`ARC_Battery_Monitoring`, `CMP_Battery_Pack`, `IFC_PWR_DC_LiPo_Pack`,
-`IMP_Battery_Log_Evaluation` and `TAE_Battery_Log_Acceptance` — the
-`2026-07-28_battery_monitoring` folders under `30_testdata`,
-`20_software/data_analysis/`, the `ARC_Battery_Monitoring` row in
-`system_overview.md`, and the sentence "The worked example under
+**Deleting it.** The example is illustration, not infrastructure, and removing
+it is part of deriving a project — which is one command, run from a clone:
+
+```bash
+python3 tools/new_project.py ../my-project
+```
+
+The script copies the template into a fresh directory, removes the example
+together with everything only this template repository needs — including its
+own `tools/` folder — and finishes by running the derived vault's validator,
+so the result is checked rather than assumed. The known duplicate-basename
+warning below stays by default and is explained in the generated README;
+`--rename-docs-readme` resolves it instead.
+
+Deriving by hand still works. Remove the seven notes of the example under
+`01_projectvault` — `REQ_Battery_Monitoring (BAT)`,
+`DEC_Battery_Log_Acceptance_Check`, `ARC_Battery_Monitoring`,
+`CMP_Battery_Pack`, `IFC_PWR_DC_LiPo_Pack`, `IMP_Battery_Log_Evaluation` and
+`TAE_Battery_Log_Acceptance` — the `2026-07-28_battery_monitoring` folders
+under `30_testdata`, `20_software/data_analysis/`, the `ARC_Battery_Monitoring`
+row in `system_overview.md`, and the sentence "The worked example under
 [[ARC_Battery_Monitoring]] shows all of this in one thread." in
 `00_documentation_file_creation_and_conventions.md`, which would otherwise be
-the one wikilink left pointing at the example. Drop the evaluator step from
-`.github/workflows/validate-vault.yml` as well. Commit the removal, and the
+the one wikilink left pointing at the example. If you keep `.github/`, replace
+`workflows/validate-vault.yml` with the two-step version the script writes —
+project vault audit and export determinism — or drop its three template-only
+steps: the validator self-test, the method vault audit and the worked example
+evidence. The self-test suite in `.claude/skills/mechatronics-docs/tests/`
+asserts this template's own vaults and stays red in a derived project, so
+remove that directory with the rest. Commit the removal, and the
 validator returns to zero errors with all of it gone — and to the single
 warning the quick start below explains. Until the commit it also reports each
 of the example's identifiers as `id-vanished`, exactly as the conventions file
@@ -214,6 +232,9 @@ says it does for an identifier that was present at git HEAD.
 # 1. Create your repo from this template (or clone it)
 git clone https://github.com/jrmmhm/obsidian-engineering-vault.git my-project
 cd my-project
+# Starting a real project instead of exploring? Derive one in one command:
+#   python3 tools/new_project.py ../my-real-project
+# (see "The worked example" above for what it removes)
 
 # 2. Check the vault is intact
 python3 .claude/skills/mechatronics-docs/validate_vault.py \
@@ -421,6 +442,7 @@ paywalled.
 ├── .claude/01_methodvault/ the method's own decision record — a second vault,
 │                           audited by the same validator
 ├── .github/                CI workflow, issue forms, pull request template
+├── tools/                  new_project.py — derives a clean project, strips itself
 ├── IEC_61508_MAPPING.md    IEC 61508 correspondence — not a conformance claim
 └── AGENTS.md, CLAUDE.md    agent instructions — AGENTS.md forwards to CLAUDE.md
 ```
