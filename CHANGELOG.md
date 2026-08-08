@@ -33,6 +33,29 @@ decision.
 
 ### Added
 
+- **The entry comes first, the argument moves to [METHOD.md](METHOD.md)** —
+  `README.md` argued the method over four screens before letting anyone in:
+  the quick start stood at line 283 and the audience section at line 530 of
+  567 (issue #80). It now answers, in order, what this is, the proof, how to
+  start and who it is for — and who it is not for, which it never said. The
+  four argument sections — "The problem this solves", "How the pieces
+  connect" with the domain graph, "The AI layer" and "Handing it to someone
+  else" — moved to `METHOD.md` **verbatim**; the only edited sentences are
+  four seams a move makes false, and the diff shows relocation rather than
+  rewriting. The stored traceability excerpt stays where it was, marker pair
+  and CI diff untouched. `METHOD.md` ships into derived projects, which
+  repairs a link that was dead in every one of them: `IEC_61508_MAPPING.md`
+  cited `README.md#handing-it-to-someone-else`, and the generated project
+  README has no such section. **Two README anchors are retired** —
+  `#the-ai-layer` and `#handing-it-to-someone-else` now resolve under
+  `METHOD.md`. The three citations inside this repository are retargeted;
+  an external bookmark to either breaks silently, and that cost is not
+  mitigated. The reasoning is
+  [`DEC_The_Argument_Moves_Out_Of_The_Entry`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Argument_Moves_Out_Of_The_Entry.md).
+  New and reordered documentation; no domain, template section, frontmatter
+  field, identifier rule, typed relation, validator severity or exporter
+  field moves, and no existing vault gains a finding: MINOR.
+
 - **A project starts with three domains and grows into nine** — the vault
   README gains the section "Start With Three, Grow Into Nine": REQ, ARC and
   TAE carry the loop the tools decide on, and one table row per domain names
