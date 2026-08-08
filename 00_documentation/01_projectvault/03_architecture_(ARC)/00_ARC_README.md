@@ -1,6 +1,8 @@
 ARC notes describe the architecture of a module as a connecting element between requirements (REQ), decisions (DEC), components (CMP), interfaces (IFC), implementation (IMP) and testing and evidence (TAE).
 ARC is the place where it becomes visible **which requirements affect which submodules/interfaces** and **how these requirements are verified** (Allocation + Verification).
 
+**This domain joins on day one.** The allocation row is where a requirement gets an owner, a verification link and a status; a requirement no row names stays unallocated no matter what else the vault contains.
+
 ---
 
 ## Goal and Principles

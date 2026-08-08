@@ -1,5 +1,7 @@
 IFC notes define interfaces as contract types.
 An IFC describes the parameters of a connection (electrical/logical/mechanical), without specifying concrete endpoints.
+
+**This domain joins with the first contract between two parts** that must keep holding while the parts on either side change – the moment your ARC module's interface table stops reading "None yet."
 The assignment of which components use an IFC is done in ARC via the interface table [[00_ARC_README]].
 
 ## Goal

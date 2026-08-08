@@ -1,6 +1,8 @@
 CMP notes document components and assemblies as independent, reusable building blocks.
 A CMP note is deliberately minimal: it is a profile with sources and entry point to details.
 
+**This domain joins with the first part you buy or build** whose datasheet or scope decides something in more than one place.
+
 ## Component Taxonomy
 
 Every CMP entry must be classified as one of two types:

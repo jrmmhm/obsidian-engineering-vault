@@ -33,6 +33,11 @@ Exactly one role must be chosen per file:
 | `98_administration_(ADM)`           | Project logistics                   | Medium   | What do I need for project management?         |
 | `99_inbox_(INB)`                    | Unclassified raw material           |          |                                                |
 
+This table says which role a file belongs to. It does not say that a project
+needs every role on its first day: the loop the tools decide on runs through
+REQ, ARC and TAE, and the other domains become due one at a time. When each
+one typically joins, and what the trigger is, is the section
+"Start With Three, Grow Into Nine" in this vault's `README.md`.
 
 **Question 4:** In which timeline does this information live?
 	 - in multiple: Subdivide file until all information lives in one timeline

@@ -1,4 +1,6 @@
 REF notes document external sources (standards, datasheets, books, papers, websites) so that they are quickly findable, traceable and usable in the project.
+
+**This domain joins with the first external source you quote a second time** – a datasheet, a standard or a paper that decides something here. The document itself stays in `50_sources`; the REF note is the project-relevant extract.
 REF is not a literature management replacement and not a complete transcription, but a project-related extract: **What is relevant and where is it located?**
 
 ---
