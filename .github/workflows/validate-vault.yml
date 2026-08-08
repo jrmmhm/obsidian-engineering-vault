@@ -52,6 +52,51 @@ jobs:
             --no-timestamp
           diff -r "$RUNNER_TEMP/tr-ref" "$RUNNER_TEMP/tr"
 
+      # The README stores the export's own output, which is the one place in
+      # this repository where generated content is committed (DEC-MTH-037).
+      # That is only defensible while something proves it current, so the
+      # export runs again here and the block between the two marker comments
+      # is diffed against it. The vault is the source; a change to the worked
+      # example that never reached the README fails this step. Only the
+      # machine-independent lines are compared - the index's provenance head
+      # carries an absolute path and a digest and would differ on every runner.
+      - name: README traceability excerpt is current
+        run: |
+          python3 .claude/skills/mechatronics-docs/export_traceability.py \
+            00_documentation/01_projectvault --output-dir "$RUNNER_TEMP/readme-tr" \
+            --no-timestamp > "$RUNNER_TEMP/export.out"
+          {
+            grep -E '^(requirements|objects):' "$RUNNER_TEMP/export.out"
+            echo
+            sed -n '/^## Objects/,$p' "$RUNNER_TEMP/readme-tr/traceability_index.md"
+          } > "$RUNNER_TEMP/excerpt-expected.txt"
+          # Exactly one marker pair, matched whole-line: prose may name the
+          # markers without turning the rest of the README into the excerpt.
+          pair=$(awk '/^<!-- traceability-excerpt:start -->$/{s++}
+                      /^<!-- traceability-excerpt:end -->$/{e++}
+                      END {print s+0, e+0}' README.md)
+          if [ "$pair" != "1 1" ]; then
+            echo "README.md must carry exactly one traceability-excerpt marker pair, found $pair" >&2
+            exit 1
+          fi
+          # The fence lines are found by matching, never by position, so a
+          # blank line around them does not shift what gets compared.
+          awk '/^<!-- traceability-excerpt:start -->$/{m=1;next}
+               /^<!-- traceability-excerpt:end -->$/{m=0}
+               m && /^```/{f=!f;next}
+               m && f' README.md > "$RUNNER_TEMP/excerpt-actual.txt"
+          if [ ! -s "$RUNNER_TEMP/excerpt-actual.txt" ]; then
+            echo "no fenced excerpt between the traceability-excerpt markers in README.md" >&2
+            exit 1
+          fi
+          diff -u "$RUNNER_TEMP/excerpt-expected.txt" "$RUNNER_TEMP/excerpt-actual.txt" || {
+            echo "The README excerpt no longer matches the vault. Regenerate it with:" >&2
+            echo "  python3 .claude/skills/mechatronics-docs/export_traceability.py \\" >&2
+            echo "    00_documentation/01_projectvault --output-dir ../traceability --no-timestamp" >&2
+            echo "and paste the two count lines plus everything from '## Objects' into the block." >&2
+            exit 1
+          }
+
       # The worked example claims its evidence is the real output of a command.
       # Running that command here is what keeps the claim from decaying: both
       # the log and the evaluator are committed, so the check is reproducible
