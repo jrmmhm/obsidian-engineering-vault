@@ -185,6 +185,12 @@ first. It stays generated rather than committed: a stored index is only as
 current as its last run, and the vault is what it is derived from. `CLAUDE.md`
 therefore names the command, not a path.
 
+`ARCHITECTURE.md` in the same directory is the maintainer's view of the
+validator: its three stages and five entry points mapped onto the functions
+that own them, plus an index of every finding code. It answers where a check
+lives, where the vault conventions answer what a rule is and the method vault
+answers why it exists.
+
 See the [README](README.md#the-ai-layer) for how to use it, with or without
 Claude Code.
 

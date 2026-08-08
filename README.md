@@ -312,6 +312,17 @@ decision you make once, because the warning nobody triages is the one everybody
 learns to scroll past. If your run shows an ERROR, or a second warning you did
 not expect, that one is yours.
 
+CI adds exactly one check that is stricter than a session, and it is not this
+one. The traceability export names, per requirement, what is unproven; the
+workflow runs it with `--fail-on not-allocated,no-evidence-note` and fails when
+a requirement of this repository's own vault is allocated by no row or named by
+no evidence note. The validator's `req-uncovered` stays a WARN either way,
+because it cannot tell an evidence chain that is still open from a vault that
+never adopted the convention — and a session must not stop over that. A run
+green locally and red in CI is that one step, and the export it writes says
+which requirement. Your own project inherits the option unarmed; turn it on
+once your loop closes.
+
 Then open the vault:
 
 1. Open Obsidian → **Open folder as vault**

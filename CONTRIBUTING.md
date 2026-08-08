@@ -111,6 +111,23 @@ the absolute vault path, the file count and the digest differ per machine, and
 comparing them would fail on every runner. The reasoning is
 [`DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It.md).
 
+**The evidence chains are closed.** The one check that is stricter than a
+working session, so it is also the one most likely to surprise you: locally the
+validator leaves an open REQ→TAE loop at `req-uncovered` (a WARN, by measured
+decision), and CI refuses it.
+
+```bash
+python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        00_documentation/01_projectvault --output-dir /tmp/tr-armed \
+        --no-timestamp --fail-on not-allocated,no-evidence-note
+# -> exit 0. Nonzero names the class and the requirements on stderr,
+#    and /tmp/tr-armed still holds the full export.
+```
+
+If you added a requirement, this is the step that asks you for its allocation
+row and its evidence note. Run it before you push and you will not meet it as a
+red check.
+
 **The worked example still proves what it claims.** The evidence in
 `TAE_Battery_Log_Acceptance` is the verbatim output of this command, so the
 command has to keep producing it — and the negative control has to keep failing.
@@ -141,6 +158,13 @@ a fix has three parts and they belong in three commits:
 
 If the fix changed how a tool behaves, or you chose between designs on the way,
 it also earns a DEC note in the method vault — see below.
+
+Where a check lives is written down:
+[`.claude/skills/mechatronics-docs/ARCHITECTURE.md`](.claude/skills/mechatronics-docs/ARCHITECTURE.md)
+maps the validator's three stages and their five entry points onto the
+functions that own them, and indexes every finding code. Read it before you go
+looking, and add a row to its index when you add a code — the test suite fails
+if you forget, and tells you which code is missing.
 
 ---
 
