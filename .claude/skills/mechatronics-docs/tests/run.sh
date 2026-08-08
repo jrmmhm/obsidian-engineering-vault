@@ -4423,6 +4423,129 @@ assert ex.resolve_roles(v, v.schema(), []) == v.roles(), \
 assert v.roles().get("REQ") == "ANF" and v.roles().get("TAE") == "TUE", v.roles()
 PY
 then ok x; else fail "validator and exporter must share one role derivation"; fi
+# BEGIN tools/new_project.py - template derivation (issues #76 / #85).
+# One self-contained block, appended last on purpose: concurrent branches
+# append here too, and a fixed position at the end keeps the merges clean.
+# Loud-fail guard like REAL_VAULT above: run through a symlinked skill in a
+# project that has no derivation script, the block must say so, not skip.
+# ==========================================================================
+NP_ROOT="$(cd -P -- "$SKILL_DIR/../../.." && pwd -P)"
+NP="$NP_ROOT/tools/new_project.py"
+TESTS=$((TESTS + 1))
+if [ -f "$NP" ]; then ok x; else fail "derivation script not found at $NP"; fi
+if [ -f "$NP" ]; then
+  NP_TMP=$(mktemp -d)
+  ND="$NP_TMP/myproj"
+  npout=$(python3 "$NP" "$ND" 2>&1); nprc=$?
+  TESTS=$((TESTS + 1))
+  if [ $nprc -eq 0 ]; then ok x; else
+    fail "default derivation must exit 0, got $nprc:"
+    printf '%s\n' "$npout" | tail -5 | sed 's/^/    /'
+  fi
+
+  # Template-repo-only material and the worked example must be gone; the
+  # method's tooling and the files STRUCTURE.md says travel must remain.
+  for gone in "CONTRIBUTING.md" "CHANGELOG.md" "tools" ".claude/01_methodvault" \
+      ".github/ISSUE_TEMPLATE" ".github/pull_request_template.md" \
+      ".claude/skills/mechatronics-docs/tests" "20_software/data_analysis" \
+      "30_testdata/31_testdata_raw/2026-07-28_battery_monitoring" \
+      "30_testdata/32_testdata_processed/2026-07-28_battery_monitoring" \
+      "00_documentation/01_projectvault/03_architecture_(ARC)/ARC_Battery_Monitoring.md" \
+      "00_documentation/01_projectvault/05_interfaces_(IFC)/IFC_PWR_DC_LiPo_Pack.md"; do
+    TESTS=$((TESTS + 1))
+    if [ ! -e "$ND/$gone" ]; then ok x; else fail "derived project still carries $gone"; fi
+  done
+  for kept in ".claude/skills/mechatronics-docs/validate_vault.py" \
+      ".claude/skills/mechatronics-docs/export_traceability.py" \
+      ".claude/skills/mechatronics-docs/hooks/stop_gate.sh" \
+      ".claude/skills/mechatronics-docs/DECISIONS.md" \
+      ".claude/skills/mechatronics-docs/SKILL.md" \
+      ".github/workflows/validate-vault.yml" "IEC_61508_MAPPING.md" \
+      "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "LICENSE" \
+      "00_documentation/.obsidian/app.json"; do
+    TESTS=$((TESTS + 1))
+    if [ -e "$ND/$kept" ]; then ok x; else fail "derived project lost $kept"; fi
+  done
+
+  # The derived workflow is the #85 fix: no template self-test, no worked
+  # example, but the vault audit still named by path.
+  npwf=$(cat "$ND/.github/workflows/validate-vault.yml" 2>/dev/null)
+  TESTS=$((TESTS + 1))
+  if contains "$npwf" "eval_battery_log" || contains "$npwf" "tests/run.sh" \
+      || contains "$npwf" "01_methodvault"; then
+    fail "derived workflow still runs template-only steps"; else ok x; fi
+  TESTS=$((TESTS + 1))
+  if contains "$npwf" "validate_vault.py 00_documentation/01_projectvault"; then
+    ok x; else fail "derived workflow lost the project vault audit"; fi
+
+  # No prose in the derived tree may still point at the worked example or
+  # the method vault - the leftover-link defect of issue #70.
+  TESTS=$((TESTS + 1))
+  if grep -rq "ARC_Battery_Monitoring" "$ND/00_documentation"; then
+    fail "worked-example reference survives in the derived vault"; else ok x; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "01_methodvault" "$ND/CLAUDE.md" "$ND/STRUCTURE.md" "$ND/.gitignore"; then
+    fail "method-vault reference survives in CLAUDE.md/STRUCTURE.md/.gitignore"; else ok x; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "new_project" "$ND/STRUCTURE.md" "$ND/README.md"; then
+    fail "derivation-script reference survives in STRUCTURE.md/README.md"; else ok x; fi
+
+  # The generated README carries the target's name and, on the default
+  # path, the explanation of the one WARN the validator will keep showing.
+  TESTS=$((TESTS + 1))
+  if [ "$(head -n 1 "$ND/README.md")" = "# myproj" ]; then ok x; else
+    fail "generated README must open with '# myproj'"; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "duplicate-basename" "$ND/README.md"; then ok x; else
+    fail "default derivation must explain the duplicate-basename WARN in README.md"; fi
+
+  # The state the script predicts is the state the validator reports.
+  npval=$(python3 "$ND/.claude/skills/mechatronics-docs/validate_vault.py" \
+    "$ND/00_documentation/01_projectvault" 2>&1); npvrc=$?
+  TESTS=$((TESTS + 1))
+  if [ $npvrc -eq 0 ] && contains "$npval" "0 error(s), 1 warning(s)" \
+      && contains "$npval" "duplicate-basename"; then ok x; else
+    fail "derived vault must report exactly the known WARN:"
+    printf '%s\n' "$npval" | sed 's/^/    /'
+  fi
+
+  # --rename-docs-readme resolves the collision: renamed file, patched
+  # STRUCTURE.md reference, zero warnings, --name in the README.
+  np2out=$(python3 "$NP" "$NP_TMP/renamed" --rename-docs-readme \
+    --name "Renamed Proj" 2>&1); np2rc=$?
+  TESTS=$((TESTS + 1))
+  if [ $np2rc -eq 0 ]; then ok x; else fail "rename derivation must exit 0, got $np2rc"; fi
+  TESTS=$((TESTS + 1))
+  if [ -f "$NP_TMP/renamed/00_documentation/02_documents/00_documents_README.md" ] \
+      && [ ! -e "$NP_TMP/renamed/00_documentation/02_documents/README.md" ]; then
+    ok x; else fail "rename flag must rename the documents README"; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "02_documents/00_documents_README.md" "$NP_TMP/renamed/STRUCTURE.md"; then
+    ok x; else fail "STRUCTURE.md must point at the renamed README"; fi
+  np2val=$(python3 "$NP_TMP/renamed/.claude/skills/mechatronics-docs/validate_vault.py" \
+    "$NP_TMP/renamed/00_documentation/01_projectvault" 2>&1)
+  TESTS=$((TESTS + 1))
+  if contains "$np2val" "0 error(s), 0 warning(s)"; then ok x; else
+    fail "renamed derivation must be warning-free:"
+    printf '%s\n' "$np2val" | sed 's/^/    /'
+  fi
+  TESTS=$((TESTS + 1))
+  if [ "$(head -n 1 "$NP_TMP/renamed/README.md")" = "# Renamed Proj" ]; then
+    ok x; else fail "--name must set the generated README title"; fi
+
+  # A non-empty target is refused, byte-untouched - the safety rule.
+  mkdir -p "$NP_TMP/full"; printf 'keep' > "$NP_TMP/full/x"
+  python3 "$NP" "$NP_TMP/full" >/dev/null 2>&1; np3rc=$?
+  TESTS=$((TESTS + 1))
+  if [ $np3rc -ne 0 ] && [ "$(cat "$NP_TMP/full/x")" = "keep" ] \
+      && [ ! -e "$NP_TMP/full/README.md" ]; then ok x; else
+    fail "non-empty target must be refused untouched (rc=$np3rc)"; fi
+
+  rm -rf "$NP_TMP"
+fi
+# ==========================================================================
+# END tools/new_project.py
+# ==========================================================================
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
