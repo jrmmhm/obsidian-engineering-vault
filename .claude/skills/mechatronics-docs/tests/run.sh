@@ -4486,6 +4486,9 @@ if [ -f "$NP" ]; then
   TESTS=$((TESTS + 1))
   if grep -q "01_methodvault" "$ND/CLAUDE.md" "$ND/STRUCTURE.md" "$ND/.gitignore"; then
     fail "method-vault reference survives in CLAUDE.md/STRUCTURE.md/.gitignore"; else ok x; fi
+  TESTS=$((TESTS + 1))
+  if grep -q "new_project" "$ND/STRUCTURE.md" "$ND/README.md"; then
+    fail "derivation-script reference survives in STRUCTURE.md/README.md"; else ok x; fi
 
   # The generated README carries the target's name and, on the default
   # path, the explanation of the one WARN the validator will keep showing.
