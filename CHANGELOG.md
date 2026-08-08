@@ -44,6 +44,23 @@ decision.
   documentation only, no rule moves and no vault gains a finding, so it is
   MINOR.
 
+- **`export_traceability.py` — one reverse-key derivation for both readers of
+  the graph** (issue #67). `assess()` read the coverage's evidence half through
+  the literal `verifies_back` while `reverse_index()` derived the key from
+  `relations.verifies.reverse_key`, so renaming that schema key silently
+  emptied the evidence half of every requirement — a falsified coverage report
+  at exit 0. One shared derivation now feeds both readers; absence at any
+  level — the `relations` block, a kind's entry, the `reverse_key` field —
+  still falls back to the `<kind>_back` convention. Two shapes are now refused
+  loudly with exit 2 and the schema entry named, where they were previously
+  guessed around or crashed bare: a `relations` block that no longer declares
+  `verifies` (the relation the coverage report is defined on), and a
+  `reverse_key` declared as anything but a non-empty string. A derived project
+  that edited its `vault_schema.json` should read that refusal as the cost of
+  this update. PATCH — no rule moved; the tool stopped being wrong about an
+  input it already had an opinion on. Why:
+  `DEC_One_Reverse_Key_Derivation_For_Both_Readers` in the method vault.
+
 ## [0.1.0] - 2026-08-06
 
 The first tagged release, and the point from which the version number in this
