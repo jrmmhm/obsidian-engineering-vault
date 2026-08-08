@@ -93,6 +93,23 @@ Twice into the *same* directory on purpose: two different directories would
 differ in the provenance block's command line, which is a true record and not a
 determinism defect.
 
+**The evidence chains are closed.** The one check that is stricter than a
+working session, so it is also the one most likely to surprise you: locally the
+validator leaves an open REQ→TAE loop at `req-uncovered` (a WARN, by measured
+decision), and CI refuses it.
+
+```bash
+python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        00_documentation/01_projectvault --output-dir /tmp/tr-armed \
+        --no-timestamp --fail-on not-allocated,no-evidence-note
+# -> exit 0. Nonzero names the class and the requirements on stderr,
+#    and /tmp/tr-armed still holds the full export.
+```
+
+If you added a requirement, this is the step that asks you for its allocation
+row and its evidence note. Run it before you push and you will not meet it as a
+red check.
+
 **The worked example still proves what it claims.** The evidence in
 `TAE_Battery_Log_Acceptance` is the verbatim output of this command, so the
 command has to keep producing it — and the negative control has to keep failing.
