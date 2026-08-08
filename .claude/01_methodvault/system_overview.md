@@ -51,6 +51,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-034 | 2026-08-08 | [[DEC_Requirement_Index_Follows_The_Role_Map]] — the requirement index follows the role map |
 | DEC-MTH-035 | 2026-08-08 | [[DEC_A_Phantom_Citation_Is_Retargeted]] — a citation that resolves to no record is retargeted, not preserved |
 | DEC-MTH-036 | 2026-08-08 | [[DEC_Deriving_A_Project_Is_One_Command]] — deriving a project is one command |
+| DEC-MTH-037 | 2026-08-08 | [[DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It]] — generated content is stored only where CI proves it current |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather
