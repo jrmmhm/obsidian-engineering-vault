@@ -93,6 +93,24 @@ Twice into the *same* directory on purpose: two different directories would
 differ in the provenance block's command line, which is a true record and not a
 determinism defect.
 
+**The README excerpt still matches the vault.** The block near the top of
+`README.md` is the export's own output, stored between two marker comments, so
+a change to the worked example has to reach it in the same pull request.
+
+```bash
+python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        00_documentation/01_projectvault --output-dir /tmp/tr --no-timestamp \
+    | grep -E '^(requirements|objects):'
+sed -n '/^## Objects/,$p' /tmp/tr/traceability_index.md
+# -> the two count lines, a blank line, then the rest: that is the block
+```
+
+Paste those into the fence between `<!-- traceability-excerpt:start -->` and
+its `end` counterpart. Everything above `## Objects` in the index stays out —
+the absolute vault path, the file count and the digest differ per machine, and
+comparing them would fail on every runner. The reasoning is
+[`DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It.md).
+
 **The worked example still proves what it claims.** The evidence in
 `TAE_Battery_Log_Acceptance` is the verbatim output of this command, so the
 command has to keep producing it — and the negative control has to keep failing.

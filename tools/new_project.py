@@ -149,11 +149,11 @@ REPLACEMENTS = [
      "That is *your project's* release trail."),
     ("STRUCTURE.md",
      "Everything GitHub reads rather than a person: `workflows/validate-vault.yml`\n"
-     "runs the validator, the template vault audit, the export determinism check and\n"
-     "the worked example on every push and pull request; `ISSUE_TEMPLATE/` holds the\n"
-     "bug report and the method change proposal, with `config.yml` for the chooser;\n"
-     "`pull_request_template.md` carries the checklist of gates a reviewer would\n"
-     "otherwise re-derive.",
+     "runs the validator, the template vault audit, the export determinism check, the\n"
+     "README traceability excerpt and the worked example on every push and pull\n"
+     "request; `ISSUE_TEMPLATE/` holds the bug report and the method change proposal,\n"
+     "with `config.yml` for the chooser; `pull_request_template.md` carries the\n"
+     "checklist of gates a reviewer would otherwise re-derive.",
      "Everything GitHub reads rather than a person: `workflows/validate-vault.yml`\n"
      "runs the project vault audit and the export determinism check on every push\n"
      "and pull request."),
