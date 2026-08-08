@@ -4161,6 +4161,112 @@ assert ex.split_cells is mod.split_cells, "the two tools do not share one reader
 PY
 then ok x; else fail "a script-mode validator must not load the exporter against a second copy of itself"; fi
 
+# ==========================================================================
+# Issue #67: assess reads the reverse key reverse_index derives from the
+# schema - one derivation, so a schema rename cannot silently falsify the
+# coverage report. A/B like fixture 5, but BOTH tools are copied beside the
+# patched schema: the exporter imports the validate_vault.py at sys.path[0]
+# and that copy resolves SCHEMA_PATH beside itself, so copying the
+# validator alone would leave the shipped exporter reading the shipped
+# schema and every assertion below would test nothing. EN_V, EN_OUT and CV
+# are in their baseline states here (every mutation above is reverted),
+# and everything below writes only into fresh directories.
+# ==========================================================================
+rk_patch() { # rk_patch <dir under EX_TMP> <one-line python patch of dict 's'>
+  mkdir -p "$EX_TMP/$1"
+  cp "$EXPORTER" "$VALIDATOR" "$EX_TMP/$1/"
+  python3 - "$SKILL_DIR/vault_schema.json" "$EX_TMP/$1/vault_schema.json" "$2" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+exec(sys.argv[3])
+json.dump(s, open(sys.argv[2], "w"))
+PY
+}
+
+# (a) reverse_key renamed: the edges move to the new name and the coverage
+# report does not notice - the exact report a rename used to falsify.
+rk_patch "sc-renamed" 's["relations"]["verifies"]["reverse_key"] = "proven_by"'
+rn_out=$(python3 "$EX_TMP/sc-renamed/export_traceability.py" "$EN_V" \
+  --output-dir "$EX_TMP/out-renamed" --no-timestamp 2>&1); rn_rc=$?
+TESTS=$((TESTS + 1))
+if [ $rn_rc -eq 0 ]; then ok x; else
+  fail "a renamed reverse key must not break the export, got $rn_rc: $rn_out"; fi
+TESTS=$((TESTS + 1))
+if python3 - "$EX_TMP/out-renamed/traceability.json" "$EN_OUT/traceability.json" <<'PY'
+import json, sys
+ren = json.load(open(sys.argv[1])); base = json.load(open(sys.argv[2]))
+assert sorted(ren["reverse"]["REQ-EXP-001"]["proven_by"]) == ["TAE:TAE_Export"], \
+    ren["reverse"]["REQ-EXP-001"]
+assert "verifies_back" not in ren["reverse"]["REQ-EXP-001"]
+assert ren["coverage"] == base["coverage"], "coverage drifted under a renamed key"
+PY
+then ok x; else
+  fail "a renamed reverse key must move the edges and leave the coverage identical"; fi
+
+# (b) the whole relations block deleted: the minimal-schema path, which is
+# also what FALLBACK_SCHEMA looks like - every kind falls back to
+# '<kind>_back' and the coverage stays correct. Only the coverage is
+# compared: deleting the block also empties the contains/test-object
+# domain gates, so edges and findings legitimately change with it.
+rk_patch "sc-norels" 'del s["relations"]'
+nr_out=$(python3 "$EX_TMP/sc-norels/export_traceability.py" "$EN_V" \
+  --output-dir "$EX_TMP/out-norels" --no-timestamp 2>&1); nr_rc=$?
+TESTS=$((TESTS + 1))
+if [ $nr_rc -eq 0 ]; then ok x; else
+  fail "a schema without a relations block must fall back, got $nr_rc: $nr_out"; fi
+TESTS=$((TESTS + 1))
+if python3 - "$EX_TMP/out-norels/traceability.json" "$EN_OUT/traceability.json" <<'PY'
+import json, sys
+nor = json.load(open(sys.argv[1])); base = json.load(open(sys.argv[2]))
+assert sorted(nor["reverse"]["REQ-EXP-001"]["verifies_back"]) == ["TAE:TAE_Export"]
+assert nor["coverage"] == base["coverage"], "coverage drifted without a relations block"
+PY
+then ok x; else
+  fail "without a relations block the '<kind>_back' convention must keep the coverage"; fi
+
+# (c) relations present but the verifies entry deleted: the coverage report
+# is defined on that relation, so the export is refused rather than built
+# on a vocabulary nobody declared. mkdir runs before analyse, so the empty
+# output directory exists - the artifact must not.
+rk_patch "sc-dropped" 'del s["relations"]["verifies"]'
+dr_out=$(python3 "$EX_TMP/sc-dropped/export_traceability.py" "$EN_V" \
+  --output-dir "$EX_TMP/out-dropped" --no-timestamp 2>&1); dr_rc=$?
+TESTS=$((TESTS + 1))
+if [ $dr_rc -eq 2 ]; then ok x; else
+  fail "a relations block without verifies must be refused with exit 2, got $dr_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$dr_out" "relations.verifies"; then ok x; else
+  fail "the refusal must name relations.verifies, got: $dr_out"; fi
+TESTS=$((TESTS + 1))
+if [ ! -f "$EX_TMP/out-dropped/traceability.json" ]; then ok x; else
+  fail "a refused export must not leave a traceability.json behind"; fi
+
+# (d) a reverse_key that is declared but unusable: the old inline fallback
+# silently overrode '' and null; a declared value is refused, not guessed.
+rk_patch "sc-junk" 's["relations"]["verifies"]["reverse_key"] = ""'
+jk_out=$(python3 "$EX_TMP/sc-junk/export_traceability.py" "$EN_V" \
+  --output-dir "$EX_TMP/out-junk" --no-timestamp 2>&1); jk_rc=$?
+TESTS=$((TESTS + 1))
+if [ $jk_rc -eq 2 ]; then ok x; else
+  fail "an empty reverse_key must be refused with exit 2, got $jk_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$jk_out" "relations.verifies.reverse_key"; then ok x; else
+  fail "the refusal must name relations.verifies.reverse_key, got: $jk_out"; fi
+
+# (f) the validator beside the refused schema: a fourth 'cannot say' state
+# beside the three of fixture 10. The refusal must degrade the allocation
+# half of req-uncovered, never crash the run - exit 2 is the code both
+# hooks fail open on. Verification half still decides (REQ-COV-002);
+# allocation half is not held against a REQ it cannot see (REQ-COV-006).
+cvf_out=$(python3 "$EX_TMP/sc-dropped/validate_vault.py" "$CV" 2>&1); cvf_rc=$?
+TESTS=$((TESTS + 1))
+if [ $cvf_rc -ne 2 ]; then ok x; else
+  fail "a refused schema must not crash the validator"; fi
+TESTS=$((TESTS + 1))
+if contains "$cvf_out" "\[req-uncovered\] REQ-COV-002" && \
+   ! contains "$cvf_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+  fail "under a refused schema the verification half must still decide alone"; fi
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
