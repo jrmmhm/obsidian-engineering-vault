@@ -78,7 +78,7 @@ decision.
   export on every push and fails when the block has drifted, naming the
   command that repairs it. Only the machine-independent lines are stored — the
   index's provenance head carries an absolute path and a digest and would
-  differ on every runner. This is the one place in this repository where
+  differ on every runner. This was the first place in this repository where
   generated content is committed, and the four conditions that bound the
   exception are
   [`DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It.md);
@@ -86,6 +86,29 @@ decision.
   issue #78. A derived project inherits neither the block nor the step —
   `tools/new_project.py` writes its own README and its own workflow — so no
   rule moves and no existing vault gains a finding: MINOR.
+- **A first success, not a first check — [TUTORIAL.md](TUTORIAL.md)** — the
+  quick start used to end with the validator reporting that the shipped vault
+  is intact, which is a check and not a result (issue #77). The tutorial is
+  the ten-minute path from there: derive a project, write one requirement,
+  one evidence note and one allocation row, and watch the exporter go from
+  `proven: 0  not proven: 1` to `proven: 1  not proven: 0` — the reader's own
+  loop, out of the reader's own three files. The worked example is untouched
+  and the tutorial does not depend on it: it runs in a project derived with
+  `tools/new_project.py`, where the example is already gone and the two CI
+  steps a derived project carries stay green after the reader is done. The
+  allocation row starts at `Draft` with an empty evidence cell and only
+  reaches `Verified` after the run whose output the reader pastes, because
+  the opposite order is the defect this method exists to prevent. The
+  document is its own CI fixture: the self-test extracts every file block
+  from it, writes them into a throwaway derived project, runs the commands
+  the page prints and diffs the output the page quotes, so a tutorial that
+  stopped being true fails the suite before it reaches a reader. The
+  reasoning is
+  [`DEC_A_Tutorial_Is_Replayed_Not_Reviewed`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Tutorial_Is_Replayed_Not_Reviewed.md),
+  which extends the four conditions of DEC-MTH-037 by the stored-input case.
+  `TUTORIAL.md` is template-repo-only and `tools/new_project.py` strips it.
+  New documentation and a new assertion, no rule moves, no existing vault
+  gains a finding: MINOR.
 
 ### Changed
 

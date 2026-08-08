@@ -37,6 +37,10 @@ STRIP_PATHS = [
     # "Replace it with your own rules or delete it" - their own blockquotes.
     "CONTRIBUTING.md",
     "CHANGELOG.md",
+    # The tutorial derives a project as its step 0 and quotes the output of
+    # a vault that has just been derived, so it is false from its first
+    # line inside one. Read it in the clone it came from (DEC-MTH-040).
+    "TUTORIAL.md",
     # "In a project made from this template, delete this directory" (STRUCTURE.md).
     ".claude/01_methodvault",
     # ".github/: delete it, or keep the workflow and replace the templates
