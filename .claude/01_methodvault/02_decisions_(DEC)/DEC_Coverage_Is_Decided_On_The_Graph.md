@@ -2,7 +2,7 @@
 domain: DEC
 id: DEC-MTH-026
 created: 2026-08-05
-last-verified: 2026-08-05
+last-verified: 2026-08-08
 ---
 Date: 2026-08-05
 Status: Accepted
@@ -183,10 +183,10 @@ the TAE body. That is precisely what the old rule accepted as proof.
    is the change with the larger measured payoff and is deliberately not
    in this amendment.
 2. **`assess` reads `verifies_back` as a literal** while `reverse_index`
-   derives the key from `relations.verifies.reverse_key`. Renaming that
-   schema key today mis-renders the export; it does not reach this rule,
-   which takes only `not-allocated` from the coverage map, and that class
-   is computed from the allocations alone.
+   derives the key from `relations.verifies.reverse_key` — closed by
+   [[DEC_One_Reverse_Key_Derivation_For_Both_Readers]] (issue #67): one
+   shared derivation now feeds both readers, so the rename that used to
+   mis-render the export yields the same coverage under the new name.
 3. **A missing `export_traceability.py` degrades the rule silently.** The
    verification half still decides, and nothing says the allocation half
    stopped. `--check-install` is the place that answers "is this copy of

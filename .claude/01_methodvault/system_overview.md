@@ -6,10 +6,12 @@ amendment was assigned when its pull request landed, so `2026-08-04e` stands
 before `2026-08-04d` and `2026-08-05j` before `2026-08-05i`. Renumbering them
 would invent a history nobody had.
 
-Every entry is a verbatim migration of one amendment of
-`.claude/skills/mechatronics-docs/DECISIONS.md`; the title column repeats the
-source heading. Where a later record corrects a statement of an earlier one, the
-earlier file carries a `Corrected by:` line above its Context.
+Every entry up to [[DEC_The_Decision_Log_Moves_Into_A_Vault]] is a verbatim
+migration of one amendment of `.claude/skills/mechatronics-docs/DECISIONS.md`;
+the title column repeats the source heading. Entries after it are decisions
+made since the migration and written here directly. Where a later record
+corrects a statement of an earlier one, the earlier file carries a
+`Corrected by:` line above its Context.
 
 | ID | Date | Decision |
 | --- | --- | --- |
@@ -45,7 +47,8 @@ earlier file carries a `Corrected by:` line above its Context.
 | DEC-MTH-030 | 2026-08-05j | [[DEC_Safety_Standard_Correspondence_Is_Structural]] — the correspondence to a safety standard is structural, not a claim |
 | DEC-MTH-031 | 2026-08-05i | [[DEC_A_REQ_File_Without_A_Table_Is_A_Process_Defect]] — a REQ file with no table is a process defect, not a validator finding |
 | DEC-MTH-032 | 2026-08-05 | [[DEC_The_Decision_Log_Moves_Into_A_Vault]] — the decision log moves into a vault of its own |
+| DEC-MTH-033 | 2026-08-08 | [[DEC_One_Reverse_Key_Derivation_For_Both_Readers]] — one reverse-key derivation for both readers of the graph |
 
-The last entry is the only one that was not migrated: it is the decision that
-performed the migration, and it is written here rather than in the file it
-retires.
+DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
+is the decision that performed the migration, and it is written here rather
+than in the file it retires.
