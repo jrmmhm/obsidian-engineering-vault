@@ -4547,6 +4547,147 @@ fi
 # END tools/new_project.py
 # ==========================================================================
 
+# ==========================================================================
+# BEGIN --fail-on: the exporter's gap classes as a blocking check (issue
+# #68, DEC-MTH-039). Self-contained and appended last for the same reason
+# the block above is: concurrent branches append here too.
+#
+# No new trap. Traps in this file OVERWRITE rather than accumulate, so a
+# fresh one would have to re-list all eleven directories or silently drop
+# them from cleanup. Everything below writes under $EX_TMP, which the last
+# trap already covers.
+#
+# The two positive assertions are paired with negative halves on purpose.
+# The fixture's gap sets are 002/003/004 = not-allocated + no-evidence-
+# note, 005 = not-proven + no-evidence-note, 006 = not-allocated, 001 =
+# none - so "names REQ-COV-006" alone passes against an implementation
+# that ignores the armed set and prints every requirement carrying any
+# gap. Only the exclusions tell the two apart.
+# ==========================================================================
+FO_OUT="$EX_TMP/fail-on"
+
+# The clean template vault, armed exactly as CI arms it.
+TESTS=$((TESTS + 1))
+if [ -d "$REAL_VAULT" ]; then
+  python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FO_OUT/real" --no-timestamp \
+    --fail-on not-allocated,no-evidence-note >/dev/null 2>&1
+  if [ $? -eq 0 ]; then ok x; else
+    fail "the shipped template vault must survive the armed classes"; fi
+else
+  fail "real template vault not found at $REAL_VAULT"
+fi
+
+# not-allocated: 006 is the requirement nothing allocates. 005 IS allocated
+# (its row carries prose instead of a link) and must not appear here.
+fo_na=$(python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/na" --no-timestamp \
+  --fail-on not-allocated 2>&1 >/dev/null); fo_na_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fo_na_rc -eq 1 ]; then ok x; else
+  fail "an armed run over an open evidence chain must exit 1, got $fo_na_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fo_na" "REQ-COV-006"; then ok x; else
+  fail "not-allocated must name REQ-COV-006:"
+  printf '%s\n' "$fo_na" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! contains "$fo_na" "REQ-COV-005" && ! contains "$fo_na" "REQ-COV-001"; then
+  ok x; else
+  fail "not-allocated named a requirement of another class:"
+  printf '%s\n' "$fo_na" | sed 's/^/    /'; fi
+
+# no-evidence-note: the mirror image. 005 is named by no TAE; 006 is.
+fo_ne=$(python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/ne" --no-timestamp \
+  --fail-on no-evidence-note 2>&1 >/dev/null); fo_ne_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fo_ne_rc -eq 1 ]; then ok x; else
+  fail "no-evidence-note must exit 1 on the coverage fixture, got $fo_ne_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fo_ne" "REQ-COV-005"; then ok x; else
+  fail "no-evidence-note must name REQ-COV-005:"
+  printf '%s\n' "$fo_ne" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! contains "$fo_ne" "REQ-COV-006" && ! contains "$fo_ne" "REQ-COV-001"; then
+  ok x; else
+  fail "no-evidence-note named a requirement of another class:"
+  printf '%s\n' "$fo_ne" | sed 's/^/    /'; fi
+
+# A run that blocks still hands over the evidence of why it blocked.
+TESTS=$((TESTS + 1))
+if [ -f "$FO_OUT/ne/traceability.json" ] && [ -f "$FO_OUT/ne/traceability.html" ]; then
+  ok x; else fail "a blocking armed run must still write its artifacts"; fi
+
+# The default contract, on the very vault the armed runs above fail on.
+# This is the load-bearing assertion of the whole block: local behaviour
+# is unchanged, and only a caller that asks for it ever gets blocked.
+TESTS=$((TESTS + 1))
+python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/plain" --no-timestamp >/dev/null 2>&1
+if [ $? -eq 0 ]; then ok x; else
+  fail "without --fail-on a gap must not change the exit code"; fi
+
+# A class name this tool does not know is refused before anything is read:
+# exit 2, the valid names printed (that message IS the recovery path), and
+# no output directory created.
+fo_bad=$(python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/typo" --no-timestamp \
+  --fail-on no_evidence_note 2>&1); fo_bad_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fo_bad_rc -eq 2 ]; then ok x; else
+  fail "an unknown gap class must be refused with exit 2, got $fo_bad_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fo_bad" "not-allocated" && contains "$fo_bad" "no-evidence-note" \
+   && contains "$fo_bad" "evidence-disagrees" && contains "$fo_bad" "not-proven" \
+   && contains "$fo_bad" "evidence-is-prose"; then ok x; else
+  fail "the refusal must list every valid class name:"
+  printf '%s\n' "$fo_bad" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ ! -e "$FO_OUT/typo" ]; then ok x; else
+  fail "a refused --fail-on must not have written anything"; fi
+
+# An empty or whitespace-only value arms nothing, which is the same
+# switched-off gate as a typo and is refused the same way.
+for fo_empty in "" "  ,  "; do
+  TESTS=$((TESTS + 1))
+  python3 "$EXPORTER" "$CV" --output-dir "$FO_OUT/empty" --no-timestamp \
+    --fail-on "$fo_empty" >/dev/null 2>&1
+  if [ $? -eq 2 ]; then ok x; else
+    fail "--fail-on '$fo_empty' must be refused, not treated as unarmed"; fi
+done
+
+# Whitespace around a name is trimmed and a repeated name is read once.
+TESTS=$((TESTS + 1))
+python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FO_OUT/dedup" --no-timestamp \
+  --fail-on "not-allocated, not-allocated , no-evidence-note" >/dev/null 2>&1
+if [ $? -eq 0 ]; then ok x; else
+  fail "--fail-on must trim and deduplicate its class list"; fi
+
+# A gate over a graph with no requirement cannot fail, so it fails. The
+# method vault is the shipped vault of exactly that shape.
+TESTS=$((TESTS + 1))
+if [ -d "$METHOD_VAULT" ]; then
+  fo_empty_out=$(python3 "$EXPORTER" "$METHOD_VAULT" --output-dir "$FO_OUT/none" \
+    --no-timestamp --fail-on not-allocated 2>&1 >/dev/null)
+  if [ $? -eq 1 ] && contains "$fo_empty_out" "no requirement at all"; then
+    ok x; else
+    fail "an armed run over a graph without requirements must fail:"
+    printf '%s\n' "$fo_empty_out" | sed 's/^/    /'; fi
+else
+  fail "method vault not found at $METHOD_VAULT"
+fi
+
+# Precedence: the flag is validated ahead of the vault-root refusal, so the
+# message names the flag the caller got wrong rather than the next thing to
+# fail. Both are exit 2, so only the message can tell them apart.
+fo_prec=$(python3 "$EXPORTER" "$EX_TMP" --output-dir "$FO_OUT/prec" \
+  --fail-on typo 2>&1); fo_prec_rc=$?
+TESTS=$((TESTS + 1))
+# Matched without the leading dashes: 'contains' passes the pattern to grep
+# unguarded, and a pattern starting with '-' is read as an option there.
+if [ $fo_prec_rc -eq 2 ] && contains "$fo_prec" "fail-on names no gap class"; then
+  ok x; else
+  fail "a bad --fail-on must be refused before the vault-root check:"
+  printf '%s\n' "$fo_prec" | sed 's/^/    /'; fi
+# ==========================================================================
+# END --fail-on
+# ==========================================================================
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
