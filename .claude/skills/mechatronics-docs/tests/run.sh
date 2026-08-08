@@ -4445,7 +4445,7 @@ if [ -f "$NP" ]; then
 
   # Template-repo-only material and the worked example must be gone; the
   # method's tooling and the files STRUCTURE.md says travel must remain.
-  for gone in "CONTRIBUTING.md" "CHANGELOG.md" "tools" ".claude/01_methodvault" \
+  for gone in "CONTRIBUTING.md" "CHANGELOG.md" "TUTORIAL.md" "tools" ".claude/01_methodvault" \
       ".github/ISSUE_TEMPLATE" ".github/pull_request_template.md" \
       ".claude/skills/mechatronics-docs/tests" "20_software/data_analysis" \
       "30_testdata/31_testdata_raw/2026-07-28_battery_monitoring" \
@@ -4790,6 +4790,202 @@ if [ $fo_prec_rc -eq 2 ] && contains "$fo_prec" "fail-on names no gap class"; th
   printf '%s\n' "$fo_prec" | sed 's/^/    /'; fi
 # ==========================================================================
 # END --fail-on
+# ==========================================================================
+
+# ==========================================================================
+# BEGIN TUTORIAL.md - the tutorial is replayed, not reviewed (issue #77,
+# DEC-MTH-040). Self-contained and appended last for the same reason the
+# two blocks above are: concurrent branches append here too.
+#
+# The document IS the fixture. Every file the tutorial tells a reader to
+# create is extracted from TUTORIAL.md itself and written to the path its
+# marker names, so a second copy cannot drift against what the page shows.
+# Then the tutorial's own commands run, in its own order, and its own
+# quoted output is diffed against what they printed.
+#
+# No new trap: traps in this file OVERWRITE rather than accumulate, so a
+# fresh one would silently drop the eleven roots the last one covers.
+# Everything below lives under $TUT_TMP and is removed explicitly at the
+# end of the block, the way the new_project.py block does it.
+#
+# The substrate is a DERIVED project, not this clone. That is not a
+# convenience: three notes in this repository's own vault break the
+# 'requirements: 3  proven: 3' assertion above and the README excerpt
+# step in CI, which is exactly the red pipeline the tutorial must not
+# hand a first-time reader.
+# ==========================================================================
+TUT_MD="$NP_ROOT/TUTORIAL.md"
+TESTS=$((TESTS + 1))
+if [ -f "$TUT_MD" ]; then ok x; else fail "tutorial not found at $TUT_MD"; fi
+
+# tut <mode> [arg] - read TUTORIAL.md. Modes: count-files, path <i>,
+# get-file <i>, get <marker>. The fence opener's length is matched, so a
+# block containing a nested fence (the TAE note does) is read whole.
+tut() {
+  python3 - "$TUT_MD" "$@" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+mode = sys.argv[2]
+FILE_RE = re.compile(r"^<!-- tutorial-file: (.+?) -->\n(`{3,})[^\n]*\n(.*?)^\2[ \t]*$",
+                     re.S | re.M)
+files = FILE_RE.findall(text)
+if mode == "count-files":
+    print(len(files))
+elif mode in ("path", "get-file"):
+    i = int(sys.argv[3])
+    if i >= len(files):
+        sys.exit("no tutorial-file block #%d" % i)
+    sys.stdout.write(files[i][0] if mode == "path" else files[i][2])
+elif mode == "get":
+    m = re.search(r"^<!-- " + re.escape(sys.argv[3]) + r" -->\n(`{3,})[^\n]*\n(.*?)^\1[ \t]*$",
+                  text, re.S | re.M)
+    if not m:
+        sys.exit("no block for marker: " + sys.argv[3])
+    sys.stdout.write(m.group(2))
+else:
+    sys.exit("unknown mode: " + mode)
+PY
+}
+
+# tut_diff <marker> <actual> <description> - the tutorial's quoted output
+# against what the command printed. Trailing newlines are normalised on
+# both sides; nothing else is.
+tut_diff() {
+  TESTS=$((TESTS + 1))
+  _exp=$(tut get "$1")
+  if [ "$_exp" = "$2" ]; then ok x; else
+    fail "$3"
+    diff <(printf '%s\n' "$_exp") <(printf '%s\n' "$2") | sed 's/^/    /'
+  fi
+}
+
+if [ -f "$TUT_MD" ] && [ -f "$NP" ]; then
+  TUT_TMP=$(mktemp -d)
+  TUT_DIR="$TUT_TMP/my-first-project"
+  TUT_VAULT="$TUT_DIR/00_documentation/01_projectvault"
+
+  # The document's shape, asserted before anything is replayed: three
+  # notes, and the third is the TAE. The order is load-bearing - the
+  # tutorial measures between the second file and the third, and a
+  # reshuffled document must fail here rather than silently test a
+  # different lesson.
+  TESTS=$((TESTS + 1))
+  if [ "$(tut count-files)" = "3" ]; then ok x; else
+    fail "TUTORIAL.md must carry exactly 3 tutorial-file blocks, found $(tut count-files)"; fi
+  TESTS=$((TESTS + 1))
+  case "$(tut path 2)" in
+    07_testing_and_evidence_*) ok x ;;
+    *) fail "the third tutorial-file block must be the TAE note, is '$(tut path 2)'" ;;
+  esac
+
+  # Step 0 of the tutorial, verbatim.
+  TESTS=$((TESTS + 1))
+  if python3 "$NP" "$TUT_DIR" >/dev/null 2>&1; then ok x; else
+    fail "step 0 of the tutorial (deriving a project) failed"; fi
+
+  if [ -d "$TUT_VAULT" ]; then
+    # Steps 1 and 2: the first two notes, written where their markers say.
+    for i in 0 1; do
+      tut get-file "$i" > "$TUT_VAULT/$(tut path "$i")"
+    done
+    # Step 3: the module row replaces the placeholder row, by name.
+    python3 - "$TUT_VAULT/system_overview.md" "$(tut get 'tutorial-row: overview')" <<'PY'
+import sys
+path, row = sys.argv[1], sys.argv[2].rstrip("\n")
+old = "| *Add your modules here* | *Brief description of the module* |"
+text = open(path, encoding="utf-8").read()
+if text.count(old) != 1:
+    sys.exit("placeholder row not found exactly once in system_overview.md")
+open(path, "w", encoding="utf-8").write(text.replace(old, row))
+PY
+    TESTS=$((TESTS + 1))
+    if grep -q "ARC_Documentation_Check" "$TUT_VAULT/system_overview.md"; then ok x; else
+      fail "step 3 did not put the module row into system_overview.md"; fi
+
+    # Step 4, in the tutorial's own spellings, from the project root.
+    tv1=$(cd "$TUT_DIR" && python3 .claude/skills/mechatronics-docs/validate_vault.py \
+      00_documentation/01_projectvault 2>&1)
+    tv1sum=$(printf '%s\n' "$tv1" | tail -n 1)
+    tut_diff "tutorial-output: validator-draft" "$tv1sum" \
+      "the validator's summary line after step 3 is not what the tutorial shows"
+    TESTS=$((TESTS + 1))
+    if contains "$tv1" "req-uncovered"; then ok x; else
+      fail "step 4 must show the reader the open req-uncovered warning:"
+      printf '%s\n' "$tv1" | sed 's/^/    /'; fi
+
+    te1=$(cd "$TUT_DIR" && python3 .claude/skills/mechatronics-docs/export_traceability.py \
+      00_documentation/01_projectvault --output-dir ../traceability 2>&1)
+    te1cmp=$(printf '%s\n' "$te1" | grep -v '^vault: ' | grep -v '^written to: ')
+    tut_diff "tutorial-output: export-draft" "$te1cmp" \
+      "the exporter's machine-independent lines after step 3 differ from the tutorial"
+
+    # The evidence the tutorial's TAE carries must be the line the run above
+    # actually printed. This is the assertion that keeps the tutorial from
+    # teaching a reader to write down a result nobody obtained.
+    TESTS=$((TESTS + 1))
+    tae_ev=$(tut get-file 2 | grep '^-- .*error(s)')
+    if [ "$tae_ev" = "$tv1sum" ]; then ok x; else
+      fail "the TAE's quoted evidence is not the line step 4 printed:"
+      printf '    TAE:  %s\n    run:  %s\n' "$tae_ev" "$tv1sum"; fi
+
+    # Step 5: the TAE. Step 6: the allocation row, replaced by its prefix -
+    # exactly one line of the ARC note starts with it.
+    tut get-file 2 > "$TUT_VAULT/$(tut path 2)"
+    python3 - "$TUT_VAULT/$(tut path 1)" "$(tut get 'tutorial-row: allocation')" <<'PY'
+import sys
+path, row = sys.argv[1], sys.argv[2].rstrip("\n")
+prefix = "| [[ARC_Documentation_Check]] (ARC-DOC-001) |"
+lines = open(path, encoding="utf-8").read().splitlines(True)
+hits = [i for i, l in enumerate(lines) if l.startswith(prefix)]
+if len(hits) != 1:
+    sys.exit("allocation row not found exactly once in the ARC note")
+lines[hits[0]] = row + "\n"
+open(path, "w", encoding="utf-8").writelines(lines)
+PY
+
+    # Step 7: the same two commands, and the reader's own loop.
+    tv2=$(cd "$TUT_DIR" && python3 .claude/skills/mechatronics-docs/validate_vault.py \
+      00_documentation/01_projectvault 2>&1)
+    tut_diff "tutorial-output: validator-final" "$(printf '%s\n' "$tv2" | tail -n 1)" \
+      "the validator's summary line after step 6 is not what the tutorial shows"
+    TESTS=$((TESTS + 1))
+    if ! contains "$tv2" "req-uncovered"; then ok x; else
+      fail "req-uncovered must be gone once the loop is closed"; fi
+
+    te2=$(cd "$TUT_DIR" && python3 .claude/skills/mechatronics-docs/export_traceability.py \
+      00_documentation/01_projectvault --output-dir ../traceability 2>&1)
+    tut_diff "tutorial-output: export-final" \
+      "$(printf '%s\n' "$te2" | grep -v '^vault: ' | grep -v '^written to: ')" \
+      "the exporter's machine-independent lines after step 6 differ from the tutorial"
+    tut_diff "tutorial-output: index" \
+      "$(cd "$TUT_DIR" && grep -- -DOC- ../traceability/traceability_index.md)" \
+      "the index lines the tutorial shows are not the ones the export wrote"
+
+    # A reader who follows the tutorial and pushes must not meet a red
+    # pipeline: the derived workflow's two steps, run here as CI runs them.
+    TESTS=$((TESTS + 1))
+    if (cd "$TUT_DIR" && python3 .claude/skills/mechatronics-docs/validate_vault.py \
+        00_documentation/01_projectvault >/dev/null 2>&1); then ok x; else
+      fail "a project that followed the tutorial must pass its own vault audit"; fi
+    # The same output directory twice with the first run copied aside, as
+    # the generated workflow does it: two different directories would
+    # differ in the provenance block's command line, which is a true
+    # record and not a determinism defect.
+    TESTS=$((TESTS + 1))
+    if (cd "$TUT_DIR" \
+        && python3 .claude/skills/mechatronics-docs/export_traceability.py \
+             00_documentation/01_projectvault --output-dir "$TUT_TMP/d" --no-timestamp >/dev/null 2>&1 \
+        && cp -r "$TUT_TMP/d" "$TUT_TMP/d-ref" \
+        && python3 .claude/skills/mechatronics-docs/export_traceability.py \
+             00_documentation/01_projectvault --output-dir "$TUT_TMP/d" --no-timestamp >/dev/null 2>&1 \
+        && diff -r "$TUT_TMP/d-ref" "$TUT_TMP/d" >/dev/null 2>&1); then ok x; else
+      fail "a project that followed the tutorial must pass its export determinism step"; fi
+  fi
+
+  rm -rf "$TUT_TMP"
+fi
+# ==========================================================================
+# END TUTORIAL.md
 # ==========================================================================
 
 echo "$TESTS tests, $FAILURES failure(s)"
