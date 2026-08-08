@@ -18,6 +18,60 @@ A validator enforces it mechanically, so the documentation cannot quietly rot.
 
 ---
 
+## The output, before the argument
+
+This is the vault that ships with this template, read back out of itself. The
+worked example is one module — battery monitoring — and the exporter walks it
+into a graph:
+
+```bash
+python3 .claude/skills/mechatronics-docs/export_traceability.py \
+        00_documentation/01_projectvault --output-dir ../traceability
+```
+
+Two lines of what it reports, then the index it writes:
+
+<!-- traceability-excerpt:start -->
+```text
+requirements: 3  proven: 3  not proven: 0
+objects: 7  relations: 20  findings: 0
+
+## Objects (7)
+
+- `ARC-BAT-001` · ARC · `03_architecture_(ARC)/ARC_Battery_Monitoring.md` · Battery monitoring module: it records telemetry from the host machine's battery pack into a log and decides whether that log meets its acceptance criteria.
+- `CMP-BAT-001` · CMP · `04_components_(CMP)/CMP_Battery_Pack.md` · Rechargeable lithium-polymer battery pack of the host machine, and the supply endpoint of IFC_PWR_DC_LiPo_Pack (IFC-BAT-001) inside the module ARC_Battery_Monitoring (ARC-BAT-001).
+- `DEC-BAT-001` · DEC · `02_decisions_(DEC)/DEC_Battery_Log_Acceptance_Check.md` · The module ARC_Battery_Monitoring (ARC-BAT-001) produces telemetry logs whose acceptance criteria are stated in REQ_Battery_Monitoring (BAT) (REQ-BAT-000).
+- `IFC-BAT-001` · IFC · `05_interfaces_(IFC)/IFC_PWR_DC_LiPo_Pack.md` · DC power contract of a four-cell lithium-polymer pack: the voltage range a consumer of this contract must tolerate, and the range within which a recorded pack voltage is considered valid.
+- `IMP-BAT-001` · IMP · `06_implementation_(IMP)/IMP_Battery_Log_Evaluation.md` · Concrete realization of the battery telemetry chain of ARC_Battery_Monitoring (ARC-BAT-001): one script that records a log from the pack and one that decides the acceptance criteria of REQ_Battery_Monitoring (BAT) (REQ-BAT-000) against…
+- `REQ-BAT-000` · REQ · `01_requirements_(REQ)/REQ_Battery_Monitoring (BAT).md` · Requirements on the battery monitoring chain of the module ARC_Battery_Monitoring (ARC-BAT-001): recording pack telemetry into a log and making that log evaluable.
+- `TAE-BAT-001` · TAE · `07_testing_and_evidence_(TAE)/TAE_Battery_Log_Acceptance.md` · Acceptance check of a recorded battery telemetry log of the module ARC_Battery_Monitoring (ARC-BAT-001) against all three requirements of REQ_Battery_Monitoring (BAT) (REQ-BAT-000).
+
+## Requirements (3)
+
+- `REQ-BAT-001` · REQ · `01_requirements_(REQ)/REQ_Battery_Monitoring (BAT).md:25` · While logging is active, the battery monitor shall record consecutive samples without a gap larger than twice the nominal sample interval.
+- `REQ-BAT-002` · REQ · `01_requirements_(REQ)/REQ_Battery_Monitoring (BAT).md:26` · The battery monitor shall record every pack voltage sample within the operating range of the DC power contract.
+- `REQ-BAT-003` · REQ · `01_requirements_(REQ)/REQ_Battery_Monitoring (BAT).md:27` · The battery monitor shall record the manufacturer and the model designation of the sampled pack in the log header.
+```
+<!-- traceability-excerpt:end -->
+
+Seven objects, one per domain, each carrying its own identifier and the first
+sentence of its own context — and three requirements, each at the file and line
+it is written on. Nothing there was typed by hand. The first two lines are the
+exporter's own summary, the rest is the tail of the `traceability_index.md` the
+command above writes.
+
+`proven: 3` is the part worth pausing on. It is not a claim in prose: it counts
+the requirements whose allocation row reached `Verified` **and** whose evidence
+note names them back, computed from the vault rather than remembered. The same
+run writes `traceability.html`, the report you would hand to a reviewer, and
+`0 not proven` is the sentence that report exists to be able to stop saying.
+
+A stored copy of generated output is only as current as its last run, which is
+why this repository does not keep one — except here, where CI regenerates the
+export on every push and fails if these lines have drifted from the vault.
+
+---
+
 ## The problem this solves
 
 Engineering documentation fails in a specific, predictable way. The same fact
