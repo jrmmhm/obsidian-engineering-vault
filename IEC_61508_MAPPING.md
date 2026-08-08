@@ -243,7 +243,7 @@ and 7, which were never opened, and it therefore cannot say what those parts
 would add to Section 6.
 
 What the repository's own tools do contribute is narrow and worth stating
-exactly once, because [README.md](README.md#handing-it-to-someone-else)
+exactly once, because [METHOD.md](METHOD.md#handing-it-to-someone-else)
 already describes it: the exporter names, per requirement, what is unproven
 rather than leaving an empty cell. Three of its classes decide whether a
 requirement counts as proven — `not-allocated`, `not-proven` and
