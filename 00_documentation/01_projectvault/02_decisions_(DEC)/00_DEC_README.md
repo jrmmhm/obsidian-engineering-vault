@@ -1,6 +1,8 @@
 
 DEC files document **decisions** (why we do X instead of Y), so that the system remains traceable later, without having to maintain implementation details or requirements twice. The file template can be found at: [[00_DEC_file_template]].
 
+**This domain joins the first time a choice had a real alternative** — one you would otherwise argue through again in six months, or that a REQ row wants to name in its Source / Justification column.
+
 ## IMPORTANT
 
 IF the statement:

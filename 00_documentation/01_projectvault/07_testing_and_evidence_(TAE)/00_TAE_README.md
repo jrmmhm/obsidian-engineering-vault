@@ -1,5 +1,7 @@
 TAE notes document tests, investigations and evidence including test conditions, limitations and traceable conclusions.
 
+**This domain joins on day one** and fills the first time you actually check something. Its `verifies:` field is the half of the loop that lives here; a requirement no evidence note names is reported as uncovered.
+
 ## Goal
 - Record traceably what was tested and under which conditions
 - Document evidence (measurement values/observations) in structured form
