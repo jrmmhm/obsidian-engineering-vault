@@ -5272,6 +5272,13 @@ PY
     tut_diff "tutorial-output: index" \
       "$(cd "$TUT_DIR" && grep -- -DOC- ../traceability/traceability_index.md)" \
       "the index lines the tutorial shows are not the ones the export wrote"
+    # The reader's own loop, drawn. Quoted from a run that carries a
+    # timestamp, because the page prints its commands without
+    # --no-timestamp - which only holds while the graph stays free of
+    # anything that depends on the run (asserted in the exporter block).
+    tut_diff "tutorial-output: graph" \
+      "$(cd "$TUT_DIR" && cat ../traceability/traceability_graph.mmd)" \
+      "the graph the tutorial shows is not the one the export drew"
 
     # A reader who follows the tutorial and pushes must not meet a red
     # pipeline: the derived workflow's two steps, run here as CI runs them.
