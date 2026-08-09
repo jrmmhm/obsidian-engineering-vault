@@ -36,11 +36,12 @@ words forward.
 
 Exit codes: 0 = artifacts written, 1 = artifacts written and a gap class
 the caller armed with --fail-on was found, 2 = not a vault, or output
-refused. A --fail-on name this tool does not know is refused before
-anything is read, ahead of both other refusals, so the message names the
-flag the caller got wrong. Without --fail-on nothing changes: coverage
-gaps are data and never change the exit code - this tool reports, it does
-not block (issue #68, DEC-MTH-039).
+refused. The two flag refusals come first and in a fixed order - a
+--fail-on name this tool does not know, then a --formats name it does not
+know - so the message names the flag the caller got wrong rather than the
+next thing that happens to fail. Without --fail-on nothing changes:
+coverage gaps are data and never change the exit code - this tool reports,
+it does not block (issue #68, DEC-MTH-039).
 """
 
 import argparse
@@ -64,6 +65,9 @@ from validate_vault import (  # noqa: E402
 )
 
 EXPORT_SCHEMA_VERSION = "1.1"
+# Every output this tool knows, in the order main() writes them. It is also
+# the default set, so the two cannot drift apart.
+FORMATS = ("json", "csv", "html", "index")
 ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 ROW_NNN_RE = re.compile(r"^\d{3}$")
 FULL_ID_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]{2,4})-(\d{3})\b")
@@ -1137,6 +1141,40 @@ def parse_fail_on(value):
     return names, None
 
 
+def parse_formats(value):
+    """-> (the formats to write, refusal message or None).
+
+    The posture --fail-on takes, one flag over and for the same reason
+    (issue #98, DEC-MTH-043). A format name this tool does not know wrote
+    nothing and exited 0, so a caller who mistyped it read an empty output
+    directory as a clean run - and it weighs heavier here than at the
+    gate, because the typo destroys the artifact instead of skipping a
+    check. A CI step that diffs two such runs can then never fail.
+
+    An empty value is refused rather than read as 'the defaults'. Falling
+    back would make '--formats ""' the one spelling that silently writes
+    nothing again, which is the whole defect.
+
+    A set, because the writers below ask for membership; the refusal
+    message keeps the caller's own order.
+    """
+    names, seen = [], set()
+    for raw in (value or "").split(","):
+        name = raw.strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    valid = ", ".join(FORMATS)
+    unknown = [n for n in names if n not in FORMATS]
+    if unknown:
+        return set(), (f"--formats names no output format of this tool: "
+                       f"{', '.join(unknown)}. Valid formats are {valid}")
+    if not names:
+        return set(), ("--formats was given without a usable format name. "
+                       f"Valid formats are {valid}")
+    return set(names), None
+
+
 def report_armed_gaps(coverage, armed):
     """-> the exit code of a run armed with --fail-on; prints its own reason.
 
@@ -1638,7 +1676,9 @@ def main(argv):
     ap.add_argument("vault_root")
     ap.add_argument("--output-dir", required=True,
                     help="directory for the artifacts; must be outside any vault")
-    ap.add_argument("--formats", default="json,csv,html,index")
+    ap.add_argument("--formats", default=",".join(FORMATS),
+                    help="comma-separated outputs to write; an unknown or "
+                         f"empty value is refused. Known: {', '.join(FORMATS)}")
     ap.add_argument("--no-timestamp", action="store_true",
                     help="omit the generation time so two runs compare equal")
     ap.add_argument("--fail-on", metavar="CLASSES",
@@ -1652,6 +1692,13 @@ def main(argv):
     # that as a clean vault. Refusing first also means the message names the
     # flag that is wrong rather than the next thing that happens to fail.
     armed, refusal = parse_fail_on(args.fail_on)
+    if refusal:
+        print(f"ERROR - {refusal}", file=sys.stderr)
+        return 2
+    # Second and not first: --fail-on's precedence over the vault-root
+    # refusal is pinned by the suite, so the new refusal takes the rank
+    # behind it rather than moving an order somebody already relies on.
+    formats, refusal = parse_formats(args.formats)
     if refusal:
         print(f"ERROR - {refusal}", file=sys.stderr)
         return 2
@@ -1675,7 +1722,6 @@ def main(argv):
         print(f"ERROR - cannot create {out}: {e}", file=sys.stderr)
         return 2
 
-    formats = {f.strip() for f in args.formats.split(",") if f.strip()}
     vault = Vault(root)
     schema, schema_error = load_schema()
     findings = []
