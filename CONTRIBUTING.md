@@ -93,23 +93,32 @@ Twice into the *same* directory on purpose: two different directories would
 differ in the provenance block's command line, which is a true record and not a
 determinism defect.
 
-**The README excerpt still matches the vault.** The block near the top of
-`README.md` is the export's own output, stored between two marker comments, so
-a change to the worked example has to reach it in the same pull request.
+**The README's generated blocks still match the vault.** `README.md` stores
+three pieces of the export's own output, each between a pair of marker
+comments, so a change to the worked example has to reach them in the same pull
+request. One run produces all three:
 
 ```bash
 python3 .claude/skills/mechatronics-docs/export_traceability.py \
         00_documentation/01_projectvault --output-dir /tmp/tr --no-timestamp \
-    | grep -E '^(requirements|objects):'
-sed -n '/^## Objects/,$p' /tmp/tr/traceability_index.md
-# -> the two count lines, a blank line, then the rest: that is the block
+    | grep -E '^(requirements|objects):'   # -> traceability-counts
+cat /tmp/tr/traceability_graph.mmd         # -> traceability-graph
+sed -n '/^## Objects/,$p' /tmp/tr/traceability_index.md   # -> traceability-excerpt
 ```
 
-Paste those into the fence between `<!-- traceability-excerpt:start -->` and
-its `end` counterpart. Everything above `## Objects` in the index stays out —
-the absolute vault path, the file count and the digest differ per machine, and
-comparing them would fail on every runner. The reasoning is
-[`DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It.md).
+Paste each into the fence between its own `<!-- <marker>:start -->` and `end`
+comment — the graph into a ` ```mermaid ` fence, the other two into ` ```text `.
+Everything above `## Objects` in the index stays out: the absolute vault path,
+the file count and the digest differ per machine, and comparing them would fail
+on every runner. `traceability_graph.mmd` carries none of the three, which is
+why it is stored whole.
+
+CI checks every marker pair the file carries, not a list of names it was given,
+so adding a fourth block means adding markers and nothing else — and removing
+the check for one is a red pipeline rather than a quiet gap. The reasoning is
+[`DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Generated_Content_Is_Stored_Only_Where_CI_Proves_It.md),
+widened to three blocks by
+[`DEC_The_Export_Draws_The_Graph_It_Reads`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Export_Draws_The_Graph_It_Reads.md).
 
 **The evidence chains are closed.** The one check that is stricter than a
 working session, so it is also the one most likely to surprise you: locally the
