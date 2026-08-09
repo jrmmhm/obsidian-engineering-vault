@@ -218,6 +218,34 @@ decision.
 
 ### Fixed
 
+- **The name index stops at the repository, so one commit indexes one set of
+  files** — the two indexes every wikilink is resolved against, and the one
+  `duplicate-basename` is decided on, were built over the vault root's
+  *parent*. In the canonical layout that parent is `00_documentation` and it
+  lies inside the repository, which is why the collision between
+  `01_projectvault` and `02_documents` is reported and stays reported. In a
+  project that versions the vault alone — the layout the validator has
+  supported since it learned to read git HEAD — that parent lies outside the
+  working tree: measured on such a vault, 53 of 378 indexed files sat outside
+  the repository, and the same commit as an isolated clone indexed 322 files
+  and none outside it. A link therefore resolved or failed depending on what
+  sat beside the checkout, and in a `git worktree` below a scratch directory
+  the walk reached that whole directory. The boundary is now the narrower of
+  the two, never the wider, so the canonical layout is untouched: verified,
+  its index holds the same 49 files and the shipped vault reports the same
+  findings. Both messages name the boundary in use instead of a hardcoded
+  `00_documentation`, which reads identically in the canonical layout and
+  names the vault's own path where no such folder exists. The reasoning, and
+  the two accepted residuals — a vault-at-repository-root layout *outside*
+  version control, and git-ignored state inside the working tree — is
+  [`DEC_The_Name_Index_Stops_At_The_Repository`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Name_Index_Stops_At_The_Repository.md).
+  Two finding codes can move in a vault of that layout, both named here so
+  you can grep before updating: a link that only ever resolved through a
+  neighbour of the checkout becomes `link-unresolved` (an ERROR in a full
+  run), and a collision with a file outside the repository stops being a
+  `duplicate-basename`. Measured on the vault this was found on: zero of
+  either. No rule of the method moves: PATCH.
+
 - **A mistyped `--formats` value no longer exits 0 and writes nothing** —
   `--formats jsonn` produced an empty output directory and a green exit, so
   a caller who mistyped it read that as a clean run (issue #98). It is now

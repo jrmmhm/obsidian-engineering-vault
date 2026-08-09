@@ -5497,6 +5497,128 @@ fi
 # END tools/new_project.py --minimal
 # ==========================================================================
 
+# ==========================================================================
+# Fixture 9: the vault IS the repository root. The name index is built over
+# the vault root's PARENT, which in this layout is a directory outside the
+# working tree - so the same commit indexed a different set of files
+# depending on what sat beside the checkout (01_methodvault, DEC-MTH-044).
+#
+# Two vaults, because the fix is a boundary and a boundary has two sides:
+# the root vault must stop at the repository, and the canonical vault below
+# it must keep reaching past the vault into 02_documents, which is where
+# duplicate-basename earns its keep.
+#
+# The only fixture that depends on git being FOUND rather than absent, so it
+# carries its own isolation assertion. Hermetic git, and GIT_DIR/GIT_WORK_TREE
+# explicitly dropped: both would make rev-parse answer for a different tree.
+# No commit is needed - --show-toplevel answers on an unborn HEAD.
+# ==========================================================================
+RT_TMP=$(mktemp -d)
+
+rgit() { # git, independent of this machine's config and of the caller's env
+  env -u GIT_DIR -u GIT_WORK_TREE \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"
+}
+
+TESTS=$((TESTS + 1))
+if ! rgit -C "$RT_TMP" rev-parse --show-toplevel >/dev/null 2>&1; then ok x; else
+  fail "TMPDIR lies inside a git repository - the root-vault fixture is void"; fi
+
+rt_domains() { # <vault root> - three domains with templates, i.e. a vault root
+  mkdir -p "$1/01_requirements_(REQ)" "$1/03_architecture_(ARC)" \
+           "$1/07_testing_and_evidence_(TAE)"
+  printf '## Context\n' > "$1/01_requirements_(REQ)/00_REQ_file_template.md"
+  printf '## Context\n' > "$1/03_architecture_(ARC)/00_ARC_file_template.md"
+  printf '## Context\n## Evidence\n' > "$1/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+  cat > "$1/03_architecture_(ARC)/ARC_Sensor.md" <<'EOF'
+---
+domain: ARC
+id: ARC-SEN-001
+status: active
+created: 2026-01-09
+last-verified: 2026-07-01
+---
+## Context
+Sensor module of the boundary fixture. It links a note that exists only in
+the directory beside this vault, and its own basename exists there a second
+time: [[REF_Outside_Datasheet]].
+EOF
+}
+
+# --- the root vault: repository root == vault root -------------------------
+RV="$RT_TMP/Rootproj"
+rt_domains "$RV"
+mkdir -p "$RT_TMP/outside"
+printf '# a second file of that name\n' > "$RT_TMP/outside/ARC_Sensor.md"
+printf '# the only match for the wikilink\n' > "$RT_TMP/outside/REF_Outside_Datasheet.md"
+rgit init -q "$RV"
+
+rvout=$(python3 "$VALIDATOR" "$RV" 2>&1); rvrc=$?
+
+TESTS=$((TESTS + 1))
+if contains "$rvout" "link-unresolved" && contains "$rvout" "REF_Outside_Datasheet"; then
+  ok x; else
+  fail "a wikilink whose only match lies outside the repository must not resolve:"
+  printf '%s\n' "$rvout" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if [ $rvrc -eq 1 ]; then ok x; else
+  fail "the unresolved link is an ERROR in a full run, so the exit code must be 1 (was $rvrc)"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$rvout" "'ARC_Sensor' exists"; then ok x; else
+  fail "a basename collision outside the repository is not this vault's collision:"
+  printf '%s\n' "$rvout" | grep duplicate-basename | sed 's/^/    /'
+fi
+# The two findings name the boundary they were decided on. A vault that has
+# no 00_documentation must not be told to look in one.
+TESTS=$((TESTS + 1))
+if ! contains "$rvout" "under 00_documentation" && contains "$rvout" "under .*Rootproj"; then
+  ok x; else
+  fail "the finding must name the boundary in use, not a folder this vault lacks:"
+  printf '%s\n' "$rvout" | grep link-unresolved | sed 's/^/    /'
+fi
+
+# Same commit, second location: the report must not depend on the neighbour.
+cp -a "$RV" "$RT_TMP/elsewhere_Rootproj"
+rvout2=$(python3 "$VALIDATOR" "$RT_TMP/elsewhere_Rootproj" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$rvout2" "REF_Outside_Datasheet" \
+    && ! contains "$rvout2" "'ARC_Sensor' exists"; then ok x; else
+  fail "one repository copied beside its own neighbour must report the same:"
+  printf '%s\n' "$rvout2" | sed 's/^/    /'
+fi
+
+# --- the canonical vault: the boundary must NOT move -----------------------
+# 02_documents lies outside the vault and inside the repository, and its
+# collision is the one the shipped template carries and CONTRIBUTING.md
+# quotes. Narrowing the boundary to the vault root would silence it.
+CV="$RT_TMP/Canonproj/00_documentation/01_projectvault"
+rt_domains "$CV"
+mkdir -p "$RT_TMP/Canonproj/00_documentation/02_documents"
+printf '# the exported twin\n' \
+  > "$RT_TMP/Canonproj/00_documentation/02_documents/ARC_Sensor.md"
+printf '# the linked note, inside the repository\n' \
+  > "$RT_TMP/Canonproj/00_documentation/02_documents/REF_Outside_Datasheet.md"
+rgit init -q "$RT_TMP/Canonproj"
+
+cvout=$(python3 "$VALIDATOR" "$CV" 2>&1)
+
+TESTS=$((TESTS + 1))
+if contains "$cvout" "'ARC_Sensor' exists 2x under 00_documentation"; then ok x; else
+  fail "the canonical layout must keep reporting the 02_documents collision:"
+  printf '%s\n' "$cvout" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$cvout" "link-unresolved"; then ok x; else
+  fail "a link into 02_documents resolves in the canonical layout:"
+  printf '%s\n' "$cvout" | grep link-unresolved | sed 's/^/    /'
+fi
+
+rm -rf "$RT_TMP"
+# ==========================================================================
+# END the name-index boundary
+# ==========================================================================
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
