@@ -6,7 +6,9 @@ reviewer, an examiner or an auditor can be handed without being taught
 the method first: a JSON graph, two CSV views and a self-contained HTML
 report (DECISIONS.md, amendment 2026-07-31b; issue #2), plus a Markdown
 index written for an agent's first read - one line per object and per
-requirement (amendment 2026-08-05f; issue #53).
+requirement (amendment 2026-08-05f; issue #53) - and a Mermaid diagram
+of the coverage chain, the one output that is a picture rather than a
+record to read (issue #99; DEC-MTH-043).
 
     export_traceability.py <vault_root> --output-dir DIR [--formats ...]
 
@@ -67,7 +69,7 @@ from validate_vault import (  # noqa: E402
 EXPORT_SCHEMA_VERSION = "1.1"
 # Every output this tool knows, in the order main() writes them. It is also
 # the default set, so the two cannot drift apart.
-FORMATS = ("json", "csv", "html", "index")
+FORMATS = ("json", "csv", "html", "index", "mermaid")
 ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 ROW_NNN_RE = re.compile(r"^\d{3}$")
 FULL_ID_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]{2,4})-(\d{3})\b")
@@ -1473,6 +1475,161 @@ def write_index(path, graph, prov, section_title):
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
+# --------------------------------------------------------------------------
+# The drawn graph
+# --------------------------------------------------------------------------
+
+# The three relations coverage is decided on. Drawing all eight was measured
+# against the shipped worked example first and produced ten nodes, twenty
+# edges and seven relation words above the fold - the containment and
+# interface edges pull the eye, and the only closed cycles in that picture
+# are the accidental evidence/test-object pairs rather than the chain. The
+# scope is stated in the diagram's own header and the complete edge set stays
+# in traceability.json and traceability_edges.csv, so nothing is lost in
+# silence (DEC-MTH-043).
+GRAPH_KINDS = ("allocates", "evidence", "verifies")
+# Which side of a drawn relation names a requirement row rather than a file
+# object. It has to be decided by kind, not guessed from the string: a
+# requirements file may legally carry the identifier of one of its own rows,
+# so 'REQ-BAT-001' can be an object key and a requirement id at once.
+REQUIREMENT_TARGET_KINDS = ("allocates", "verifies")
+# Mermaid reads a label up to the next structural character, so a label is a
+# record only when every one of them is an entity code. '|' is the one that
+# ends the diagram rather than the label: an allocation status is authored
+# text, and 'Verified \| Draft' is a real cell spelling. '#' is substituted
+# first because it is the escape character itself.
+MERMAID_ENTITIES = {'"': "#quot;", "|": "#124;", "<": "#60;", ">": "#62;",
+                    "&": "#38;", "{": "#123;", "}": "#125;", "`": "#96;"}
+MERMAID_ID_RE = re.compile(r"[^A-Za-z0-9_]+")
+
+
+def mermaid_label(text):
+    """Authored text, collapsed to one line and safe inside a quoted label."""
+    text = " ".join(str(text or "").split()).replace("#", "#35;")
+    return "".join(MERMAID_ENTITIES.get(c, c) for c in text)
+
+
+def mermaid_id(prefix, key, taken):
+    """A node id Mermaid accepts, derived from a key it would not.
+
+    A vault key is 'ARC:ARC_Export' or 'REQ_Battery_Monitoring (BAT)':
+    colons, parentheses, spaces and non-ASCII, none of them legal in an
+    id, and 'end', 'o' and 'x' are reserved words besides. The prefix
+    answers the reserved words and one thing more - it keeps the object
+    namespace and the requirement namespace apart, so a file carrying the
+    identifier of one of its own rows does not silently take that row's
+    node. Collisions after sanitising get a counter, and every caller
+    below iterates in sorted order, so the numbering is the vault's and
+    not the file system's.
+    """
+    base = prefix + (MERMAID_ID_RE.sub("_", nfc(str(key))).strip("_") or "x")
+    candidate, n = base, 2
+    while candidate in taken:
+        candidate, n = f"{base}_{n}", n + 1
+    taken.add(candidate)
+    return candidate
+
+
+def _endpoint(edge, side):
+    """('o'|'r', key) for one end of a drawn edge."""
+    key = edge[side]
+    if side == "target" and edge["kind"] in REQUIREMENT_TARGET_KINDS:
+        return ("r", key)
+    return ("o", key)
+
+
+def write_mermaid(path, graph, coverage):
+    """The coverage chain as a Mermaid diagram GitHub renders natively.
+
+    The fifth format, and the first output of this tool that is a picture
+    rather than a record to read (issue #99). It carries the diagram
+    source and no fence, so the same bytes can be pasted into a fenced
+    block and diffed against a fresh run by a CI step - which is the
+    fourth of DEC-MTH-037's conditions and the only reason storing it in
+    reader-facing documentation is allowed at all.
+
+    Nothing here is machine-dependent. No vault path, no input digest, no
+    generation time, so the file is byte-identical with and without
+    --no-timestamp - the property TUTORIAL.md leans on, because the
+    commands that page prints carry no flags.
+
+    Parallel edges are collapsed on (kind, source, target, qualifier). A
+    requirement allocated in several rows produces one evidence edge per
+    row, which is right in the JSON and is four identical arrows here.
+    """
+    edges, seen = [], set()
+    for e in sorted(graph.edges, key=lambda e: (
+            e["kind"], e["source"], e["target"], e["qualifier"] or "")):
+        if e["kind"] not in GRAPH_KINDS:
+            continue
+        sig = (e["kind"], e["source"], e["target"], e["qualifier"])
+        if sig in seen:
+            continue
+        seen.add(sig)
+        edges.append(e)
+
+    drawn = set()
+    for e in edges:
+        drawn.add(_endpoint(e, "source"))
+        drawn.add(_endpoint(e, "target"))
+
+    taken, ids = set(), {}
+    for key in sorted(graph.nodes):
+        if ("o", key) in drawn:
+            ids[("o", key)] = mermaid_id("o_", key, taken)
+    for rid in sorted(graph.requirements):
+        if ("r", rid) in drawn:
+            ids[("r", rid)] = mermaid_id("r_", rid, taken)
+
+    out = ["flowchart LR"]
+    a = out.append
+    # Below the diagram type, never above it: a comment there is legal in
+    # every Mermaid version measured, and this way the question does not
+    # have to be asked.
+    a("  %% Coverage graph of this vault, generated by export_traceability.py.")
+    a("  %% Drawn are the three relations coverage is decided on - allocates,")
+    a("  %% evidence, verifies. The complete edge set is in traceability.json")
+    a("  %% and traceability_edges.csv. Regenerate this rather than editing")
+    a("  %% it: the vault is the source and this diagram is derived from it.")
+
+    for key in sorted(graph.nodes):
+        nid = ids.get(("o", key))
+        if nid is None:
+            continue
+        node = graph.nodes[key]
+        label = mermaid_label(key)
+        # A second line only where it says a second thing: a filename-keyed
+        # object's key already IS 'ROLE:filename'.
+        if node["id_source"] == "frontmatter":
+            label += "<br>" + mermaid_label(node["name"])
+        a(f'  {nid}["{label}"]')
+    for rid in sorted(graph.requirements):
+        nid = ids.get(("r", rid))
+        if nid is None:
+            continue
+        # The state the count line beside this diagram reports, on the node
+        # it belongs to. An allocation cell reading 'Verified (Rebuild:
+        # Draft)' is not proven, and the edge label alone would show the
+        # word 'Verified' and nothing else.
+        state = "proven" if coverage.get(rid, {}).get("proven") else "not proven"
+        a(f'  {nid}("{mermaid_label(rid)}<br>{state}")')
+    for e in edges:
+        src, dst = ids.get(_endpoint(e, "source")), ids.get(_endpoint(e, "target"))
+        if src is None or dst is None:
+            continue
+        text = e["kind"] + (f": {e['qualifier']}" if e["qualifier"] else "")
+        a(f'  {src} -->|"{mermaid_label(text)}"| {dst}')
+
+    if not ids:
+        # An empty diagram is a parse error, and a parse error is a red box
+        # where the reader was promised a picture. The same posture the
+        # index takes with a vault it could not read: say so, in the artifact.
+        a('  nothing_drawn["this vault carries no allocation row, no '
+          'evidence link and no verifies entry - none of the coverage chain '
+          'could be drawn"]')
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
 CSS = """
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
@@ -1763,6 +1920,8 @@ def main(argv):
     if "index" in formats:
         write_index(out / "traceability_index.md", graph, prov,
                     bindings.get("req_table", {}).get("section"))
+    if "mermaid" in formats:
+        write_mermaid(out / "traceability_graph.mmd", graph, coverage)
 
     proven = sum(1 for c in coverage.values() if c["proven"])
     print(f"vault: {root}")
