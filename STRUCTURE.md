@@ -181,9 +181,13 @@ refuses any `--output-dir` inside one, because the vault is Markdown only. A
 revision worth keeping belongs in `00_documentation/02_documents/`.
 
 That holds for `traceability_index.md` too — the compact index an agent reads
-first. It stays generated rather than committed: a stored index is only as
+first — and for `traceability_graph.mmd`, the coverage chain as a Mermaid
+diagram. Both stay generated rather than committed: a stored copy is only as
 current as its last run, and the vault is what it is derived from. `CLAUDE.md`
-therefore names the command, not a path.
+therefore names the command, not a path. The one place this repository stores
+either is `README.md`, under four conditions that include a CI step
+regenerating and diffing it — the exception is argued in the method vault, not
+assumed here.
 
 `ARCHITECTURE.md` in the same directory is the maintainer's view of the
 validator: its three stages and five entry points mapped onto the functions
@@ -229,7 +233,7 @@ not your project.
 
 Everything GitHub reads rather than a person: `workflows/validate-vault.yml`
 runs the validator, the template vault audit, the export determinism check, the
-README traceability excerpt and the worked example on every push and pull
+README's generated blocks and the worked example on every push and pull
 request; `ISSUE_TEMPLATE/` holds the bug report and the method change proposal,
 with `config.yml` for the chooser; `pull_request_template.md` carries the
 checklist of gates a reviewer would otherwise re-derive.
