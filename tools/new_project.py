@@ -266,7 +266,7 @@ REPLACEMENTS = [
     ("STRUCTURE.md",
      "Everything GitHub reads rather than a person: `workflows/validate-vault.yml`\n"
      "runs the validator, the template vault audit, the export determinism check, the\n"
-     "README traceability excerpt and the worked example on every push and pull\n"
+     "README's generated blocks and the worked example on every push and pull\n"
      "request; `ISSUE_TEMPLATE/` holds the bug report and the method change proposal,\n"
      "with `config.yml` for the chooser; `pull_request_template.md` carries the\n"
      "checklist of gates a reviewer would otherwise re-derive.",

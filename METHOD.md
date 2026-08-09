@@ -228,15 +228,25 @@ python3 .claude/skills/mechatronics-docs/export_traceability.py \
         00_documentation/01_projectvault --output-dir ../traceability
 ```
 
-It writes five files: a self-contained `traceability.html` report, a
+It writes six files: a self-contained `traceability.html` report, a
 requirement-centric `traceability_requirements.csv`, an edge-list
 `traceability_edges.csv` that pivots into either direction, `traceability.json`
-carrying the whole graph, and `traceability_index.md` — one line per object and
+carrying the whole graph, `traceability_index.md` — one line per object and
 per requirement, written for the agent or the newcomer who wants to know what
-the vault contains before opening anything. Standard library only, like the
-validator.
+the vault contains before opening anything — and `traceability_graph.mmd`, the
+Mermaid diagram at the top of the [README](README.md). Standard library only,
+like the validator.
 
-Three things make it worth reading rather than filing.
+The diagram is the one output that is a picture rather than a record. It draws
+the three relations coverage is decided on — `allocates`, `evidence`,
+`verifies` — and says so in its own header, because the other four are in the
+JSON and the edge CSV and a picture that quietly dropped them would be a
+different claim. Paste it between a ` ```mermaid ` fence and a closing ` ``` `
+and GitHub renders it. On a large vault it stops being legible and eventually
+exceeds Mermaid's 50 000-character ceiling; nothing else about the export
+changes, and no check depends on the picture being readable.
+
+Three things make the rest worth reading rather than filing.
 
 **Both directions, and only one of them is written down.** Requirement to
 evidence comes from the allocation table; evidence to requirement is computed
