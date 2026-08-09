@@ -33,6 +33,32 @@ decision.
 
 ### Added
 
+- **The export draws the graph it reads, and the README opens with it** —
+  the exporter has read the vault as a graph since its first version and
+  has never drawn one: the HTML report is tables, the index is one line per
+  object, and the REQ→TAE edge appeared in no output at all (issue #99). A
+  fifth format, `mermaid`, writes `traceability_graph.mmd`: the coverage
+  chain as a Mermaid node-link diagram GitHub renders natively. Drawn are
+  the three relations coverage is decided on — `allocates`, `evidence`,
+  `verifies` — and the diagram's own header says so and points at
+  `traceability.json` and `traceability_edges.csv` for the other four. It
+  is deterministic, stdlib-only and free of anything machine- or
+  run-dependent, so it is byte-identical with and without `--no-timestamp`.
+  `README.md` now opens on **what this is** in four plain sentences, then
+  that diagram, then one requirement traced through it; the two count
+  lines stay under the picture and the index tail moves into a `<details>`
+  block under "The worked example". Three stored blocks, one marker pair
+  each, all three regenerated and diffed by CI — which now also refuses a
+  `traceability-*` marker pair it was not told to check, so a stored block
+  cannot lose its gate quietly. `TUTORIAL.md` step 7 shows the reader their
+  own three-node loop, replayed by the suite like the rest of that page.
+  The reasoning, including why three relations and not eight, is
+  [`DEC_The_Export_Draws_The_Graph_It_Reads`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Export_Draws_The_Graph_It_Reads.md).
+  A new exporter output and new documentation; no domain, template section,
+  frontmatter field, identifier rule, typed relation or validator severity
+  moves, and no existing vault gains a finding — a derived project sees one
+  additional file in its export directory and nothing else: MINOR.
+
 - **The entry comes first, the argument moves to [METHOD.md](METHOD.md)** —
   `README.md` argued the method over four screens before letting anyone in:
   the quick start stood at line 283 and the audience section at line 530 of
@@ -191,6 +217,21 @@ decision.
   `DEC_Requirement_Index_Follows_The_Role_Map` (issue #66).
 
 ### Fixed
+
+- **A mistyped `--formats` value no longer exits 0 and writes nothing** —
+  `--formats jsonn` produced an empty output directory and a green exit, so
+  a caller who mistyped it read that as a clean run (issue #98). It is now
+  refused with exit 2 and the list of valid formats, checked before the
+  vault is read and behind `--fail-on`, whose own precedence is unchanged.
+  An empty value is refused the same way rather than falling back to the
+  defaults, because `--formats ""` would otherwise stay the one spelling
+  that writes nothing in silence. It weighs heavier than the same typo at
+  `--fail-on`: there it skips a check, here it destroys the artifact the
+  caller asked for, and a CI step diffing two such runs can never fail.
+  This closes the first accepted residual of
+  [`DEC_CI_Blocks_On_What_A_Session_Only_Warns_About`](.claude/01_methodvault/02_decisions_(DEC)/DEC_CI_Blocks_On_What_A_Session_Only_Warns_About.md),
+  which carries a `Corrected by:` line for it now. A run that names a valid
+  format is unaffected, and no rule of the method moves: PATCH.
 
 - **The frontmatter-missing message is built from the domain schema** — a file
   without YAML frontmatter was told it needs `(domain, status, created,
