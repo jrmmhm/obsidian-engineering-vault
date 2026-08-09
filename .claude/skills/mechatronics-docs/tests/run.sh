@@ -3159,8 +3159,9 @@ dout=$(python3 "$EXPORTER" "$DE_V" --output-dir "$DE_OUT" --no-timestamp 2>&1)
 TESTS=$((TESTS + 1))
 if [ -f "$EN_OUT/traceability.json" ] && [ -f "$EN_OUT/traceability.html" ] && \
    [ -f "$EN_OUT/traceability_requirements.csv" ] && \
-   [ -f "$EN_OUT/traceability_edges.csv" ]; then ok x; else
-  fail "exporter must write json, html and both csv views"; fi
+   [ -f "$EN_OUT/traceability_edges.csv" ] && \
+   [ -f "$EN_OUT/traceability_graph.mmd" ]; then ok x; else
+  fail "exporter must write json, html, both csv views and the graph"; fi
 
 # The German twin must not be a smaller graph. This is the assertion the
 # header-signature binding would have failed on every production vault.
@@ -3413,6 +3414,180 @@ assert "summaries" not in d["field_types"]["authored"], d["field_types"]
 assert all("summary" not in n for n in d["nodes"].values()), "authored nodes gained a derived field"
 PY
 then ok x; else fail "summaries must be declared derived and never written onto a node"; fi
+
+# --------------------------------------------------------------------------
+# Issue #99 / DEC-MTH-043: the drawn graph. There is no Mermaid parser in a
+# stdlib-only repository, so the substitute is a structural self-check -
+# every emitted line has to be one of four shapes, and no label may carry a
+# character that would end the label or the diagram. A currency check alone
+# (the CI diff) would happily keep a syntactically dead diagram current.
+# --------------------------------------------------------------------------
+MMD="$EN_OUT/traceability_graph.mmd"
+
+TESTS=$((TESTS + 1))
+if python3 - "$MMD" <<'PY'
+import re, sys
+lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
+assert lines and lines[0] == "flowchart LR", lines[:1]
+NODE = re.compile(r'^  [A-Za-z_][A-Za-z0-9_]*(\["[^"]*"\]|\("[^"]*"\))$')
+EDGE = re.compile(r'^  [A-Za-z_][A-Za-z0-9_]*'
+                  r' -->\|"[^"|]*"\| [A-Za-z_][A-Za-z0-9_]*$')
+for i, line in enumerate(lines[1:], start=2):
+    assert line.startswith("  %% ") or NODE.match(line) or EDGE.match(line), \
+        f"line {i} is none of the four shapes: {line!r}"
+# The labels, read back out and checked for what must never survive in one.
+# '<br>' is the one piece of markup the writer authors itself; every other
+# angle bracket would be vault content that reached the label unescaped.
+for label in re.findall(r'"([^"]*)"', "\n".join(lines)):
+    for bad in ("|", "&", "`", "{", "}"):
+        assert bad not in label, f"unescaped {bad!r} in label {label!r}"
+    rest = label.replace("<br>", "")
+    assert "<" not in rest and ">" not in rest, f"raw markup in label {label!r}"
+PY
+then ok x; else fail "every line of the graph must be a shape Mermaid accepts"; fi
+
+# The scope is stated in the artifact, not only in a decision record: a
+# reader of the file has to be able to see that four relations are not in it.
+TESTS=$((TESTS + 1))
+if contains "$(cat "$MMD")" "traceability_edges.csv" && \
+   contains "$(cat "$MMD")" "allocates,"; then ok x; else
+  fail "the graph must name its own scope and where the full edge set is"; fi
+
+# Only the coverage relations, and every one of them. Read against the JSON
+# so the two cannot drift: an edge kind added to GRAPH_KINDS without a test
+# still has to survive the shape check above.
+TESTS=$((TESTS + 1))
+if python3 - "$MMD" "$EN_OUT/traceability.json" <<'PY'
+import json, re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+d = json.load(open(sys.argv[2]))
+drawn = {m.split(":")[0].strip() for m in re.findall(r'-->\|"([^"]*)"\|', text)}
+assert drawn == {"allocates", "evidence", "verifies"}, drawn
+# Every distinct coverage edge of the graph reaches the picture exactly once,
+# and a repeated one is collapsed rather than stacked.
+want = {(e["kind"], e["source"], e["target"], e["qualifier"])
+        for e in d["edges"] if e["kind"] in ("allocates", "evidence", "verifies")}
+assert len(re.findall(r"-->", text)) == len(want), \
+    f"{len(re.findall(r'-->', text))} arrows for {len(want)} distinct edges"
+PY
+then ok x; else fail "the graph must draw each distinct coverage edge exactly once"; fi
+
+# The state the count line reports, on the node it belongs to. The fixture's
+# EXP-002 is allocated 'Verified (Rebuild: Draft)' - qualified, not proven -
+# so the picture must not read like the word in the cell.
+TESTS=$((TESTS + 1))
+if python3 - "$MMD" "$EN_OUT/traceability.json" <<'PY'
+import json, re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+cov = json.load(open(sys.argv[2]))["coverage"]
+seen = dict(re.findall(r'\("([A-Z]{2,4}-[A-Z]{2,4}-\d{3})<br>(proven|not proven)"\)', text))
+assert seen, "no requirement node carried a proven state"
+for rid, state in seen.items():
+    want = "proven" if cov[rid]["proven"] else "not proven"
+    assert state == want, f"{rid}: node says {state!r}, coverage says {want!r}"
+assert seen.get("REQ-EXP-002") == "not proven", seen.get("REQ-EXP-002")
+PY
+then ok x; else fail "a requirement node must carry the coverage verdict, not the cell's word"; fi
+
+# The file is a picture and nothing else: no vault path, no digest, no time.
+# TUTORIAL.md prints its commands without --no-timestamp, so the graph it
+# quotes only stays true while this holds.
+python3 "$EXPORTER" "$EN_V" --output-dir "$EX_TMP/out-stamped" >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if cmp -s "$MMD" "$EX_TMP/out-stamped/traceability_graph.mmd"; then ok x; else
+  fail "the graph must be byte-identical with and without --no-timestamp"; fi
+
+# A vault the coverage chain is absent from says so in the artifact. An
+# empty diagram is a parse error, which is a red box where a reader was
+# promised a picture - the same posture the index takes with an empty vault.
+TESTS=$((TESTS + 1))
+if [ -d "$METHOD_VAULT" ]; then
+  python3 "$EXPORTER" "$METHOD_VAULT" --output-dir "$EX_TMP/out-nograph" \
+    --no-timestamp --formats mermaid >/dev/null 2>&1
+  if contains "$(cat "$EX_TMP/out-nograph/traceability_graph.mmd")" \
+       "none of the coverage chain could be drawn" && \
+     [ "$(grep -c -- '-->' "$EX_TMP/out-nograph/traceability_graph.mmd")" = "0" ]; then
+    ok x; else fail "a vault without a coverage chain must say so in the diagram"; fi
+else
+  fail "method vault not found at $METHOD_VAULT"
+fi
+
+# The negative control, and the three rules a real vault cannot reach from
+# here. write_mermaid is called directly, because a status cell carrying a
+# '|', a requirements file carrying the identifier of one of its own rows,
+# and two keys sanitising to one id are each legal and each absent from the
+# fixtures above. Without the escaping the first alone kills the diagram.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$EX_TMP/unit.mmd" <<'PY'
+import re, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import export_traceability as ex
+
+g = ex.Graph()
+# 'REQ-UNI-001' is BOTH a file object and a requirement row - legal, and a
+# single id namespace would silently merge them.
+g.nodes["REQ-UNI-001"] = {"key": "REQ-UNI-001", "role": "REQ", "domain": "REQ",
+                          "name": "REQ_Unit (UNI)", "file": "r.md",
+                          "id_source": "frontmatter", "status": None,
+                          "last_verified": None}
+# A filename-keyed object: its key already carries the name, so the label
+# must not repeat it.
+g.nodes["ARC:ARC_Unit"] = {"key": "ARC:ARC_Unit", "role": "ARC", "domain": "ARC",
+                           "name": "ARC_Unit", "file": "a.md",
+                           "id_source": "filename", "status": None,
+                           "last_verified": None}
+# Sanitises to the same characters as the key above - the counter has to
+# keep them apart.
+g.nodes["ARC-ARC-Unit"] = {"key": "ARC-ARC-Unit", "role": "ARC", "domain": "ARC",
+                           "name": "ARC_Unit_Two", "file": "a2.md",
+                           "id_source": "frontmatter", "status": None,
+                           "last_verified": None}
+g.nodes["TAE:TAE_Unit"] = {"key": "TAE:TAE_Unit", "role": "TAE", "domain": "TAE",
+                           "name": "TAE_Unit", "file": "t.md",
+                           "id_source": "filename", "status": None,
+                           "last_verified": None}
+g.requirements["REQ-UNI-001"] = {"id": "REQ-UNI-001", "file": "r.md", "line": 9}
+# The status cell that ends the diagram if it is not escaped. '\|' in a
+# table cell is a real spelling and unescape() hands it over as a bare '|'.
+nasty = 'Verified | Draft <b>#1</b> & "quoted"'
+g.add_edge("allocates", "ARC:ARC_Unit", "REQ-UNI-001", "a.md", 12, qualifier=nasty)
+g.add_edge("evidence", "ARC:ARC_Unit", "TAE:TAE_Unit", "a.md", 12, qualifier=nasty)
+# The same edge a second time, as a second allocation row would author it.
+g.add_edge("evidence", "ARC:ARC_Unit", "TAE:TAE_Unit", "a.md", 30, qualifier=nasty)
+g.add_edge("verifies", "TAE:TAE_Unit", "REQ-UNI-001", "t.md", 1)
+# Draws the second colliding key and the REQ FILE object, so the id rules
+# are exercised rather than skipped: an object nothing connects is not part
+# of the coverage chain and is correctly left out of the picture.
+g.add_edge("evidence", "ARC-ARC-Unit", "REQ-UNI-001", "a2.md", 5)
+
+out = Path(sys.argv[2])
+ex.write_mermaid(out, g, {"REQ-UNI-001": {"proven": False}})
+text = out.read_text(encoding="utf-8")
+
+# Nothing structural survived inside a label.
+labels = re.findall(r'"([^"]*)"', text)
+assert labels, text
+for label in labels:
+    for bad in ("|", "&", "`"):
+        assert bad not in label, f"unescaped {bad!r} in {label!r}"
+    assert "<" not in label.replace("<br>", ""), f"raw markup in {label!r}"
+assert "#124;" in text and "#60;" in text and "#38;" in text and "#quot;" in text, text
+assert "#35;1" in text, "'#' must be escaped before the other entities"
+
+# The two namespaces stay apart: the same string is a file object and a
+# requirement row, and each keeps its own node.
+assert 'o_REQ_UNI_001["REQ-UNI-001<br>REQ_Unit (UNI)"]' in text, text
+assert 'r_REQ_UNI_001("REQ-UNI-001<br>not proven")' in text, text
+# Two keys sanitising to one id keep their own too, numbered in sorted key
+# order - 'ARC-ARC-Unit' sorts before 'ARC:ARC_Unit'.
+assert 'o_ARC_ARC_Unit["ARC-ARC-Unit<br>ARC_Unit_Two"]' in text, text
+# A filename-keyed object does not repeat its own name; its key carries it.
+assert 'o_ARC_ARC_Unit_2["ARC:ARC_Unit"]' in text, text
+# The duplicated evidence edge is collapsed; four distinct ones remain.
+assert text.count("-->") == 4, text
+PY
+then ok x; else fail "the graph must survive a status cell that would otherwise end it"; fi
 
 # Determinism: the property, not just the timestamp.
 cp -r "$EN_OUT" "$EX_TMP/out-en-ref"
