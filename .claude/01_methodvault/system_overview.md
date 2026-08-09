@@ -56,6 +56,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-039 | 2026-08-08 | [[DEC_CI_Blocks_On_What_A_Session_Only_Warns_About]] — CI blocks on what a session only warns about |
 | DEC-MTH-040 | 2026-08-08 | [[DEC_A_Tutorial_Is_Replayed_Not_Reviewed]] — a tutorial is replayed, not reviewed |
 | DEC-MTH-041 | 2026-08-08 | [[DEC_A_Project_Starts_With_Three_Domains]] — a project starts with three domains and grows into nine |
+| DEC-MTH-042 | 2026-08-09 | [[DEC_The_Argument_Moves_Out_Of_The_Entry]] — the method's argument moves out of the entry |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather
