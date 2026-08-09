@@ -54,50 +54,81 @@ jobs:
 
       # The README stores the export's own output. Generated content is
       # committed in exactly two places here, each with a mechanism that
-      # proves it current: this block (DEC-MTH-037) and the quoted output
+      # proves it current: these blocks (DEC-MTH-037) and the quoted output
       # of TUTORIAL.md, replayed by the self-test above (DEC-MTH-040).
       # That is only defensible while something proves it current, so the
-      # export runs again here and the block between the two marker comments
-      # is diffed against it. The vault is the source; a change to the worked
+      # export runs again here and every block between a marker pair is
+      # diffed against it. The vault is the source; a change to the worked
       # example that never reached the README fails this step. Only the
       # machine-independent lines are compared - the index's provenance head
-      # carries an absolute path and a digest and would differ on every runner.
-      - name: README traceability excerpt is current
+      # carries an absolute path and a digest and would differ on every
+      # runner, while the graph carries none of the three and is stored whole.
+      #
+      # Three blocks since DEC-MTH-043, so the check is a loop rather than
+      # three copies of itself. The list it loops over is verified against
+      # the file first: a block nobody diffs is stored generated content
+      # with no gate on it, which is the one failure this widening could
+      # introduce, and a copy-paste slip in the list below is exactly how
+      # it would happen.
+      - name: README generated blocks are current
         run: |
           python3 .claude/skills/mechatronics-docs/export_traceability.py \
             00_documentation/01_projectvault --output-dir "$RUNNER_TEMP/readme-tr" \
             --no-timestamp > "$RUNNER_TEMP/export.out"
-          {
-            grep -E '^(requirements|objects):' "$RUNNER_TEMP/export.out"
-            echo
-            sed -n '/^## Objects/,$p' "$RUNNER_TEMP/readme-tr/traceability_index.md"
-          } > "$RUNNER_TEMP/excerpt-expected.txt"
-          # Exactly one marker pair, matched whole-line: prose may name the
-          # markers without turning the rest of the README into the excerpt.
-          pair=$(awk '/^<!-- traceability-excerpt:start -->$/{s++}
-                      /^<!-- traceability-excerpt:end -->$/{e++}
+
+          CHECKED="traceability-graph traceability-counts traceability-excerpt"
+          cp "$RUNNER_TEMP/readme-tr/traceability_graph.mmd" \
+            "$RUNNER_TEMP/expected-traceability-graph.txt"
+          grep -E '^(requirements|objects):' "$RUNNER_TEMP/export.out" \
+            > "$RUNNER_TEMP/expected-traceability-counts.txt"
+          sed -n '/^## Objects/,$p' "$RUNNER_TEMP/readme-tr/traceability_index.md" \
+            > "$RUNNER_TEMP/expected-traceability-excerpt.txt"
+
+          present=$(grep -oE '^<!-- traceability-[a-z-]+:start -->$' README.md \
+                    | sed -E 's/^<!-- (.+):start -->$/\1/' | sort -u | tr '\n' ' ')
+          want=$(printf '%s\n' $CHECKED | sort -u | tr '\n' ' ')
+          if [ "$present" != "$want" ]; then
+            echo "README.md carries generated blocks this step does not check." >&2
+            echo "  in the file: $present" >&2
+            echo "  checked:     $want" >&2
+            exit 1
+          fi
+
+          for marker in $CHECKED; do
+            # Exactly one pair, matched as a whole line: prose may name a
+            # marker without turning the rest of the README into a block.
+            pair=$(awk -v m="$marker" \
+                     '$0 == "<!-- " m ":start -->" {s++}
+                      $0 == "<!-- " m ":end -->" {e++}
                       END {print s+0, e+0}' README.md)
-          if [ "$pair" != "1 1" ]; then
-            echo "README.md must carry exactly one traceability-excerpt marker pair, found $pair" >&2
-            exit 1
-          fi
-          # The fence lines are found by matching, never by position, so a
-          # blank line around them does not shift what gets compared.
-          awk '/^<!-- traceability-excerpt:start -->$/{m=1;next}
-               /^<!-- traceability-excerpt:end -->$/{m=0}
-               m && /^```/{f=!f;next}
-               m && f' README.md > "$RUNNER_TEMP/excerpt-actual.txt"
-          if [ ! -s "$RUNNER_TEMP/excerpt-actual.txt" ]; then
-            echo "no fenced excerpt between the traceability-excerpt markers in README.md" >&2
-            exit 1
-          fi
-          diff -u "$RUNNER_TEMP/excerpt-expected.txt" "$RUNNER_TEMP/excerpt-actual.txt" || {
-            echo "The README excerpt no longer matches the vault. Regenerate it with:" >&2
-            echo "  python3 .claude/skills/mechatronics-docs/export_traceability.py \\" >&2
-            echo "    00_documentation/01_projectvault --output-dir ../traceability --no-timestamp" >&2
-            echo "and paste the two count lines plus everything from '## Objects' into the block." >&2
-            exit 1
-          }
+            if [ "$pair" != "1 1" ]; then
+              echo "README.md must carry exactly one $marker marker pair, found $pair" >&2
+              exit 1
+            fi
+            # The fence lines are found by matching, never by position, so a
+            # blank line or a <details> wrapper around them does not shift
+            # what gets compared.
+            awk -v m="$marker" \
+                '$0 == "<!-- " m ":start -->" {b=1;next}
+                 $0 == "<!-- " m ":end -->" {b=0}
+                 b && /^```/{f=!f;next}
+                 b && f' README.md > "$RUNNER_TEMP/actual-$marker.txt"
+            if [ ! -s "$RUNNER_TEMP/actual-$marker.txt" ]; then
+              echo "no fenced content between the $marker markers in README.md" >&2
+              exit 1
+            fi
+            diff -u "$RUNNER_TEMP/expected-$marker.txt" \
+                    "$RUNNER_TEMP/actual-$marker.txt" || {
+              echo "The README's $marker block no longer matches the vault." >&2
+              echo "CONTRIBUTING.md holds the recipe; the short form is:" >&2
+              echo "  python3 .claude/skills/mechatronics-docs/export_traceability.py \\" >&2
+              echo "    00_documentation/01_projectvault --output-dir /tmp/tr --no-timestamp" >&2
+              echo "then paste /tmp/tr/traceability_graph.mmd, the two count lines of the" >&2
+              echo "run, and everything from '## Objects' in traceability_index.md into" >&2
+              echo "their own blocks." >&2
+              exit 1
+            }
+          done
 
       # The worked example claims its evidence is the real output of a command.
       # Running that command here is what keeps the claim from decaying: both

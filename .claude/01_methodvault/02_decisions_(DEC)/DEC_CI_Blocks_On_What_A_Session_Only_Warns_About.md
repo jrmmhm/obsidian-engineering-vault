@@ -6,6 +6,7 @@ last-verified: 2026-08-08
 ---
 Date: 2026-08-08
 Status: Accepted
+Corrected by: [[DEC_The_Export_Draws_The_Graph_It_Reads]] — residual 1 is closed
 
 ## Context
 
@@ -140,9 +141,8 @@ have.
 
 ### Accepted residuals
 
-1. **`--formats` keeps the hazard `--fail-on` closes.** Measured:
-   `--formats jsonn` exits 0 and leaves an empty output directory. Same
-   silent-typo shape, one flag over, and out of scope here.
+1. **`--formats` kept the hazard `--fail-on` closes.** Measured: `--formats
+   jsonn` exits 0 with an empty output directory — closed 2026-08-09, above.
 2. **`not-allocated` was already reachable from the suite.** The existing
    template-vault assertion pins `proven: 3`, and `proven` folds that
    class in. The class genuinely new to the blocking path is
