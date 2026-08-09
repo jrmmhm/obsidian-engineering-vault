@@ -5066,6 +5066,45 @@ rm -rf "$FMT_OUT"
 # ==========================================================================
 
 # ==========================================================================
+# BEGIN README generated blocks - the one property their CI gate is blind
+# to (issue #99, DEC-MTH-043). That step diffs text, so a block whose
+# fence GitHub never parses as a fence passes it byte for byte and renders
+# as a wall of backticks. The rule is CommonMark's: a raw-HTML block runs
+# until a blank line, so a fence opened directly under <summary> or
+# <details> is HTML content and not Markdown.
+# ==========================================================================
+RM_MD="$(cd -P -- "$SKILL_DIR/../../.." && pwd -P)/README.md"
+
+TESTS=$((TESTS + 1))
+if [ -f "$RM_MD" ]; then
+  if python3 - "$RM_MD" <<'PY'
+import re, sys
+lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
+markers = [i for i, l in enumerate(lines)
+           if re.fullmatch(r"<!-- traceability-[a-z-]+:(start|end) -->", l)]
+assert markers, "README.md carries no traceability marker at all"
+for i in markers:
+    before = lines[i - 1].strip() if i else ""
+    assert not before.startswith(("<details", "</summary", "<summary")), (
+        f"line {i + 1}: a generated block opens straight after {before!r} - "
+        "CommonMark keeps the raw-HTML block open and the fence below never "
+        "becomes a fence. Put a blank line between them.")
+# The fence of every block is a real fence line, and the graph is the one
+# that has to be a mermaid fence or GitHub draws nothing.
+text = "\n".join(lines)
+m = re.search(r"<!-- traceability-graph:start -->\n(```[a-z]*)", text)
+assert m and m.group(1) == "```mermaid", (
+    "the graph block must open a mermaid fence, got %r" % (m and m.group(1)))
+PY
+  then ok x; else fail "a generated README block must stay renderable, not just current"; fi
+else
+  fail "README.md not found at $RM_MD"
+fi
+# ==========================================================================
+# END README generated blocks
+# ==========================================================================
+
+# ==========================================================================
 # BEGIN TUTORIAL.md - the tutorial is replayed, not reviewed (issue #77,
 # DEC-MTH-040). Self-contained and appended last for the same reason the
 # two blocks above are: concurrent branches append here too.
