@@ -58,6 +58,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-041 | 2026-08-08 | [[DEC_A_Project_Starts_With_Three_Domains]] — a project starts with three domains and grows into nine |
 | DEC-MTH-042 | 2026-08-09 | [[DEC_The_Argument_Moves_Out_Of_The_Entry]] — the method's argument moves out of the entry |
 | DEC-MTH-043 | 2026-08-09 | [[DEC_The_Export_Draws_The_Graph_It_Reads]] — the export draws the graph it reads |
+| DEC-MTH-044 | 2026-08-09 | [[DEC_The_Name_Index_Stops_At_The_Repository]] — the name index stops at the repository |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather

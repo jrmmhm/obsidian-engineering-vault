@@ -310,7 +310,7 @@ lists those as advisory; the full audit is the pass that counts.
 | --- | --- | --- | --- |
 | `stub` | WARN | domain files | Fewer than 5 non-blank lines below the frontmatter. Fill the file or do not create it yet. |
 | `structure` | WARN | domain files | More than 100 lines, frontmatter included, without a single `##` or `###` heading among them. |
-| `duplicate-basename` | WARN, vault-wide | every `.md` file under `00_documentation` | The same filename stem exists more than once. The scope reaches past the vault: `02_documents` counts, and the shipped template hits this with its two `README.md` files. |
+| `duplicate-basename` | WARN, vault-wide | every `.md` file under `00_documentation` | The same filename stem exists more than once. The scope reaches past the vault: `02_documents` counts, and the shipped template hits this with its two `README.md` files. It stops at the repository, so a project that versions the vault alone is compared against its own repository and the finding names that boundary instead. |
 | `link-repeat` | WARN | every file the validator reads | The same target linked more than three times in one file. An alias, an anchor and an embed all address the same target; a link into the file itself (`[[#Heading]]`, `[[#^blockid]]`) is not counted. |
 | `encoding-not-utf8` | ERROR | every file the validator reads, templates included | The bytes are not UTF-8. Every other finding on that file is a consequence of the encoding — re-save as UTF-8 and read them again. |
 | `id-scope-mismatch` | WARN, vault-wide | REQ files carrying both an `id` and a `(SCOPE)` token | The scope in the frontmatter `id` differs from the token in the filename. The id wins, so every row of the file is addressed under the id's scope. |
