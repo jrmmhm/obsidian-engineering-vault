@@ -4817,6 +4817,80 @@ if [ $fo_prec_rc -eq 2 ] && contains "$fo_prec" "fail-on names no gap class"; th
 # ==========================================================================
 
 # ==========================================================================
+# BEGIN --formats - a mistyped output name is refused, not written past
+# (issue #98, DEC-MTH-043). Appended after the --fail-on block because it
+# reuses its vault variables and takes the same shape: the refusal is the
+# recovery path, so the message has to name the valid values.
+# ==========================================================================
+FMT_OUT=$(mktemp -d)
+
+# An unknown name: exit 2, every valid format listed, nothing written. It
+# weighs heavier than the --fail-on typo above - that one skipped a check,
+# this one destroys the artifact the caller asked for.
+fmt_bad=$(python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FMT_OUT/typo" \
+  --no-timestamp --formats jsonn 2>&1); fmt_bad_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fmt_bad_rc -eq 2 ]; then ok x; else
+  fail "an unknown --formats name must be refused with exit 2, got $fmt_bad_rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$fmt_bad" "jsonn" && contains "$fmt_bad" "json" \
+   && contains "$fmt_bad" "csv" && contains "$fmt_bad" "html" \
+   && contains "$fmt_bad" "index"; then ok x; else
+  fail "the refusal must name the bad value and every valid format:"
+  printf '%s\n' "$fmt_bad" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ ! -e "$FMT_OUT/typo" ]; then ok x; else
+  fail "a refused --formats must not have written anything"; fi
+
+# The measured shape of issue #98: exit 0 and an empty directory. Both must
+# now be impossible, for an empty value as much as for a typo - falling back
+# to the defaults would leave '--formats ""' writing nothing in silence.
+for fmt_empty in "" "  ,  "; do
+  TESTS=$((TESTS + 1))
+  python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FMT_OUT/empty" \
+    --no-timestamp --formats "$fmt_empty" >/dev/null 2>&1
+  if [ $? -eq 2 ] && [ ! -e "$FMT_OUT/empty" ]; then ok x; else
+    fail "--formats '$fmt_empty' must be refused and write nothing"; fi
+done
+
+# Precedence, pinned by message because both refusals are exit 2: --fail-on
+# is checked first, so a caller who got both flags wrong is told about the
+# gate before the output. The vault root is deliberately bad as well - all
+# three refusals are in play and the first one still wins.
+fmt_prec=$(python3 "$EXPORTER" "$EX_TMP" --output-dir "$FMT_OUT/prec" \
+  --formats jsonn --fail-on typo 2>&1); fmt_prec_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fmt_prec_rc -eq 2 ] && contains "$fmt_prec" "fail-on names no gap class"; then
+  ok x; else
+  fail "--fail-on must be refused ahead of --formats and the vault root:"
+  printf '%s\n' "$fmt_prec" | sed 's/^/    /'; fi
+
+# A bad --formats still beats the vault-root refusal, so the message names
+# the flag rather than the next thing that fails.
+fmt_root=$(python3 "$EXPORTER" "$EX_TMP" --output-dir "$FMT_OUT/root" \
+  --formats jsonn 2>&1); fmt_root_rc=$?
+TESTS=$((TESTS + 1))
+if [ $fmt_root_rc -eq 2 ] && contains "$fmt_root" "formats names no output format"; then
+  ok x; else
+  fail "a bad --formats must be refused before the vault-root check:"
+  printf '%s\n' "$fmt_root" | sed 's/^/    /'; fi
+
+# A valid subset is unchanged: whitespace trimmed, a repeat read once, and
+# only what was asked for on disk.
+TESTS=$((TESTS + 1))
+if python3 "$EXPORTER" "$REAL_VAULT" --output-dir "$FMT_OUT/subset" \
+     --no-timestamp --formats " csv , csv " >/dev/null 2>&1 \
+   && [ -f "$FMT_OUT/subset/traceability_requirements.csv" ] \
+   && [ -f "$FMT_OUT/subset/traceability_edges.csv" ] \
+   && [ ! -f "$FMT_OUT/subset/traceability.json" ]; then ok x; else
+  fail "a valid --formats subset must write exactly what it names"; fi
+
+rm -rf "$FMT_OUT"
+# ==========================================================================
+# END --formats
+# ==========================================================================
+
+# ==========================================================================
 # BEGIN TUTORIAL.md - the tutorial is replayed, not reviewed (issue #77,
 # DEC-MTH-040). Self-contained and appended last for the same reason the
 # two blocks above are: concurrent branches append here too.
