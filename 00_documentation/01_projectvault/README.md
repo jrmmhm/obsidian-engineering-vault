@@ -104,7 +104,9 @@ beside the project: `python3 .claude/skills/mechatronics-docs/export_traceabilit
 produces, next to the report and the two CSV views, a
 `traceability_index.md` carrying one line per object and per requirement —
 the fastest way to see what this vault contains without opening it file by
-file. It is generated on the spot, never stored here: the vault is the
+file — and `traceability_graph.mmd`, the same chain drawn: one Mermaid
+diagram of which module owns which requirement and which note proves it.
+Both are generated on the spot, never stored here: the vault is the
 source, the export is derived from it.
 
 

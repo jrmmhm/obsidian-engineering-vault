@@ -109,8 +109,10 @@ python3 .claude/skills/mechatronics-docs/export_traceability.py \
         <VAULT_ROOT> --output-dir <DIR outside the vault>
 ```
 
-It produces a self-contained HTML report, two CSV views, a JSON graph and
-`traceability_index.md`. The index is the one written for you: one line
+It produces a self-contained HTML report, two CSV views, a JSON graph,
+`traceability_graph.mmd` — the coverage chain as a Mermaid diagram, for a
+page rather than for a read — and `traceability_index.md`. The index is
+the one written for you: one line
 per object and per requirement — identifier, domain, file, and the first
 sentence of the section the project's own requirements template binds.
 Generate it and read it once instead of searching the vault for its
