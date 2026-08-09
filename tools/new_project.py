@@ -248,9 +248,16 @@ REPLACEMENTS = [
     ("STRUCTURE.md",
      "the vault validator, the traceability exporter, its hooks and its test suite.",
      "the vault validator, the traceability exporter, and its hooks."),
-    ("STRUCTURE.md",
-     "See the [README](README.md#the-ai-layer) for how to use it, with or without\nClaude Code.",
-     "See `.claude/skills/mechatronics-docs/SKILL.md` for how to use it, with or\nwithout Claude Code."),
+    # STRUCTURE.md's skill pointer had an entry here for one reason: it cited
+    # README.md#the-ai-layer, a section the generated project README does not
+    # have. That section is METHOD.md#the-ai-layer now and METHOD.md ships, so
+    # the citation resolves in a derived project and needs no rerouting.
+    # METHOD.md carries exactly one template-only sentence - the pointer at the
+    # skill's own test suite, which the strip list removes (DEC-MTH-042).
+    ("METHOD.md",
+     "\nIts own test suite lives next to it:\n\n"
+     "```bash\nbash .claude/skills/mechatronics-docs/tests/run.sh\n```\n",
+     ""),
     ("STRUCTURE.md",
      "That is *your project's* release trail. The template's own is\n"
      "[CHANGELOG.md](CHANGELOG.md) at the repository root — keep the two apart, or\n"
@@ -335,6 +342,9 @@ validator that checks it mechanically.
   itself. Start at its `README.md` for the reading order, and read
   `00_documentation_file_creation_and_conventions.md` before writing anything.
 - [STRUCTURE.md](STRUCTURE.md) — which folder holds which kind of artifact.
+- [METHOD.md](METHOD.md) — why the method is shaped this way: the failure it is
+  built against, how the domains connect, and how to hand the result to
+  somebody who was never taught it.
 - `.claude/skills/mechatronics-docs/` — the validator, the traceability
   exporter and the Claude Code skill that enforce the method.
 
