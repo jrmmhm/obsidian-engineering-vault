@@ -510,6 +510,7 @@ class Vault:
         self._req_index = None
         self._roles = None
         self._git_root = None
+        self._index_root = None
         self._schema = None
         self._schema_error = None
         self._schema_reported = False
@@ -581,6 +582,51 @@ class Vault:
                 self._git_root = False
         return self._git_root or None
 
+    def index_root(self):
+        """The directory the name index is built over.
+
+        doc_root while the repository contains it. That is the canonical
+        layout, where the index deliberately reaches past the vault into
+        02_documents: two files of one name, one of them not linkable, is
+        the collision duplicate-basename exists for.
+
+        Once the repository does NOT contain doc_root, the vault root IS
+        the repository root - both are ancestors of it, so they lie on one
+        chain and no third case exists. Walking doc_root then leaves the
+        working tree: measured 53 of 378 indexed files outside the
+        repository on a vault of that shape, and a different index for the
+        same commit in an isolated checkout.
+
+        The fallback is self.root rather than the path git printed. In the
+        honest case those are the same directory; where GIT_DIR or
+        GIT_WORK_TREE is set in the environment, or git spells the path
+        differently from the resolved one this class holds, it lands on the
+        vault instead of on a foreign tree. Subprocess output decides the
+        branch here, it never becomes the search root. Without a repository
+        the boundary stays doc_root: there is nothing to clamp to, and
+        inferring one from directory names would undo the language
+        independence of amendment 2026-07-28 (01_methodvault, DEC-MTH-044).
+        """
+        if self._index_root is None:
+            repo = self.git_root()
+            repo = repo.resolve() if repo else None
+            inside = repo is not None and (repo == self.doc_root
+                                           or repo in self.doc_root.parents)
+            self._index_root = self.doc_root if repo is None or inside else self.root
+        return self._index_root
+
+    def index_root_label(self):
+        """The boundary as the two findings name it, relative to project_root.
+
+        '00_documentation' in the canonical layout - the same words the
+        shipped documentation quotes - and the vault's own path where the
+        vault is the repository and no such folder exists.
+        """
+        try:
+            return str(self.index_root().relative_to(self.project_root))
+        except ValueError:
+            return str(self.index_root())
+
     def templates_for(self, abbr):
         """H2 heading sets of each template of a domain (empty sets excluded).
 
@@ -626,7 +672,7 @@ class Vault:
         # the same collision on different files, which is the very
         # non-determinism issue #42 is about, one index further out.
         self._md_names, self._all_names = {}, {}
-        for p in sorted(self.doc_root.rglob("*")):
+        for p in sorted(self.index_root().rglob("*")):
             if any(part in (".obsidian", ".git") for part in p.parts):
                 continue
             if p.is_file():
@@ -1606,7 +1652,7 @@ def check_links(vault, path, lines, findings, strict, hub=False):
                 sev = "ERROR" if strict else "WARN"
                 findings.append(Finding(sev, "link-unresolved", str(path), i,
                                         f"[[{target}]] does not resolve to any file "
-                                        "under 00_documentation"))
+                                        f"under {vault.index_root_label()}"))
     budget = LINK_BUDGET_HUB if (hub or path.name == "system_overview.md") else LINK_BUDGET
     if total > budget:
         findings.append(Finding("WARN", "link-budget", str(path), None,
@@ -2324,7 +2370,8 @@ def validate_vault_wide(vault: Vault):
     for name, paths in vault.md_names().items():
         if len(paths) > 1:
             findings.append(Finding("WARN", "duplicate-basename", str(paths[0]), None,
-                                    f"'{name}' exists {len(paths)}x under 00_documentation - "
+                                    f"'{name}' exists {len(paths)}x under "
+                                    f"{vault.index_root_label()} - "
                                     "wikilinks to it are ambiguous"))
     return findings
 
