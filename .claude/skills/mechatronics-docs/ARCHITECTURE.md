@@ -32,7 +32,14 @@ these five.
 
 `--check-install` is the odd one out: it answers whether the personal
 `~/.claude/skills/` entry reaches *this* copy of the skill, reads no vault and
-emits no finding at all.
+emits no finding at all. It also prints `SKILL_REVISION`, the module-level
+constant that names this copy. That constant exists because the copies that
+can disagree cannot be compared by content: a derived project ships the
+skill without `tests/` on purpose (`tools/new_project.py`), so equal
+directories are not the criterion — an equal revision is. The hooks resolve
+through `CLAUDE_PLUGIN_ROOT` and therefore always run the loaded copy
+(DEC-MTH-045); the CI and the pre-commit hook run the vendored one, and the
+revision line is how a disagreement between the two becomes visible.
 
 `--hook post` runs `validate_file` **twice with different values**. The git
 HEAD baseline is captured with `strict_links=True`, the live pass runs with
