@@ -16,12 +16,12 @@ hooks:
       hooks:
         - type: command
           shell: bash
-          command: 'for d in "$CLAUDE_PROJECT_DIR/.claude/skills/mechatronics-docs" "$HOME/.claude/skills/mechatronics-docs"; do [ -f "$d/hooks/post_write_check.sh" ] && exec bash "$d/hooks/post_write_check.sh"; done; exit 0'
+          command: 'for d in "${CLAUDE_PLUGIN_ROOT:-}" "$HOME/.claude/skills/mechatronics-docs" "${CLAUDE_PROJECT_DIR:-}/.claude/skills/mechatronics-docs"; do [ -n "$d" ] && [ -f "$d/hooks/post_write_check.sh" ] && exec bash "$d/hooks/post_write_check.sh"; done; printf "%s\n" "{\"systemMessage\":\"vault validator: no reachable skill copy - vault rules are NOT enforced this turn\"}"; exit 0'
   Stop:
     - hooks:
         - type: command
           shell: bash
-          command: 'for d in "$CLAUDE_PROJECT_DIR/.claude/skills/mechatronics-docs" "$HOME/.claude/skills/mechatronics-docs"; do [ -f "$d/hooks/stop_gate.sh" ] && exec bash "$d/hooks/stop_gate.sh"; done; exit 0'
+          command: 'for d in "${CLAUDE_PLUGIN_ROOT:-}" "$HOME/.claude/skills/mechatronics-docs" "${CLAUDE_PROJECT_DIR:-}/.claude/skills/mechatronics-docs"; do [ -n "$d" ] && [ -f "$d/hooks/stop_gate.sh" ] && exec bash "$d/hooks/stop_gate.sh"; done; printf "%s\n" "{\"systemMessage\":\"vault validator: no reachable skill copy - vault rules are NOT enforced this turn\"}"; exit 0'
 ---
 
 # Mechatronics Project Documentation
@@ -34,7 +34,14 @@ of copying content.
 ## Enforcement Layer — How This Skill Is Gated
 
 While this skill is active, two hooks enforce the mechanically checkable
-vault rules (`validate_vault.py`, same directory):
+vault rules (`validate_vault.py`, same directory). "Same directory" is the
+whole point: both hooks resolve their script through `CLAUDE_PLUGIN_ROOT`,
+which Claude Code sets to the skill directory it actually loaded, so the
+copy whose text you are reading is the copy that enforces. A project that
+carries its own vendored copy no longer overrides that — the vendored copy
+serves the CI and the pre-commit hook, which have no session to ask
+(DEC-MTH-045). `--check-install` prints the revision of the copy that
+answers, which is how the two are told apart when they disagree.
 
 - After every `Edit`/`Write`/`MultiEdit` into a vault, the validator checks
   the written file and feeds findings back. Fix ERRORs immediately, while
@@ -105,9 +112,15 @@ purpose. `export_traceability.py` walks the declared relations into a
 graph and writes the vault out as a traceability artifact:
 
 ```bash
-python3 .claude/skills/mechatronics-docs/export_traceability.py \
+python3 ${CLAUDE_SKILL_DIR}/export_traceability.py \
         <VAULT_ROOT> --output-dir <DIR outside the vault>
 ```
+
+Claude Code expands `${CLAUDE_SKILL_DIR}` before a session reads this file;
+nothing outside a session does. Typed into a shell or written into a
+workflow, the command takes the path to a copy on disk instead —
+`.claude/skills/mechatronics-docs/` where the project carries the skill,
+`~/.claude/skills/mechatronics-docs/` where it does not.
 
 It produces a self-contained HTML report, two CSV views, a JSON graph,
 `traceability_graph.mmd` — the coverage chain as a Mermaid diagram, for a

@@ -14,7 +14,8 @@ Modes:
   validate_vault.py --hook post               PostToolUse hook (JSON on stdin)
   validate_vault.py --hook stop               Stop hook (JSON on stdin)
   validate_vault.py --check-install           does the personal skill entry
-                                              reach this copy of the skill?
+                                              reach this copy of the skill,
+                                              and which revision is it?
 
 Exit codes: 0 = no errors (warnings allowed), 1 = at least one error,
 2 = validator crash (hooks fail open on 2).
@@ -2715,6 +2716,15 @@ def hook_stop(payload):
 
 SKILL_NAME = "mechatronics-docs"
 
+# Identifies this copy of the skill in one line, so "which copy just
+# enforced?" can be answered without diffing two directory trees. A tree
+# comparison cannot answer it: a derived project legitimately ships fewer
+# files than the template (tools/new_project.py strips tests/), so content
+# equality is the wrong question. Bump on every release that changes what
+# the validator or the hooks do; the release checklist in CONTRIBUTING.md
+# owns the bump.
+SKILL_REVISION = "2026-08-10.1"
+
 
 def check_install():
     """Report whether the personal skill entry reaches this copy of the skill.
@@ -2733,7 +2743,7 @@ def check_install():
     """
     own = Path(__file__).resolve().parent
     entry = Path.home() / ".claude" / "skills" / SKILL_NAME
-    print(f"this copy:      {own}")
+    print(f"this copy:      {own} (rev {SKILL_REVISION})")
     print(f"personal entry: {entry}")
 
     # is_symlink() before exists(): exists() follows the link and is False
