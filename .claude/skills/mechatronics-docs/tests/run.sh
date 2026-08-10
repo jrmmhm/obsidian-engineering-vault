@@ -4116,6 +4116,17 @@ if [ $ci_rc -eq 0 ] && contains "$ci_out" "OK - the entry reaches this copy"; th
   printf '%s\n' "$ci_out" | sed 's/^/    /'
 fi
 
+# The revision has to be ON the report, not merely defined in the module.
+# It is the only thing that tells two copies apart: the vendored copy of a
+# derived project ships without tests/ on purpose, so equal content is not
+# the question an installed-copy check can ask.
+CI_REV=$(python3 -c 'import re,sys; s=open(sys.argv[1]).read(); m=re.search(r"^SKILL_REVISION = \"([^\"]+)\"", s, re.M); print(m.group(1) if m else "")' "$VALIDATOR")
+TESTS=$((TESTS + 1))
+if [ -n "$CI_REV" ] && contains "$ci_out" "(rev $CI_REV)"; then ok x; else
+  fail "--check-install must name the revision of the copy that answers:"
+  printf '%s\n' "$ci_out" | sed 's/^/    /'
+fi
+
 # Issue #40 itself: the link carries a path this host does not have. The
 # stored path must appear - it is what names the host that wrote it.
 CI_C="$CI_TMP/c"; mkdir -p "$CI_C/.claude/skills"
@@ -4165,6 +4176,90 @@ fi
 
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
       "/tmp/claude-mechdocs/blocks-$SID"
+
+# ==========================================================================
+# Fixture 9b: which copy the hooks execute (DEC-MTH-045).
+#
+# The skill exists twice at once by design - vendored in a derived project
+# for its CI, and installed personally for the machine that maintains it.
+# Claude Code loads the personal one (personal overrides project by name),
+# but the hook COMMANDS used to enumerate candidate directories starting
+# with the project's, so a session read one copy and enforced another. The
+# stale validator ran and nothing said so.
+#
+# What is pinned here is the resolution RULE, not its wording: the command
+# string is lifted out of SKILL.md and executed against fixture copies that
+# announce which one of them ran. A rewrite of the string keeps passing; a
+# return to project-first does not.
+# ==========================================================================
+HR_TMP=$(mktemp -d)
+trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP" "$ID_TMP" "$SC_TMP" "$PF_TMP" \
+      "$CAP_TMP" "$EX_TMP" "$DUP_TMP" "$CI_TMP" "$HR_TMP"' EXIT
+
+# The hook command as the frontmatter really carries it: the line naming the
+# script, stripped of "command: '" and its closing quote.
+hr_cmd() { # hr_cmd <script-basename>
+  grep -F "$1" "$SKILL_DIR/SKILL.md" | grep -F "command:" | head -1 \
+    | sed -e "s/^ *command: '//" -e "s/'$//"
+}
+
+# A copy that says its own name when its hook script runs.
+hr_copy() { # hr_copy <dir> <label>
+  mkdir -p "$1/hooks"
+  printf '#!/usr/bin/env bash\necho "RAN=%s"\n' "$2" > "$1/hooks/post_write_check.sh"
+  printf '#!/usr/bin/env bash\necho "RAN=%s"\n' "$2" > "$1/hooks/stop_gate.sh"
+}
+
+HR_LOADED="$HR_TMP/loaded"                                   # what PLUGIN_ROOT names
+HR_HOME="$HR_TMP/home"                                       # the personal entry
+HR_PROJ="$HR_TMP/proj"                                       # the vendored copy
+hr_copy "$HR_LOADED" loaded
+hr_copy "$HR_HOME/.claude/skills/mechatronics-docs" home
+hr_copy "$HR_PROJ/.claude/skills/mechatronics-docs" project
+
+hr_run() { # hr_run <plugin_root> <home> <project_dir> <script-basename>
+  env -u CLAUDE_PLUGIN_ROOT -u CLAUDE_PROJECT_DIR \
+      ${1:+CLAUDE_PLUGIN_ROOT="$1"} HOME="$2" ${3:+CLAUDE_PROJECT_DIR="$3"} \
+      bash -c "$(hr_cmd "$4")" 2>&1
+}
+
+for hr_script in post_write_check.sh stop_gate.sh; do
+  # The whole point: a vendored copy beside the loaded one does not win.
+  hr_out=$(hr_run "$HR_LOADED" "$HR_HOME" "$HR_PROJ" "$hr_script")
+  TESTS=$((TESTS + 1))
+  if contains "$hr_out" "RAN=loaded"; then ok x; else
+    fail "$hr_script must run the loaded copy, not the vendored one:"
+    printf '%s\n' "$hr_out" | sed 's/^/    /'
+  fi
+
+  # Without the variable the personal entry is the better guess, because
+  # that is the copy Claude Code loads when both exist.
+  hr_out=$(hr_run "" "$HR_HOME" "$HR_PROJ" "$hr_script")
+  TESTS=$((TESTS + 1))
+  if contains "$hr_out" "RAN=home"; then ok x; else
+    fail "$hr_script must fall back to the personal entry before the project:"
+    printf '%s\n' "$hr_out" | sed 's/^/    /'
+  fi
+
+  # No personal entry: the project copy is what a reader who cloned the
+  # project has, and it must still run.
+  hr_out=$(hr_run "" "$HR_TMP/empty-home" "$HR_PROJ" "$hr_script")
+  TESTS=$((TESTS + 1))
+  if contains "$hr_out" "RAN=project"; then ok x; else
+    fail "$hr_script must still run the project copy when nothing else exists:"
+    printf '%s\n' "$hr_out" | sed 's/^/    /'
+  fi
+
+  # Nothing reachable at all. Exiting 0 in silence is what let the stale
+  # copy govern unnoticed; the turn has to say enforcement is off.
+  hr_out=$(hr_run "" "$HR_TMP/empty-home" "$HR_TMP/empty-proj" "$hr_script")
+  TESTS=$((TESTS + 1))
+  if contains "$hr_out" "systemMessage" && contains "$hr_out" "NOT enforced"; then
+    ok x; else
+    fail "$hr_script must announce that nothing enforces this turn:"
+    printf '%s\n' "$hr_out" | sed 's/^/    /'
+  fi
+done
 
 # ==========================================================================
 # Fixture 10: coverage vault - what counts as coverage and what only looks
