@@ -218,6 +218,30 @@ decision.
 
 ### Fixed
 
+- **A session enforces the copy of the skill it loaded** (PATCH; no finding
+  code changes, see the consequence below) — the skill exists twice at once by
+  design: vendored in a derived project for its CI and its pre-commit hook,
+  installed personally on the machine that maintains it. Claude Code loads the
+  personal copy, because personal overrides project by name. The hook commands
+  in that same frontmatter, however, enumerated candidate directories starting
+  with the project's, and each hook script then resolves its validator relative
+  to itself — so a session read the maintained `SKILL.md` and enforced the
+  vendored `validate_vault.py` beside it, with nothing saying so. Measured in a
+  derived project: the hook executed a validator four days behind the copy the
+  session was reading. Both hooks now resolve through `CLAUDE_PLUGIN_ROOT`,
+  which Claude Code sets to the loaded skill directory inside skill hooks
+  (verified on 2.1.220 and 2.1.226, and for every shape the personal entry
+  takes, including a dangling symlink and no entry at all); the remaining
+  candidates survive only as a degradation path for a version that does not set
+  it, and an unresolvable chain now announces that nothing is enforcing this
+  turn instead of exiting silently. `validate_vault.py` carries a
+  `SKILL_REVISION` that `--check-install` prints, because the two copies cannot
+  be told apart by content — a derived project ships without `tests/` on
+  purpose. **Consequence:** a project whose vendored copy lagged behind is now
+  enforced by the copy its maintainer edits, so it can report findings the
+  vendored copy was blind to. Bump the vendored copy to match, and compare
+  `--check-install` on both if they disagree (DEC-MTH-045).
+
 - **The name index stops at the repository, so one commit indexes one set of
   files** — the two indexes every wikilink is resolved against, and the one
   `duplicate-basename` is decided on, were built over the vault root's
