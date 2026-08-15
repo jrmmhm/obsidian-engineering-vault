@@ -73,10 +73,21 @@ FORMATS = ("json", "csv", "html", "index", "mermaid")
 ID_EXCLUDED_DOMAINS = ("ADM", "INB")
 ROW_NNN_RE = re.compile(r"^\d{3}$")
 FULL_ID_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]{2,4})-(\d{3})\b")
-# A continuation inherits the prefix and scope of the last full identifier in
-# the same cell: "ANF-BAK-008, 027, 028" and "ANF-CPL-001, -003" are both
-# real homelab spellings and both mean three requirements, not one.
+# A continuation inherits the prefix and scope of the NEAREST PRECEDING full
+# identifier in the same cell: "ANF-BAK-008, 027, 028" and "ANF-CPL-001, -003"
+# are both real homelab spellings and both mean three requirements, not one.
+# A number standing before the first full identifier inherits nothing and is
+# reported unresolved - expansion is offered, never asserted.
 CONTINUATION_RE = re.compile(r"(?<![\w-])-?(\d{3})(?![\w-])")
+# One scan for both shapes, in cell order: groups 1-3 are a full identifier,
+# group 4 a continuation number. The alternation is what makes "nearest
+# preceding" fall out of a single finditer - a full identifier is consumed as
+# one match, so a continuation can never fire inside it, and the scope a
+# continuation inherits is the last full identifier the scan has PASSED.
+# Resolving against the last identifier of the whole cell instead made
+# 'ANF-BAK-001, -010, -011, ANF-PUB-011' lose BAK-010/011 and invent PUB-010,
+# with nothing reported (2026-08-15).
+TOKEN_RE = re.compile(FULL_ID_RE.pattern + "|" + CONTINUATION_RE.pattern)
 RANGE_SEPARATORS = ("bis", "to", "–", "—")
 # Fences: CommonMark 0.31.2 - at least three backticks or tildes, closed only
 # by the same character and at least the same length. Tracking neither is how
@@ -608,16 +619,18 @@ def expand_requirement_cell(cell, index, req_abbr):
 
     Handles the three spellings the corpus actually contains: full
     identifiers, a range ('ANF-NAV-001 bis ANF-NAV-009'), and a
-    continuation that inherits prefix and scope ('ANF-BAK-008, 027, 028',
-    'ANF-CPL-001, -003'). Expansion is offered, never asserted: an
-    identifier that does not exist in the vault is returned as unresolved
-    instead of being invented.
+    continuation that inherits prefix and scope from the nearest preceding
+    full identifier ('ANF-BAK-008, 027, 028', 'ANF-CPL-001, -003').
+    Expansion is offered, never asserted: an identifier that does not
+    exist in the vault is returned as unresolved instead of being
+    invented, and a continuation with no identifier before it is returned
+    as an unresolved fragment rather than borrowing a scope from later in
+    the cell.
     """
     text = unescape(cell)
     if not FULL_ID_RE.search(text):
         return [], []
     resolved, unresolved = [], []
-    full = list(FULL_ID_RE.finditer(text))
 
     for sep in RANGE_SEPARATORS:
         pattern = re.compile(
@@ -639,16 +652,16 @@ def expand_requirement_cell(cell, index, req_abbr):
         return sorted(set(resolved)), unresolved
 
     last_prefix, last_scope = None, None
-    consumed = set()
-    for m in full:
-        rid = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-        last_prefix, last_scope = m.group(1), m.group(2)
-        consumed.update(range(m.start(), m.end()))
-        (resolved if rid in index else unresolved).append(rid)
-    for m in CONTINUATION_RE.finditer(text):
-        if m.start() in consumed or last_prefix is None:
+    for m in TOKEN_RE.finditer(text):
+        if m.group(1):
+            rid = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            last_prefix, last_scope = m.group(1), m.group(2)
+        elif last_prefix is None:
+            unresolved.append(f"{m.group(0).strip()} "
+                              "(no full identifier precedes it)")
             continue
-        rid = f"{last_prefix}-{last_scope}-{m.group(1)}"
+        else:
+            rid = f"{last_prefix}-{last_scope}-{m.group(4)}"
         (resolved if rid in index else unresolved).append(rid)
     return sorted(set(resolved)), sorted(set(unresolved))
 
