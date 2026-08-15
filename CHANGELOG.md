@@ -43,6 +43,24 @@ decision.
   path on another machine names the machine — with a pointer to the
   section that governs the non-owned case. Corrected documentation, no
   rule moves and no vault gains a finding: MINOR.
+- **A continuation number inherits from its nearest preceding identifier,
+  never from a later one** — `expand_requirement_cell` resolved every
+  continuation against the LAST full identifier of the whole cell, so a
+  cell that changes scope, `ANF-BAK-001, -010, -011, ANF-PUB-011`, lost
+  BAK-010/011's allocations silently and invented one for PUB-010, with
+  no finding on either side. One positional scan now reads the cell in
+  order; a number standing before the first full identifier is returned
+  as an unresolved fragment instead of borrowing a scope from later in
+  the cell. Grep your vault before updating: affected cells surface as
+  `export-unresolved-requirement`, and requirements whose allocations
+  were mis-resolved can newly gain or lose `req-uncovered` (validator)
+  and `not-allocated` / `no-evidence-note` (the `--fail-on` classes) —
+  those results were computed from wrong edges before. Single-scope
+  cells, which the authoring convention produces, expand unchanged. The
+  reasoning is
+  [`DEC_A_Continuation_Inherits_From_Its_Nearest_Preceding_Identifier`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Continuation_Inherits_From_Its_Nearest_Preceding_Identifier.md).
+  The rules do not move, the tool stops misreading an input it already
+  had an opinion on: PATCH.
 
 ### Added
 
