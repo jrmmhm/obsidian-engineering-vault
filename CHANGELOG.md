@@ -31,6 +31,19 @@ decision.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The IMP README states the whole `host=` rule it teaches** — the
+  "Artifacts on Other Machines" section explained the declaration but not
+  its failure mode: a `host=` naming no machine is reported as an error
+  (`fence-host`), which the validator has enforced since the rule landed
+  and the README never said. The References rules now also carry the
+  ownership qualifier the rule hinges on — "IMP refers to artifacts, it
+  does not replace them" holds **for artifacts this project owns**, and a
+  path on another machine names the machine — with a pointer to the
+  section that governs the non-owned case. Corrected documentation, no
+  rule moves and no vault gains a finding: MINOR.
+
 ### Added
 
 - **The export draws the graph it reads, and the README opens with it** —
