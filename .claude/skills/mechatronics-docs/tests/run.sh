@@ -3257,6 +3257,50 @@ TESTS=$((TESTS + 1))
 if [ "$en_counts" = "7 4 18" ]; then ok x; else
   fail "expected 7 requirements, 4 proven, 18 edges; got '$en_counts'"; fi
 
+# The continuation resolver, called directly - the scope defect of
+# 2026-08-15: every continuation inherited from the LAST full identifier
+# of the cell, so 'ANF-BAK-001, -010, -011, ANF-PUB-011' came back as
+# BAK-001 + PUB-010 + PUB-011 - two requirements silently unallocated, one
+# allocation invented, nothing reported on either side. A continuation
+# inherits from the nearest PRECEDING identifier. The two single-scope
+# spellings the CONTINUATION_RE comment quotes get their first direct
+# assertions here, and a number standing before the first full identifier
+# is refused as a fragment rather than resolved against a later scope.
+cell_out=$(python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from export_traceability import expand_requirement_cell as expand
+idx = {k: {} for k in (
+    "ANF-BAK-001", "ANF-BAK-008", "ANF-BAK-010", "ANF-BAK-011",
+    "ANF-BAK-027", "ANF-BAK-028", "ANF-CPL-001", "ANF-CPL-003",
+    "ANF-PUB-010", "ANF-PUB-011")}
+print(expand("ANF-BAK-001, -010, -011, ANF-PUB-011", idx, "ANF"))
+print(expand("ANF-BAK-008, 027, 028", idx, "ANF"))
+print(expand("ANF-CPL-001, -003", idx, "ANF"))
+print(expand("010, ANF-BAK-011", idx, "ANF"))
+PY
+)
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 1p)" = \
+     "(['ANF-BAK-001', 'ANF-BAK-010', 'ANF-BAK-011', 'ANF-PUB-011'], [])" ]; then
+  ok x; else
+  fail "a continuation must inherit from the nearest preceding identifier, got: $(printf '%s\n' "$cell_out" | sed -n 1p)"; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 2p)" = \
+     "(['ANF-BAK-008', 'ANF-BAK-027', 'ANF-BAK-028'], [])" ]; then
+  ok x; else
+  fail "the bare-number continuation spelling must keep resolving, got: $(printf '%s\n' "$cell_out" | sed -n 2p)"; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 3p)" = \
+     "(['ANF-CPL-001', 'ANF-CPL-003'], [])" ]; then
+  ok x; else
+  fail "the dashed continuation spelling must keep resolving, got: $(printf '%s\n' "$cell_out" | sed -n 3p)"; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 4p)" = \
+     "(['ANF-BAK-011'], ['010 (no full identifier precedes it)'])" ]; then
+  ok x; else
+  fail "a leading fragment must be unresolved, never resolved backwards, got: $(printf '%s\n' "$cell_out" | sed -n 4p)"; fi
+
 exq() { python3 - "$EN_OUT/traceability.json" "$1" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
