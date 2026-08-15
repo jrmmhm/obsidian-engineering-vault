@@ -31,6 +31,28 @@ decision.
 
 ## [Unreleased]
 
+### Changed
+
+- **The strict pointer zone opens in every template language** —
+  `check_paths` promoted a dead artifact path to ERROR only under an H2
+  containing `reference` or `source`, and `check_leaks` exempted the same
+  headings; the German template sections (`Referenzen`, `Verweise`,
+  `Quelle(n)`, `Kanonische Quelle`) never matched. One predicate
+  (`REF_SECTION_TOKENS`, `is_ref_section()`) now carries the English and
+  the German spellings for both zones. **Grep your vault for
+  `path-missing` before updating:** in a German vault every dead path in a
+  reference/source section moves WARN→ERROR, fenced and backticked
+  pointers there are scanned for the first time, the pending/planned/TBD
+  escape no longer applies there, and the stop gate's blocking set grows
+  (pre-existing findings stay non-blocking through the per-file HEAD
+  baseline). German ARC/DEC files lose `impl-leak` findings inside those
+  sections — the exemption English sections always had. The reasoning is
+  [`DEC_The_Strict_Zone_Opens_In_Every_Template_Language`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Strict_Zone_Opens_In_Every_Template_Language.md),
+  closing the decided English-only residual of
+  [`DEC_One_Project_Path_Definition_In_Both_Zones`](.claude/01_methodvault/02_decisions_(DEC)/DEC_One_Project_Path_Definition_In_Both_Zones.md).
+  An existing WARN is raised to ERROR, so by the table this is MAJOR —
+  recorded as MINOR while the repository is at 0.x.
+
 ### Added
 
 - **The export draws the graph it reads, and the README opens with it** —
