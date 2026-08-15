@@ -1616,9 +1616,11 @@ done
 # both, which the multiset assertion below and the issue #66 block at the
 # end of this file pin. Still out of scope by decision: the row-grammar
 # checks (req-class/req-nnn/req-criterion/req-duplicate) stay on the
-# literal REQ folder, and the English-only heuristics (system_overview.md,
-# "References"/"Sources" section names) stay dark - the twins therefore
-# carry no overview file, and both are equally unaffected.
+# literal REQ folder, and the system_overview.md heuristic stays
+# English-only and dark - the twins therefore carry no overview file. The
+# "References"/"Sources" section names are no longer English-only: since
+# REF_SECTION_TOKENS (DEC-MTH-047) the seeded dead path under
+# '## Referenzen' is the strict-zone ERROR in both twins alike.
 #
 # Separate mktemp roots on purpose: check_paths probes project_root.parent,
 # so a shared root would let one twin resolve the other twin's artifacts.
@@ -1696,7 +1698,8 @@ Der Rest des Inhalts ist bewusst unauffaellig gehalten.
 - Zweite Zeile gegen die Stub-Warnung.
 EOF
 
-  # seeded: frontmatter-missing + path-missing
+  # seeded: frontmatter-missing + path-missing (the dead path sits under
+  # '## Referenzen', so it is the strict-zone ERROR, not the body WARN)
   cat > "$V/$I/IMP_Messkette.md" <<'EOF'
 ## Kontext
 Konkrete Realisierung der Messkette ohne jede Frontmatter.
@@ -1863,6 +1866,74 @@ out=$(python3 "$VALIDATOR" --file "$DE_V/03_Architektur_(ARC)/ARC_Unvollstaendig
 TESTS=$((TESTS + 1))
 if [ $rc -ne 2 ] && contains "$out" "\[template-sections\]"; then ok x; else
   fail "--file must auto-detect the German vault root, got rc=$rc"; fi
+
+# The strict pointer zone opens on the German section spellings too
+# (REF_SECTION_TOKENS, DEC-MTH-047): IMP_Messkette's seeded dead path sits
+# under '## Referenzen', so it is the References ERROR in BOTH twins - not
+# the body WARN that pending/planned/TBD can silence.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "ERROR .*IMP_Messkette.*\[path-missing\]"; then ok x; else
+  fail "dead path under '## Referenzen' must be the strict-zone ERROR in the German twin"; fi
+TESTS=$((TESTS + 1))
+if contains "$en_out" "ERROR .*IMP_Messkette.*\[path-missing\]"; then ok x; else
+  fail "dead path under '## Referenzen' must be the strict-zone ERROR in the English twin"; fi
+
+# The homelab spelling '## Verweise' and the leak scan's exemption, pinned
+# on a fixture of their own: a dead path under '## Verweise' is ERROR even
+# with a pending marker on its line, and a concrete value under
+# '## Quelle(n)' in an ARC file is no impl-leak - the same exemption the
+# English 'Sources' heading has always granted.
+GS="$DE_TMP/Strictproj/00_Dokumentation/01_Projektvault"
+mkdir -p "$GS/03_Architektur_(ARC)" "$GS/06_Implementierung_(IMP)" \
+         "$GS/09_Referenzen_(REF)"
+printf '## Kontext\n## Verweise\n## Implementierung\n' \
+  > "$GS/06_Implementierung_(IMP)/00_IMP_Dateitemplate.md"
+printf '## Kontext\n' > "$GS/03_Architektur_(ARC)/00_ARC_Dateitemplate.md"
+printf '## Quelle(n)\n## Kontext\n' > "$GS/09_Referenzen_(REF)/00_REF_Dateitemplate.md"
+cat > "$GS/06_Implementierung_(IMP)/IMP_Strikt.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-08-15
+last-verified: 2026-08-15
+---
+## Kontext
+Die zeigerdichteste Sektion dieses Vaults traegt eine deutsche Ueberschrift.
+
+## Verweise
+- Skript (pending): 20_software/tools/absichtlich_tot.sh
+
+## Implementierung
+- Ein Fakt, zweite Inhaltszeile gegen die Stub-Warnung.
+EOF
+cat > "$GS/03_Architektur_(ARC)/ARC_Strikt.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-15
+last-verified: 2026-08-15
+---
+## Kontext
+Karte ohne konkrete Werte im eigenen Text.
+Zweite Inhaltszeile gegen die Stub-Warnung.
+
+## Quelle(n)
+- Datenblatt nennt 3,3 V als Grenzwert der Wandlerstufe.
+EOF
+gs_out=$(python3 "$VALIDATOR" "$GS" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gs_out" "ERROR .*IMP_Strikt.*\[path-missing\].*absichtlich_tot"; then ok x; else
+  fail "a dead path under '## Verweise' must be the References ERROR, pending or not:"
+  printf '%s\n' "$gs_out" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$gs_out" "IMP_Strikt.*\[path-missing\].*mark it pending"; then ok x; else
+  fail "the strict zone must not offer the pending/planned/TBD escape"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$gs_out" "ARC_Strikt.*\[impl-leak\]"; then ok x; else
+  fail "a value under '## Quelle(n)' in ARC must be exempt from the leak scan:"
+  printf '%s\n' "$gs_out" | grep impl-leak | sed 's/^/    /'
+fi
 
 # ==========================================================================
 # Fixture 4: identity vault UNDER version control - the only fixture with a
