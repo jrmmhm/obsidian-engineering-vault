@@ -166,6 +166,29 @@ ARTIFACT_SEG_RE = re.compile(r"^\d{2}_")
 # never the References/Sources ERROR (silent-bypass prevention).
 PENDING_RE = re.compile(r"\b(pending|planned|tbd|not\s+yet)\b", re.I)
 
+# H2 headings that open the strict pointer zone in check_paths and end the
+# leak scan's reach in check_leaks, matched as substrings of the lowercased
+# heading - TEMPLATE_MARKERS' pattern, one tuple for every language the
+# templates ship in. 'reference' and 'source' cover the English sections
+# ('References', 'Sources' - and 'Resources' by substring, which predates
+# this tuple); 'referenz', 'verweis' and 'quelle' cover the German ones
+# ('Referenzen', 'Verweise', 'Quelle(n)', 'Kanonische Quelle' - and
+# 'Querverweise' or 'Fehlerquellen' by the same substring looseness).
+# English-only, these left the pointer-densest sections of every German
+# vault at WARN and ran the leak scan inside their source sections - a
+# decided residual of DEC-MTH-007 (follow-up 5), closed by DEC-MTH-047.
+REF_SECTION_TOKENS = ("reference", "source", "referenz", "verweis", "quelle")
+
+
+def is_ref_section(heading: str) -> bool:
+    """Does this LOWERCASED H2 text name a references/sources section?
+
+    One predicate for both zones: check_paths opens its strict zone on it
+    and check_leaks exempts on it, so the two can never disagree about
+    where the pointer rules of a section begin.
+    """
+    return any(t in heading for t in REF_SECTION_TOKENS)
+
 # Findings about a section the author DID write, under a title the template
 # does not carry. Counted separately in the run summary, because formatting
 # drift across a domain must not read as a batch of unwritten sections.
@@ -1736,7 +1759,7 @@ def check_leaks(abbr, path, lines, fm_end, findings):
         sec = section_of(lines, i - 1, fm_end)
         if abbr == "DEC" and "context" not in sec:
             continue
-        if "reference" in sec or "source" in sec:
+        if is_ref_section(sec):
             continue
         stripped = line
         for r in STRIP_RES:
@@ -1765,7 +1788,8 @@ def check_paths(vault, path, lines, fm_end, findings):
     amendment 2026-07-28e).
 
     The zones still differ where that was decided on purpose. Under an H2
-    naming references or sources, dead pointers are ERROR, fenced and
+    naming references or sources (REF_SECTION_TOKENS - the English and the
+    German template spellings), dead pointers are ERROR, fenced and
     backticked content is scanned, and no pending/planned/TBD marker
     suppresses anything (silent-bypass prevention). In the rest of the
     body the same finding is a WARN, inline code and fenced blocks are
@@ -1793,7 +1817,7 @@ def check_paths(vault, path, lines, fm_end, findings):
         if not in_fence:
             if line.startswith("## "):
                 h = line[3:].strip().lower()
-                in_ref = "reference" in h or "source" in h
+                in_ref = is_ref_section(h)
                 pending_scope = bool(PENDING_RE.search(h))
                 continue
             if line.startswith("### "):

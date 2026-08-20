@@ -98,9 +98,9 @@ The domain chain, in the order it executes:
 | 4 | `check_sections` | `template-sections`, `section-mismatch`, `section-near-miss` | ERROR, ERROR, WARN |
 | 5 | `check_length` | `length`, `structure` | `length` is ERROR above the hard limit, WARN above the soft one |
 | 6 | `check_links` | `link-unresolved`, `link-budget`, `link-repeat` | `link-unresolved` is ERROR when `strict_links`, WARN otherwise |
-| 7 | `check_leaks` | `impl-leak` | ERROR in ARC, WARN in a DEC Context section; no other domain is scanned |
+| 7 | `check_leaks` | `impl-leak` | ERROR in ARC, WARN in a DEC Context section; no other domain is scanned, and a References/Sources section (`REF_SECTION_TOKENS`, English and German spellings) is exempt |
 | 7a | `check_fence` | `code-fence`, `fence-host`, `fence-record` | only in the banned domains; a declared over-long block is WARN, an undeclared one ERROR |
-| 8 | `check_paths` | `path-missing` | ERROR under a References or Sources heading, WARN in the rest of the body |
+| 8 | `check_paths` | `path-missing` | ERROR under a References or Sources heading (`REF_SECTION_TOKENS` — `Referenzen`, `Verweise` and `Quelle(n)` open the zone too), WARN in the rest of the body |
 | 9 | `check_req_table` | `req-class`, `req-nnn`, `req-duplicate`, `req-criterion` | all ERROR; triggered on the literal `REQ` folder |
 | 9a | `check_req_table_silence` | `req-table-unrecognized` | WARN |
 | 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered through the **role map**, so a translated evidence domain is covered |
@@ -218,7 +218,7 @@ Python, which is why a grep of the source alone does not find them.
 | `link-repeat` | `check_links` | every file read | WARN |
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
-| `path-missing` | `check_paths` | domain | ERROR in a References or Sources section, WARN elsewhere |
+| `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere |
 | `req-class` | `check_req_table` | domain, REQ | ERROR |
 | `req-criterion` | `check_req_table` | domain, REQ | ERROR |
 | `req-duplicate` | `check_req_table` | domain, REQ | ERROR |
