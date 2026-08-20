@@ -51,6 +51,7 @@ systemctl --user status navidrome
 ```
 
 - Use the same machine name you would use in a host-qualified path (`userver:/etc/systemd/system/navidrome.service`). It is the name under which the machine is documented, not an IP and not a connection string.
+- A `host=` that names no machine is not a declaration — the validator reports it as an error (`fence-host`). Write `host=<machine>` or leave the declaration off entirely.
 - Never write `localhost`. The vault is read on other machines than the one you are sitting at, and `localhost` names a different machine for every reader.
 - A declared block is reported as a warning, deliberately: nothing can verify that no source file exists, so the claim stays visible and is yours.
 - A repeatable multi-step procedure belongs in OAU. A single command that verifies one fact is not a runbook — it stays with the fact it proves.
@@ -88,7 +89,8 @@ List of external artifacts that represent or contain the implementation.
 **Rules:**
 - Paths must be stable and project-wide unique
 - No duplication of files in the vault
-- IMP refers to artifacts, it does not replace them
+- IMP refers to artifacts, it does not replace them — **for artifacts this project owns.** What is not a file of this repository (the state of another machine, a command against it) has no path to point at; that case is governed by "Artifacts on Other Machines" above
+- A path on another machine names the machine, or it does not say where it is true
 
 ---
 

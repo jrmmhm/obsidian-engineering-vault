@@ -1616,9 +1616,11 @@ done
 # both, which the multiset assertion below and the issue #66 block at the
 # end of this file pin. Still out of scope by decision: the row-grammar
 # checks (req-class/req-nnn/req-criterion/req-duplicate) stay on the
-# literal REQ folder, and the English-only heuristics (system_overview.md,
-# "References"/"Sources" section names) stay dark - the twins therefore
-# carry no overview file, and both are equally unaffected.
+# literal REQ folder, and the system_overview.md heuristic stays
+# English-only and dark - the twins therefore carry no overview file. The
+# "References"/"Sources" section names are no longer English-only: since
+# REF_SECTION_TOKENS (DEC-MTH-047) the seeded dead path under
+# '## Referenzen' is the strict-zone ERROR in both twins alike.
 #
 # Separate mktemp roots on purpose: check_paths probes project_root.parent,
 # so a shared root would let one twin resolve the other twin's artifacts.
@@ -1696,7 +1698,8 @@ Der Rest des Inhalts ist bewusst unauffaellig gehalten.
 - Zweite Zeile gegen die Stub-Warnung.
 EOF
 
-  # seeded: frontmatter-missing + path-missing
+  # seeded: frontmatter-missing + path-missing (the dead path sits under
+  # '## Referenzen', so it is the strict-zone ERROR, not the body WARN)
   cat > "$V/$I/IMP_Messkette.md" <<'EOF'
 ## Kontext
 Konkrete Realisierung der Messkette ohne jede Frontmatter.
@@ -1863,6 +1866,74 @@ out=$(python3 "$VALIDATOR" --file "$DE_V/03_Architektur_(ARC)/ARC_Unvollstaendig
 TESTS=$((TESTS + 1))
 if [ $rc -ne 2 ] && contains "$out" "\[template-sections\]"; then ok x; else
   fail "--file must auto-detect the German vault root, got rc=$rc"; fi
+
+# The strict pointer zone opens on the German section spellings too
+# (REF_SECTION_TOKENS, DEC-MTH-047): IMP_Messkette's seeded dead path sits
+# under '## Referenzen', so it is the References ERROR in BOTH twins - not
+# the body WARN that pending/planned/TBD can silence.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "ERROR .*IMP_Messkette.*\[path-missing\]"; then ok x; else
+  fail "dead path under '## Referenzen' must be the strict-zone ERROR in the German twin"; fi
+TESTS=$((TESTS + 1))
+if contains "$en_out" "ERROR .*IMP_Messkette.*\[path-missing\]"; then ok x; else
+  fail "dead path under '## Referenzen' must be the strict-zone ERROR in the English twin"; fi
+
+# The homelab spelling '## Verweise' and the leak scan's exemption, pinned
+# on a fixture of their own: a dead path under '## Verweise' is ERROR even
+# with a pending marker on its line, and a concrete value under
+# '## Quelle(n)' in an ARC file is no impl-leak - the same exemption the
+# English 'Sources' heading has always granted.
+GS="$DE_TMP/Strictproj/00_Dokumentation/01_Projektvault"
+mkdir -p "$GS/03_Architektur_(ARC)" "$GS/06_Implementierung_(IMP)" \
+         "$GS/09_Referenzen_(REF)"
+printf '## Kontext\n## Verweise\n## Implementierung\n' \
+  > "$GS/06_Implementierung_(IMP)/00_IMP_Dateitemplate.md"
+printf '## Kontext\n' > "$GS/03_Architektur_(ARC)/00_ARC_Dateitemplate.md"
+printf '## Quelle(n)\n## Kontext\n' > "$GS/09_Referenzen_(REF)/00_REF_Dateitemplate.md"
+cat > "$GS/06_Implementierung_(IMP)/IMP_Strikt.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-08-15
+last-verified: 2026-08-15
+---
+## Kontext
+Die zeigerdichteste Sektion dieses Vaults traegt eine deutsche Ueberschrift.
+
+## Verweise
+- Skript (pending): 20_software/tools/absichtlich_tot.sh
+
+## Implementierung
+- Ein Fakt, zweite Inhaltszeile gegen die Stub-Warnung.
+EOF
+cat > "$GS/03_Architektur_(ARC)/ARC_Strikt.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-15
+last-verified: 2026-08-15
+---
+## Kontext
+Karte ohne konkrete Werte im eigenen Text.
+Zweite Inhaltszeile gegen die Stub-Warnung.
+
+## Quelle(n)
+- Datenblatt nennt 3,3 V als Grenzwert der Wandlerstufe.
+EOF
+gs_out=$(python3 "$VALIDATOR" "$GS" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gs_out" "ERROR .*IMP_Strikt.*\[path-missing\].*absichtlich_tot"; then ok x; else
+  fail "a dead path under '## Verweise' must be the References ERROR, pending or not:"
+  printf '%s\n' "$gs_out" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$gs_out" "IMP_Strikt.*\[path-missing\].*mark it pending"; then ok x; else
+  fail "the strict zone must not offer the pending/planned/TBD escape"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$gs_out" "ARC_Strikt.*\[impl-leak\]"; then ok x; else
+  fail "a value under '## Quelle(n)' in ARC must be exempt from the leak scan:"
+  printf '%s\n' "$gs_out" | grep impl-leak | sed 's/^/    /'
+fi
 
 # ==========================================================================
 # Fixture 4: identity vault UNDER version control - the only fixture with a
@@ -3185,6 +3256,50 @@ if [ "$en_counts" = "$de_counts" ]; then ok x; else
 TESTS=$((TESTS + 1))
 if [ "$en_counts" = "7 4 18" ]; then ok x; else
   fail "expected 7 requirements, 4 proven, 18 edges; got '$en_counts'"; fi
+
+# The continuation resolver, called directly - the scope defect of
+# 2026-08-15: every continuation inherited from the LAST full identifier
+# of the cell, so 'ANF-BAK-001, -010, -011, ANF-PUB-011' came back as
+# BAK-001 + PUB-010 + PUB-011 - two requirements silently unallocated, one
+# allocation invented, nothing reported on either side. A continuation
+# inherits from the nearest PRECEDING identifier. The two single-scope
+# spellings the CONTINUATION_RE comment quotes get their first direct
+# assertions here, and a number standing before the first full identifier
+# is refused as a fragment rather than resolved against a later scope.
+cell_out=$(python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from export_traceability import expand_requirement_cell as expand
+idx = {k: {} for k in (
+    "ANF-BAK-001", "ANF-BAK-008", "ANF-BAK-010", "ANF-BAK-011",
+    "ANF-BAK-027", "ANF-BAK-028", "ANF-CPL-001", "ANF-CPL-003",
+    "ANF-PUB-010", "ANF-PUB-011")}
+print(expand("ANF-BAK-001, -010, -011, ANF-PUB-011", idx, "ANF"))
+print(expand("ANF-BAK-008, 027, 028", idx, "ANF"))
+print(expand("ANF-CPL-001, -003", idx, "ANF"))
+print(expand("010, ANF-BAK-011", idx, "ANF"))
+PY
+)
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 1p)" = \
+     "(['ANF-BAK-001', 'ANF-BAK-010', 'ANF-BAK-011', 'ANF-PUB-011'], [])" ]; then
+  ok x; else
+  fail "a continuation must inherit from the nearest preceding identifier, got: $(printf '%s\n' "$cell_out" | sed -n 1p)"; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 2p)" = \
+     "(['ANF-BAK-008', 'ANF-BAK-027', 'ANF-BAK-028'], [])" ]; then
+  ok x; else
+  fail "the bare-number continuation spelling must keep resolving, got: $(printf '%s\n' "$cell_out" | sed -n 2p)"; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 3p)" = \
+     "(['ANF-CPL-001', 'ANF-CPL-003'], [])" ]; then
+  ok x; else
+  fail "the dashed continuation spelling must keep resolving, got: $(printf '%s\n' "$cell_out" | sed -n 3p)"; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$cell_out" | sed -n 4p)" = \
+     "(['ANF-BAK-011'], ['010 (no full identifier precedes it)'])" ]; then
+  ok x; else
+  fail "a leading fragment must be unresolved, never resolved backwards, got: $(printf '%s\n' "$cell_out" | sed -n 4p)"; fi
 
 exq() { python3 - "$EN_OUT/traceability.json" "$1" <<'PY'
 import json, sys

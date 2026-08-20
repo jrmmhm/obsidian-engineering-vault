@@ -1,6 +1,6 @@
 ---
 domain: DEC
-id: DEC-MTH-046
+id: DEC-MTH-048
 created: 2026-08-20
 last-verified: 2026-08-20
 ---

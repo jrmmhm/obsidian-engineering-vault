@@ -305,9 +305,11 @@ contradicting or duplicating a live decision.
 4. **Use relative project paths** for non-vault files (testdata, source
    code, CAD, 02_documents, 50_sources). Paths must exist — a dead path
    is an ERROR in References/Sources sections and a WARN anywhere else
-   in the body. Mark intentionally-not-yet-existing paths with
-   pending/planned/TBD on the line or its heading; markers never
-   silence References/Sources sections.
+   in the body. The section is recognised in every template language:
+   `Referenzen`, `Verweise` and `Quelle(n)` open the same strict zone
+   as `References` and `Sources`. Mark intentionally-not-yet-existing
+   paths with pending/planned/TBD on the line or its heading; markers
+   never silence References/Sources sections.
    Only the relative form is checked. A path that starts at a
    filesystem root, at `~`, at a host name or at a URL scheme names an
    artifact on another machine — it is never reported as dead, and for
