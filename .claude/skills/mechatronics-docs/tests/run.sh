@@ -5061,6 +5061,94 @@ PY
 then ok x; else fail "ARCHITECTURE.md and the validator disagree about the finding codes"; fi
 
 # ==========================================================================
+# The prose that counts the typed relations agrees with the schema
+# ==========================================================================
+# Three documents state how many typed relations exist, and one of them
+# claims to list all of them. Adding the ninth (corrected-by) falsified all
+# four statements at once, and nothing caught it - the count is prose, and
+# prose about data rots silently. It is derived here instead, on every run.
+#
+# Both directions again, and for the table the NAMES rather than the number:
+# a relation the schema declares and section 5 does not list breaks that
+# section's completeness claim, and a row naming a relation the schema no
+# longer declares is the likelier defect after a rename.
+#
+# The count sentences are matched by their number word, because that is how
+# they are written. A document that stops carrying such a sentence fails
+# here rather than passing silently - the missing-guard failure mode this
+# suite exists to prevent.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import json, re, sys
+from pathlib import Path
+
+skill = Path(sys.argv[1])
+root = skill.parent.parent.parent
+
+rels = json.loads((skill / "vault_schema.json").read_text(encoding="utf-8-sig"))["relations"]
+# "note" documents the block itself and is not a relation kind.
+names = {k for k in rels if k != "note"}
+n = len(names)
+WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+         7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}
+if n not in WORDS:
+    sys.exit(f"{n} relations - extend the number-word map in this check")
+word = WORDS[n]
+
+bad = []
+# Only number words count. "domains and typed relations" is prose about the
+# pair, not a count, and matching any word before the phrase would read
+# "and" as the number.
+NUMBER = "|".join(WORDS.values())
+for rel_path in ("METHOD.md", "STRUCTURE.md", "IEC_61508_MAPPING.md"):
+    text = (root / rel_path).read_text(encoding="utf-8-sig")
+    found = set(re.findall(rf"\b({NUMBER})\s+typed\s+relations", text))
+    if not found:
+        bad.append(f"{rel_path}: no 'N typed relations' sentence - it used to carry one")
+    elif found != {word}:
+        bad.append(f"{rel_path}: says {sorted(found)} typed relations, the schema declares {n} ({word})")
+
+# Section 5 of the mapping claims to list every relation. Read its table.
+iec = (root / "IEC_61508_MAPPING.md").read_text(encoding="utf-8-sig")
+sec = re.search(r"^## 5\..*?(?=^## 6\.)", iec, re.S | re.M)
+if sec is None:
+    sys.exit("IEC_61508_MAPPING.md: section 5 is gone - its relation table cannot be read")
+listed = set(re.findall(r"^\|\s*\*\*`([a-z-]+)`\*\*", sec.group(0), re.M))
+if names - listed:
+    bad.append("declared in vault_schema.json, absent from IEC section 5: "
+               + " ".join(sorted(names - listed)))
+if listed - names:
+    bad.append("listed in IEC section 5, no longer declared: "
+               + " ".join(sorted(listed - names)))
+
+if bad:
+    sys.exit("\n".join(bad))
+PY
+then ok x; else fail "the prose relation counts and the schema disagree"; fi
+
+# ==========================================================================
+# Both DEC templates declare the Corrected by line
+# ==========================================================================
+# The line is authored in the method vault and enforced by nothing
+# (relations.corrected-by is declared-only), so the template is the only
+# place an author can learn it exists - in the method vault's own template
+# and in the one every derived project inherits.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).parent.parent.parent
+missing = [str(p) for p in (
+    root / ".claude/01_methodvault/02_decisions_(DEC)/00_DEC_file_template.md",
+    root / "00_documentation/01_projectvault/02_decisions_(DEC)/00_DEC_file_template.md",
+) if not any(l.startswith("Corrected by") for l in p.read_text(encoding="utf-8-sig").splitlines())]
+if missing:
+    sys.exit("DEC template carries no 'Corrected by' line: " + " ".join(missing))
+PY
+then ok x; else fail "a DEC template no longer declares the Corrected by line"; fi
+
+# ==========================================================================
 # BEGIN --fail-on: the exporter's gap classes as a blocking check (issue
 # #68, DEC-MTH-039). Self-contained and appended last for the same reason
 # the block above is: concurrent branches append here too.
