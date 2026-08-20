@@ -5100,6 +5100,18 @@ bad = []
 # pair, not a count, and matching any word before the phrase would read
 # "and" as the number.
 NUMBER = "|".join(WORDS.values())
+
+# The schema counts its own relations in graph.scope, in the same file as the
+# truth. That copy was the one this check missed on its first day: the three
+# guides were repaired and pinned while the sentence one screen above the
+# data went on saying eight, and the suite stayed green.
+scope = json.loads((skill / "vault_schema.json").read_text(encoding="utf-8-sig"))["graph"]["scope"]
+found = set(re.findall(rf"\b({NUMBER})\s+declared\s+relations", scope))
+if not found:
+    bad.append("vault_schema.json graph.scope: no 'N declared relations' sentence - it used to carry one")
+elif found != {word}:
+    bad.append(f"vault_schema.json graph.scope: says {sorted(found)} declared relations, the schema declares {n} ({word})")
+
 for rel_path in ("METHOD.md", "STRUCTURE.md", "IEC_61508_MAPPING.md"):
     text = (root / rel_path).read_text(encoding="utf-8-sig")
     found = set(re.findall(rf"\b({NUMBER})\s+typed\s+relations", text))

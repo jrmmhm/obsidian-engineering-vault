@@ -11,9 +11,9 @@ Status: Accepted
 
 The decision-log migration introduced a `Corrected by:` pointer for the case
 a later decision overturns a *statement* of an earlier one without replacing
-the decision itself. Fifteen such lines stand in thirteen files today; the
-migration record counted eleven, so the convention has spread twice since it
-was invented. It was declared nowhere: not as a typed relation, not in either
+the decision itself. Sixteen such lines stand in fourteen files once this
+decision has added its own; the migration record counted eleven, so the
+convention has spread on its own since it was invented. It was declared nowhere: not as a typed relation, not in either
 DEC template, and no check knew the line existed. Issue #72 asked for one of
 two remedies — declare it, or teach the validator to verify it.
 
@@ -64,10 +64,15 @@ falsified the premise the earlier severity decision had rested on.
 
 ## Justification
 
-- A relation that is declared and not enforced is the vault's normal state,
-  not an exception: five of the eight relations that preceded it are
-  `declared-only`. The new entry is the sixth, and it says so in its own
-  `enforced` field.
+- This is the first `declared-only` relation: of the eight that preceded it,
+  six are `export-driven` and two `validator-internal`. That is worth stating
+  plainly rather than dressing up, because the label describes who *consumes*
+  a relation, and this one has no consumer to disappoint. The graph draws no
+  decision lineage at all — the exporter extracts neither this relation nor
+  `superseded-by` — and `superseded-by` earns its `validator-internal` label
+  from a presence rule tied to a status this relation deliberately does not
+  touch. `declared-only` therefore names exactly what was already true of the
+  sibling's other half, and names it in the field a reader checks first.
 - The unenforced remainder is named in `enforced_detail` rather than implied.
   A gap a reader can find in the schema is a different object from a gap they
   discover when it bites.
@@ -101,3 +106,14 @@ falsified the premise the earlier severity decision had rested on.
   is reached through a literal `DEC` rather than the role map, so its rules
   do not fire in a vault that aliases the domain. That predates this change
   and belongs to its own issue.
+- One further review finding is recorded as refused rather than acted on:
+  the same function stops reading at the first `Status:` line, so a rule
+  added inside its loop would never have seen a pointer, all of which sit
+  below that line. It was a defect of the rejected option and has no effect
+  on anything that shipped. It is written down because a confirmed finding
+  that simply disappears is indistinguishable from one that was overlooked.
+- The data model gained a relation, so `schema_version` moves with it. The
+  versioning table binds that number to domains, identifiers, fields and
+  relations, and the exported artifact publishes it — a consumer that cannot
+  tell the eight-relation model from the nine-relation one is the reason the
+  number exists.
