@@ -31,6 +31,29 @@ decision.
 
 ## [Unreleased]
 
+### Added
+
+- **`corrected-by` is a declared typed relation** — the `Corrected by:
+  [[DEC_...]]` line has been authored in decision records since the
+  decision-log migration without being declared anywhere: not a relation, not
+  in a template, known to no check. It is now the ninth typed relation in
+  `vault_schema.json`, subject-first like the other eight, with `corrects` as
+  the computed reverse, and both DEC templates declare the line — the method
+  vault's own and the one every derived project inherits. It is not
+  `superseded-by` under another name: a corrected record keeps its Status,
+  because a later decision overturned a *statement* it makes rather than
+  replacing the decision. **MAJOR** by the table in
+  [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
+  — a typed relation was added — recorded as MINOR while the repository is at
+  0.x. **Nothing in an existing vault turns red**: the relation is
+  `declared-only`, no new finding code exists, and a dead pointer was already
+  a blocking `link-unresolved` ERROR before this change. What stays unchecked
+  is named in the schema's own `enforced_detail` rather than left to be
+  discovered — a line with no link, a line below the first heading, and the
+  spelling variants. The reasoning, including the rule that was designed for
+  those cases and rejected on measurement, is
+  [`DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own.md).
+
 ### Changed
 
 - **The strict pointer zone opens in every template language** —
