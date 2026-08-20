@@ -148,9 +148,9 @@ published title; what it requires is not stated here.*
 
 ## 5. Relation → trace
 
-All eight typed relations declared in
+All nine typed relations declared in
 [`vault_schema.json`](.claude/skills/mechatronics-docs/vault_schema.json) are
-listed, including the five with no counterpart. Each is authored in exactly one
+listed, including the six with no counterpart. Each is authored in exactly one
 place and one direction; the reverse direction is computed and never written
 down.
 
@@ -166,6 +166,7 @@ down.
 | **`contains`** — subject `ARC`, objects `REQ`/`DEC`/`CMP`/`IMP`/`ARC`; authored in annotated ARC body links and the main-module submodule table | none named | none | Vault-native decomposition. |
 | **`test-object`** — subject `TAE`, object `CMP`/`IFC`/`ARC`; authored in TAE frontmatter | none named in `[P1]`/`[P3]`; compare ISO 13849-2:2012, 4.5 *Information for validation* `[C849-2]` | none | Named across the fence deliberately: the nearest titled counterpart found sits in a standard this file did not choose. |
 | **`superseded-by`** — subject `DEC`, object `DEC`; authored in the DEC body line | none named | none | Vault-native document control. |
+| **`corrected-by`** — subject `DEC`, object `DEC`; authored in the DEC body line | none named | none | Vault-native document control, and the weaker of the pair: it overturns a statement of the earlier decision without replacing the decision, so the corrected record keeps its status. |
 
 ---
 
