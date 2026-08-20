@@ -20,6 +20,10 @@
 # Graph view tuning and theme choice - personal
 **/.obsidian/graph.json
 **/.obsidian/appearance.json
+# ...and the theme files the choice points at. appearance.json named the
+# choice while the installed theme itself stayed untracked and showed up on
+# every status - the same gap the workspace patterns above were written for.
+**/.obsidian/themes/
 
 # Community plugins are not shipped: listing them without installing only
 # produces load errors for template users.
