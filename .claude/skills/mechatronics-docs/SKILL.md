@@ -336,6 +336,59 @@ The most common misplacements. Follow strictly:
 | Project-created PDF (export, report) | 50_sources | 02_documents |
 | Raw test data | 32_processed | 31_raw (IMMUTABLE) |
 
+## Detail Ownership — One Fact, One File
+
+The timeline column above says which file a statement belongs in. This
+section says what happens to the *other* files, and it is the rule that
+was missing: a volatile fact may be written down once. Everywhere else it
+is named and linked, never restated.
+
+A volatile fact is anything that changes without the surrounding document
+changing: a filesystem path, a version, a CLI flag, a value with a unit, a
+unit or service name, a function or file name, a port, a hostname.
+
+Why this is a rule and not a preference. Documentation goes stale
+silently — no build breaks, no test fails — and the content that goes
+stale first is exactly this: 28.9% of the most popular GitHub projects
+currently carry at least one outdated reference to a code element, and
+82.3% carried one at some point (arXiv 2212.01479). A fact written in one
+file ages in one place and is repaired in one place. The same fact written
+in five files ages in five and is repaired in one, and the vault then holds
+four confident, wrong answers with no way to tell them from the right one.
+Measured in a real vault of this method: one database path appeared in 23
+files across five domains including the requirements and the architecture
+map, the decisions domain carried 138 distinct filesystem paths, the
+components domain 66.
+
+The rules:
+
+1. **Name the owner, then link.** Every volatile fact has exactly one
+   owning file — normally IMP for a project artifact, CMP for a datasheet
+   value, IFC for a contract, TAE for a measurement. Other notes write the
+   link (`[[IMP_...]]`) and the *role* the fact plays, never the fact.
+   Google's own style guide states the general form: "Do not write your own
+   guide to a common Google technology or process. Link to it instead."
+2. **The higher the abstraction, the shorter the mention.** arc42 on the
+   building-block view: "Hide the inner workings of blackboxes!" and
+   "prefer relevance over completeness" — document the "important,
+   surprising, risky, complex or volatile" parts and leave out the "normal,
+   simple, boring or standardized" ones. ARC states that a thing exists and
+   what it connects to. It never states what the thing is set to.
+3. **A decision records a choice, not an implementation.** Nygard's ADR
+   format is one page: "The whole document should be one or two pages
+   long." A DEC that walks through the implementation has stopped being a
+   decision record; move the walk-through to IMP and keep the trade-off.
+4. **Repetition inside one file counts too.** A value stated in the context
+   section and again in the conclusion is two places to repair.
+5. **When a fact must appear twice, the second occurrence is a quote with a
+   source.** Name the owning file on the same line. A reader who finds a
+   contradiction then knows which one is authoritative — without that, both
+   are equally credible and both are useless.
+
+The check before you write any concrete value: *if this changes next
+month, how many files in this vault become wrong?* More than one is a
+defect in the documentation, not a property of the system.
+
 ## Rules — Critical Pitfalls
 
 1. **Verify technical claims before documenting.** Any statement about
@@ -424,7 +477,9 @@ The most common misplacements. Follow strictly:
 2. Frontmatter complete and true in every touched file (`last-verified`
    updated)?
 3. Every behavioral claim evidenced or marked `(unverified)`?
-4. No concrete implementation values outside IMP/CMP/IFC/TAE/REQ tables?
+4. No concrete implementation values outside IMP/CMP/IFC/TAE/REQ tables,
+   and every volatile fact you wrote owned by exactly one file — no path,
+   version, flag, value or unit name restated in a second note?
 5. All wikilinks resolve; all referenced artifact paths exist?
 6. Invalidation sweep done — no existing note contradicts the new state?
 7. Every touched REQ has a verifying TAE (or a recorded deferred one)?
