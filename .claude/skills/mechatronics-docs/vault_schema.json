@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.3",
+  "schema_version": "0.4",
   "decision": "DECISIONS.md, amendments 2026-07-28b, 2026-07-28d and 2026-07-31b",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",

@@ -47,7 +47,10 @@ decision.
   — a typed relation was added — recorded as MINOR while the repository is at
   0.x. **Nothing in an existing vault turns red**: the relation is
   `declared-only`, no new finding code exists, and a dead pointer was already
-  a blocking `link-unresolved` ERROR before this change. What stays unchecked
+  a blocking `link-unresolved` ERROR before this change. `schema_version` moves
+  to `0.4`, because the data model is what that number tracks and
+  `traceability.json` publishes it — without the bump a consumer cannot tell
+  the eight-relation model from the nine-relation one. What stays unchecked
   is named in the schema's own `enforced_detail` rather than left to be
   discovered — a line with no link, a line below the first heading, and the
   spelling variants. The reasoning, including the rule that was designed for
