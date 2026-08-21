@@ -63,6 +63,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-046 | 2026-08-15 | [[DEC_A_Continuation_Inherits_From_Its_Nearest_Preceding_Identifier]] — a continuation inherits from its nearest preceding identifier, never a later one |
 | DEC-MTH-047 | 2026-08-15 | [[DEC_The_Strict_Zone_Opens_In_Every_Template_Language]] — the strict pointer zone opens in every template language |
 | DEC-MTH-048 | 2026-08-20 | [[DEC_A_Volatile_Fact_Has_One_Owning_File]] — a volatile fact is written once and linked everywhere else |
+| DEC-MTH-049 | 2026-08-20 | [[DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own]] — corrected-by is declared and deliberately unenforced, with the gap written down |
 | DEC-MTH-050 | 2026-08-21 | [[DEC_Per_File_Checks_Follow_The_Role_Map]] — the per-file domain checks decide by canonical role |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it

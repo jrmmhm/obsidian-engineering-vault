@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.3",
+  "schema_version": "0.4",
   "decision": "DECISIONS.md, amendments 2026-07-28b, 2026-07-28d and 2026-07-31b",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",
@@ -299,7 +299,7 @@
 
   "graph": {
     "artifact": "traceability_graph.mmd, written by export_traceability.py as the 'mermaid' format and part of the default format list. The coverage chain as a Mermaid node-link diagram - the one output of this tool that is a picture rather than a record to read. It carries the diagram source and no Markdown fence, so the same bytes can be embedded in a fenced block and diffed against a fresh run; that diff is what allows README.md to store it at all. Issue #99, DEC-MTH-043.",
-    "scope": "Three of the eight declared relations: allocates, evidence and verifies - the ones coverage is decided on. Drawing all eight was measured against the shipped worked example first and produced ten nodes, twenty edges and seven relation words above the fold, in which the only closed cycles are the accidental evidence/test-object pairs rather than the chain a reader was meant to follow. The scope is stated in the diagram's own header and the complete edge set stays in traceability.json and traceability_edges.csv, so the omission is named rather than silent.",
+    "scope": "Three of the nine declared relations: allocates, evidence and verifies - the ones coverage is decided on. Drawing every relation that existed at the time (eight) was measured against the shipped worked example first and produced ten nodes, twenty edges and seven relation words above the fold, in which the only closed cycles are the accidental evidence/test-object pairs rather than the chain a reader was meant to follow. The scope is stated in the diagram's own header and the complete edge set stays in traceability.json and traceability_edges.csv, so the omission is named rather than silent.",
     "identity": "Node ids are synthetic: the key sanitised to [A-Za-z0-9_], prefixed 'o_' for a file object and 'r_' for a requirement row, with a counter where two keys sanitise alike. A vault key is not a legal Mermaid id - 'ARC:ARC_Export' and 'REQ_Battery_Monitoring (BAT)' carry colons, parentheses and spaces, and 'end', 'o' and 'x' are reserved words. The two prefixes are load-bearing beyond that: a requirements file may legally carry the identifier of one of its own rows, and one namespace would silently merge the file object with the requirement.",
     "labels": "Every label is entity-escaped ('#' first, then \" | < > & { } and the backtick), because a label is a record and an allocation status is authored text. A single unescaped '|' ends the edge label and takes the diagram with it, and 'Verified \\| Draft' is a spelling the corpus contains. A requirement node also carries its coverage verdict as text - 'proven' or 'not proven' - because the qualifier on the edge shows the word in the cell, and a cell reading 'Verified (Rebuild: Draft)' is qualified and not proven.",
     "determinism": "Parallel edges are collapsed on (kind, source, target, qualifier): a requirement allocated in several rows authors one evidence edge per row, which is right in the JSON and is four identical arrows in a picture. Nothing machine- or run-dependent is written - no vault path, no input digest, no generation time - so the file is byte-identical with and without --no-timestamp, which is what lets TUTORIAL.md quote it from a run that carries one.",
@@ -400,9 +400,20 @@
       "reverse_key": "supersedes",
       "outgoing": "is superseded by",
       "incoming": "supersedes",
-      "note": "Issue #4 names this kind 'supersedes'. It is authored in the superseded decision, so the subject of the authored line is the OLD decision and the authored direction is superseded-by; 'supersedes' is the computed reverse. Naming it the other way round would reverse the arrow against the other seven kinds, which are all authored subject-first.",
+      "note": "Issue #4 names this kind 'supersedes'. It is authored in the superseded decision, so the subject of the authored line is the OLD decision and the authored direction is superseded-by; 'supersedes' is the computed reverse. Naming it the other way round would reverse the arrow against the other eight kinds, which are all authored subject-first.",
       "enforced": "validator-internal",
       "enforced_detail": "dec-superseded (ERROR) requires the link to be present whenever the body Status is 'Superseded'. The link target is not resolved to a DEC object; that is graph work and belongs to issue #2."
+    },
+    "corrected-by": {
+      "subject_domains": ["DEC"],
+      "object_domains": ["DEC"],
+      "authored_in": "DEC body line 'Corrected by: [[DEC_...]]', above the first section heading and below the frontmatter",
+      "reverse_key": "corrects",
+      "outgoing": "is corrected by",
+      "incoming": "corrects",
+      "note": "A later decision that overturns a STATEMENT of an earlier one, not the decision itself. It leaves the corrected record's Status untouched - that is the property separating it from superseded-by, and it is the ADR convention: an amended record stays accepted and gains a pointer, a replaced one is superseded. Authored subject-first like the other eight: the pointer sits in the corrected file, so the subject is the OLD decision. An optional short reason may follow the link, as the Superseded by line has always allowed.",
+      "enforced": "declared-only",
+      "enforced_detail": "No check of its own, deliberately. A target that resolves to nothing is already a blocking ERROR through link-unresolved, which run_full raises with strict links - measured, not assumed. What stays unenforced: a line carrying no link at all, a line below the first section heading, and every spelling variant ('Corrected-by:', lowercase). A rule for those was designed and rejected - it produced eight false ERRORs in this repository's own method vault and rejected every file freshly copied from the DEC template, whose placeholder is the escaped '\\[\\[' spelling and therefore carries no link. See DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own. Its siblings dec-status and dec-superseded decide by canonical role since DEC_Per_File_Checks_Follow_The_Role_Map and do fire in a vault that aliases the domain; this relation stays declared-only regardless, for the reason above."
     }
   },
 
