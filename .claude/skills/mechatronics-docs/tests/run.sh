@@ -1933,6 +1933,16 @@ if contains "$de_out" "ERROR .*ENT_Statuswert.*\[dec-status\]"; then ok x; else
 TESTS=$((TESTS + 1))
 if contains "$de_out" "ERROR .*ENT_Ohne_Nachfolger.*\[dec-superseded\]"; then ok x; else
   fail "check_dec_status must reach the translated decisions folder (dec-superseded)"; fi
+# A folder reached through the alias map says so in the finding. Without
+# this the reverse-alias risk is a paragraph in a changelog: a project that
+# means something else by ENT would read a finding about DEC in a folder
+# where the word never appears. The English twin must not carry the clause.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "\[dec-status\].*folder ENT is read as the DEC domain"; then ok x; else
+  fail "a dec-status finding on an aliased folder must name the translation it applied"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$en_out" "is read as the DEC domain"; then ok x; else
+  fail "the literal DEC folder must not carry the alias clause"; fi
 for code in req-class req-nnn req-duplicate req-criterion; do
   TESTS=$((TESTS + 1))
   if contains "$de_out" "ERROR .*ANF_Grammatik.*\[$code\]"; then ok x; else
@@ -6054,6 +6064,11 @@ rm -rf "$I5_TMP"
 #                   'context' section title, and opening one without the
 #                   other emits nothing. Owned by its own issue.
 # Adding an entry means writing the argument for it, not extending a list.
+#
+# What it does NOT see: membership against a named constant, which is the
+# shape check_fence has (FENCE_BANNED_DOMAINS). Resolving the name would
+# mean interpreting the module, and the three gates this guard was built
+# for are covered behaviourally by the fixtures above either way.
 TESTS=$((TESTS + 1))
 if python3 - "$VALIDATOR" <<'PY'
 import ast, sys
