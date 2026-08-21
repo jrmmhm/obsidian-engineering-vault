@@ -4920,22 +4920,27 @@ if [ -f "$NP" ]; then
     fail "derivation left a git repository behind - SKILL.md assumes none"; fi
 
   # A2 (structural): every concrete backticked path SKILL.md names exists in the
-  # derived tree. Globs, placeholders and template patterns are excluded by the
-  # character class rather than allowlisted, so the allowlist stays small enough
-  # to read. It holds exactly the paths that are absent BY DESIGN, each with its
-  # reason, and it is checked in BOTH directions: an entry that starts existing
-  # is a finding, because an allowlist that excludes nothing has quietly stopped
+  # derived tree. What counts as a path is decided by an extension whitelist and
+  # a trailing slash, and that is a real limit, not only a filter for globs and
+  # template placeholders: a backticked path whose extension is not in the list
+  # below is SILENTLY NOT CHECKED, and so is any path containing a space, which
+  # vault note names routinely have. Widen the alternation when SKILL.md starts
+  # naming a new kind of file - the check cannot tell you that it skipped one.
+  # The allowlist holds the paths that are absent BY DESIGN, each with its
+  # reason, and is checked in BOTH directions: an entry that starts existing is
+  # a finding, because an allowlist that excludes nothing has quietly stopped
   # meaning anything and is about to be copied by the next author.
-  #   traceability_index.md  export_traceability.py writes it into a directory
-  #                          outside the vault; it is never a file in the tree.
+  #   traceability_index.md  export_traceability.py writes these into a
+  #   traceability_graph.mmd  directory outside the vault; they are never files
+  #                          in the tree.
   #   .git/hooks/            named precisely BECAUSE it does not travel with a
   #                          clone or a pull - that absence is the point of the
   #                          sentence naming it.
-  SKILL_ALLOW_PATHS="traceability_index.md .git/hooks/"
+  SKILL_ALLOW_PATHS="traceability_index.md traceability_graph.mmd .git/hooks/"
   np_skill="$ND/.claude/skills/mechatronics-docs/SKILL.md"
   np_missing=""; np_stale_allow=""
   for p in $(grep -o '`[^`]*`' "$np_skill" | tr -d '`' \
-      | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json)$' \
+      | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json|\.mmd|\.html|\.csv)$' \
       | grep -v -E '[*{}$~]|YYYY|ABBR|NN_|DOMAIN' | sort -u); do
     if [ -e "$ND/$p" ] || [ -e "$ND/.claude/skills/mechatronics-docs/$p" ]; then
       exists=1; else exists=0; fi
@@ -4964,6 +4969,20 @@ if [ -f "$NP" ]; then
       fail "derived SKILL.md still carries the retired phrasing: $phrase"
     else ok x; fi
   done
+
+  # A4 (structural, template-side): SKILL.md's one surviving claim about the
+  # CONTENTS of a workflow - that the template repository's own workflow arms
+  # not-allocated and no-evidence-note - is pinned here. This is the
+  # correspondence check the note above calls self-defeating, and it works in
+  # this one direction because both the claim and the file it is about live in
+  # THIS repository: no marker and no repository-dependent variant is needed.
+  # Drop that step and SKILL.md goes silently false in every derived project
+  # already shipped, which is issue #117 a second time.
+  np_tmpl_wf=$(cat "$NP_ROOT/.github/workflows/validate-vault.yml" 2>/dev/null)
+  TESTS=$((TESTS + 1))
+  if contains "$np_tmpl_wf" "fail-on not-allocated,no-evidence-note"; then
+    ok x; else
+    fail "template workflow no longer arms the --fail-on classes SKILL.md names"; fi
 
   # No prose in the derived tree may still point at the worked example or
   # the method vault - the leftover-link defect of issue #70.
