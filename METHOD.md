@@ -197,9 +197,11 @@ python3 .claude/skills/mechatronics-docs/validate_vault.py path/to/01_projectvau
 # -> ERRORs block, WARNs advise, warnings alone still exit 0
 ```
 
-That third hook covers what the editor gates never see — an Obsidian edit, a
-hand edit, a subagent write. It validates the staged files at commit time and
-reports without blocking:
+That third hook is the one that can close what the editor gates never see — an
+Obsidian edit, a hand edit, a subagent write — and it closes nothing until it is
+installed. `.git/hooks/` travels with no clone and no pull, so installing it is a
+step per machine and per checkout. Installed, it validates the staged files at
+commit time and reports without blocking:
 
 ```bash
 ln -sf ../../.claude/skills/mechatronics-docs/hooks/pre_commit_vault.sh \
