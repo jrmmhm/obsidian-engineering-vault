@@ -98,10 +98,16 @@ decision.
   `verifies-unknown-req`,** because three consequences follow:
 
   - the false `verifies-format` on the vault's own spelling is gone;
-  - in a vault that has *finished* translating, an English-spelled
-    `verifies:` entry is now `verifies-format`. It names nothing there, and
-    the canonical spelling is tolerated only while a literal `REQ` folder
-    still exists — that is the mid-translation state and its whole extent;
+  - where the format check runs at all, the canonical `REQ-` spelling is
+    accepted only while a literal `REQ` folder still exists — that is the
+    mid-translation state and its whole extent — so an English-spelled
+    entry in a vault that has finished translating is now
+    `verifies-format`. This reaches a vault whose *evidence* folder is
+    still spelled `TAE`, and only that one: the field profile that turns
+    the check on is looked up by folder abbreviation, so a vault spelling
+    its evidence folder `TUE` has no `verifies` check of any kind and is
+    unaffected. That lookup stays as it is, for the reason in the last
+    paragraph;
   - in a vault carrying **both** evidence folders, `check_tae_verifies` now
     also reads the one that lost the role, so a dead requirement reference
     there is reported for the first time.

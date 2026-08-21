@@ -91,7 +91,10 @@ abbreviation and both the format check and the reference check read it.
 The canonical `REQ-` spelling is tolerated beside it **only while the
 vault carries a literal `REQ` folder** - that is the mid-translation
 state and its whole extent; in a vault that has finished translating, an
-English-spelled entry names nothing and says so.
+English-spelled entry names nothing and says so. The format check reaches
+only a vault whose evidence folder is spelled `TAE`, because the field
+profile that switches it on is the lookup left untouched below; the
+reference check has no such bound.
 
 **The requiredness of `verifies` in a translated evidence domain stays
 unshipped**, and `Vault.fields_for` therefore stays keyed by the folder
