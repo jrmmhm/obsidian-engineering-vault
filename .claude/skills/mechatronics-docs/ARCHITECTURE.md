@@ -125,11 +125,17 @@ the folder that lost can be reported as `req-duplicate` inside its own file
 and never as `req-duplicate-global`, and that is the shape to expect rather
 than a defect. `domain-duplicate-folder` names the pair.
 
-`check_leaks` is the one domain-specific check still keyed on `abbr`. It
-carries a second English lock of its own — the DEC branch tests the section
-title for `context`, which a German file spells `Kontext` — so resolving the
-domain alone emits nothing. It is left whole for the issue that owns both
-locks.
+Two domain-specific checks are still keyed on `abbr`, for different reasons.
+`check_leaks` carries a second English lock of its own — the DEC branch tests
+the section title for `context`, which a German file spells `Kontext` — so
+resolving the domain alone emits nothing; it is left whole for the issue that
+owns both locks. `check_fence` decides on `FENCE_BANNED_DOMAINS` and
+`FENCE_EXEMPT_DOMAINS`, and the question never arises today because `ARC` and
+`IMP` are spelled identically in every language the alias map knows. That is
+an argument from the shipped map, not from the code: a map that ever aliases
+either token turns this into the same defect issue #115 fixed, and the AST
+guard in `tests/run.sh` cannot warn about it — it reads comparison operands,
+and membership against a named constant is invisible to it.
 
 ---
 
