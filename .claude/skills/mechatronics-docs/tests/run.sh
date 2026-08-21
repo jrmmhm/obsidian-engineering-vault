@@ -132,6 +132,9 @@ cat > "$V/09_references_(REF)/00_REF_file_template.md" <<'EOF'
 EOF
 
 cat > "$V/system_overview.md" <<'EOF'
+---
+vault-role: system-overview
+---
 ## Context
 This file lists the top-level modules.
 
@@ -1618,9 +1621,12 @@ done
 # domain (DEC / ENT) and a file of defective requirement rows, because the
 # per-file domain checks decide by canonical role too: dec-status,
 # dec-superseded and the four row-grammar codes are asserted by name on
-# the German side below. The system_overview.md heuristic is the one that
-# stays English-only and dark - the twins therefore carry no overview
-# file. The "References"/"Sources" section names are no longer
+# the German side below. Since DEC-MTH-051 the overview is the vault-root
+# file carrying the marker rather than the file called
+# system_overview.md, so the twins carry one each under two DIFFERENT
+# names, with identical content: neither twin is called
+# system_overview.md, and arc-not-in-overview must still fire in both.
+# The "References"/"Sources" section names are no longer
 # English-only: since REF_SECTION_TOKENS (DEC-MTH-047) the seeded dead
 # path under '## Referenzen' is the strict-zone ERROR in both twins alike.
 #
@@ -1633,10 +1639,27 @@ trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP"' EXIT
 
 build_twin() { # build_twin <vault_dir> <arc_dir> <imp_dir> <ref_dir> <template_infix>
                #            <req_dir> <tae_dir> <req_abbr> <tae_abbr>
-               #            <dec_dir> <dec_abbr>
+               #            <dec_dir> <dec_abbr> <overview_filename>
   local V="$1" A="$2" I="$3" R="$4" T="$5" RQ="$6" TA="$7" P="$8" EV="$9"
-  local DC="${10}" DA="${11}"
+  local DC="${10}" DA="${11}" OVW="${12}"
   mkdir -p "$V/$A" "$V/$I" "$V/$R" "$V/$RQ" "$V/$TA" "$V/$DC"
+
+  # The overview differs between the twins in its FILE NAME and in nothing
+  # else, which is the whole point: the entry point is the file carrying
+  # the marker, so the same content under two names must produce the same
+  # findings. It names ARC_Messkette and not ARC_Unvollstaendig, so each
+  # twin owes exactly one arc-not-in-overview.
+  cat > "$V/$OVW" <<'EOF'
+---
+vault-role: system-overview
+---
+## Kontext
+Diese Datei listet die Top-Level-Module des Vaults.
+
+| Modul (ARC) | Kurzbeschreibung |
+| --- | --- |
+| [[ARC_Messkette]] | Digitalisiert die analogen Eingangssignale |
+EOF
 
   cat > "$V/$A/00_ARC_$T.md" <<'EOF'
 ## Kontext
@@ -1879,11 +1902,11 @@ EN_V="$EN_TMP/Enproj/00_documentation/01_projectvault"
 build_twin "$DE_V" "03_Architektur_(ARC)" "06_Implementierung_(IMP)" \
            "09_Referenzen_(REF)" "Dateitemplate" \
            "01_Anforderungen_(ANF)" "07_Test_und_Evidenz_(TUE)" "ANF" "TUE" \
-           "02_Entscheidungen_(ENT)" "ENT"
+           "02_Entscheidungen_(ENT)" "ENT" "Systemuebersicht.md"
 build_twin "$EN_V" "03_architecture_(ARC)" "06_implementation_(IMP)" \
            "09_references_(REF)" "file_template" \
            "01_requirements_(REQ)" "07_testing_and_evidence_(TAE)" "REQ" "TAE" \
-           "02_decisions_(DEC)" "DEC"
+           "02_decisions_(DEC)" "DEC" "Overview.md"
 
 # 02_Dokumente mirror: same German domain folder names, NO template files.
 # It must stay unrecognized - link resolution depends on that distinction.
