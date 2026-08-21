@@ -284,7 +284,7 @@ pointing at it and needs no edit.
 
 ## IEC_61508_MAPPING.md
 
-The nine domains and the eight typed relations placed against the clause
+The nine domains and the nine typed relations placed against the clause
 structure of IEC 61508, with the gaps named — what the standard has titles for
 and this vault has no home for.
 
