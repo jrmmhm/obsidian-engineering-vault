@@ -140,18 +140,23 @@ the export understood less of the vault than it looks like it did. The exporter 
 It can block a caller that asks it to: `--fail-on <classes>` exits 1 when
 a requirement carries one of the named coverage gaps. No hook uses it and
 no session does — it exists for a CI job, which sees the whole vault at
-once and costs nobody a working session. This repository's own workflow
-arms `not-allocated` and `no-evidence-note` on its template vault, so a
+once and costs nobody a working session. The template repository's own
+workflow arms `not-allocated` and `no-evidence-note` on its vault, so a
 missing allocation row or a missing `verifies:` entry there is a red
 check rather than a WARN you scroll past.
 
-Two further tiers run the same validator without Claude Code, so a change
-authored in Obsidian or by hand is covered too: a pre-commit hook
-(`hooks/pre_commit_vault.sh`, install by symlinking it to
-`.git/hooks/pre-commit`) that reports findings in the staged files and
-only blocks when `MECHDOCS_PRECOMMIT_BLOCK=1` is set, and a GitHub
-Actions workflow that runs the test suite and the full vault audit on
-every push and pull request.
+Two further tiers apply the same validator outside Claude Code, and
+neither one runs by merely being present. `hooks/pre_commit_vault.sh` is
+installed per checkout — `.git/hooks/` travels with no clone and no pull
+— and the hook's own header carries the symlink command and the
+`MECHDOCS_PRECOMMIT_BLOCK=1` switch that makes it block rather than
+report. `.github/workflows/validate-vault.yml` runs where the repository
+is hosted with Actions enabled, and that file is the only current answer
+to which checks it runs; a project derived from this template gets a
+workflow written for it, and no run of this skill's own test suite is
+among them, because that suite does not travel with the vendored copy.
+Until one of the two is turned on, an edit made in Obsidian, by hand or
+by a subagent reaches the vault unchecked.
 
 Which copy of this skill a session is actually running is a separate
 question, and one a global `~/.claude/skills/` entry cannot answer by
