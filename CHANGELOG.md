@@ -33,6 +33,28 @@ decision.
 
 ### Changed
 
+- **The requirement-row checks follow the requirements role** —
+  `check_req_table` and `check_req_table_silence` compared the folder
+  abbreviation to the literal `REQ`, so a vault spelling its requirements
+  folder `01_Anforderungen_(ANF)` had its rows read by the index and by no
+  row check. **Grep your vault for `req-class`, `req-nnn`, `req-duplicate`,
+  `req-criterion` and `req-table-unrecognized` before updating:** in a
+  translated vault every requirement row is now held to the row grammar for
+  the first time, four of those five codes are ERRORs, and a table the index
+  reads while no row check can is the fifth as a WARN. Measured across three
+  derived German vaults — 289 requirement rows — the finding sets are
+  identical before and after, so the rows those projects wrote already
+  conform; that is a measurement, not a promise about yours. Pre-existing
+  findings stay non-blocking at the stop gate through the per-file HEAD
+  baseline. `DEC_Requirement_Index_Follows_The_Role_Map` called this
+  extension a convention rollout and refused it; that refusal is overturned
+  here, and the entry under *Fixed* below explains why the cost it priced
+  belonged to a different check. A blocking check reaching files it never
+  reached is a rule change by the table: MAJOR — recorded as MINOR while the
+  repository is at 0.x. The reasoning is
+  [`DEC_Per_File_Checks_Follow_The_Role_Map`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Per_File_Checks_Follow_The_Role_Map.md)
+  (issue #115).
+
 - **The strict pointer zone opens in every template language** —
   `check_paths` promoted a dead artifact path to ERROR only under an H2
   containing `reference` or `source`, and `check_leaks` exempted the same
@@ -54,6 +76,47 @@ decision.
   recorded as MINOR while the repository is at 0.x.
 
 ### Fixed
+
+- **The decision checks and the requirement-row identifier follow the role
+  map** (PATCH; the codes are named below) — `check_dec_status` compared the
+  folder abbreviation to the literal `DEC`, so a vault spelling its decisions
+  folder `02_Entscheidungen_(ENT)` had no Status line checked at all: not its
+  presence, not its value against the schema's list, not the successor link a
+  `Superseded` state requires. **Grep your vault for `dec-status` and
+  `dec-superseded`.** No decision ever covered this — it was residual 1 of
+  `DEC_Language_Independent_Recognition_And_VCS_Tier` and nothing closed it —
+  and across three derived German vaults (141 decision files) the finding sets
+  are identical before and after.
+
+  In the same pass, `check_field_value` and `check_tae_verifies` stopped
+  disagreeing about what a requirement-row identifier looks like. The format
+  check used a constant English prefix while the reference check used the
+  vault's own, so a vault carrying an English `07_testing_and_evidence_(TAE)`
+  folder beside a translated requirements folder reported every correctly
+  written `ANF-BAK-001` as `verifies-format` at ERROR — and resolved the same
+  id in the same run. **Grep for `verifies-format` and
+  `verifies-unknown-req`,** because three consequences follow:
+
+  - the false `verifies-format` on the vault's own spelling is gone;
+  - in a vault that has *finished* translating, an English-spelled
+    `verifies:` entry is now `verifies-format`. It names nothing there, and
+    the canonical spelling is tolerated only while a literal `REQ` folder
+    still exists — that is the mid-translation state and its whole extent;
+  - in a vault carrying **both** evidence folders, `check_tae_verifies` now
+    also reads the one that lost the role, so a dead requirement reference
+    there is reported for the first time.
+
+  One risk worth knowing before you update: a folder whose abbreviation the
+  alias map translates but which does not hold that domain — an `(ENT)`
+  folder that is not decisions — now receives one `dec-status` ERROR per
+  file. The finding names the translation it applied, and the alias map is
+  data: a project that means something else by that token removes the entry
+  from its own `vault_schema.json`. The requiredness of `verifies` in a
+  translated evidence domain stays unshipped; that is the 38-ERROR rollout
+  refused since issue #66 and refused again here, and it is the cost the
+  earlier record priced when it also refused the row checks. Reasoning:
+  [`DEC_Per_File_Checks_Follow_The_Role_Map`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Per_File_Checks_Follow_The_Role_Map.md)
+  (issue #115).
 
 - **The IMP README states the whole `host=` rule it teaches** — the
   "Artifacts on Other Machines" section explained the declaration but not
@@ -267,7 +330,11 @@ decision.
   `req-duplicate`) and the requiredness of `verifies` deliberately stay on the
   English domains: extending blocking checks to translated files would be a
   rule change, not a repaired blind spot. Decision record:
-  `DEC_Requirement_Index_Follows_The_Role_Map` (issue #66).
+  `DEC_Requirement_Index_Follows_The_Role_Map` (issue #66). **The
+  row-grammar half of that last sentence no longer holds:** the entry above
+  moves those four codes onto the requirements role, and it is classified as
+  the rule change this sentence says it is. The requiredness of `verifies`
+  stays exactly where this entry leaves it.
 
 ### Fixed
 
