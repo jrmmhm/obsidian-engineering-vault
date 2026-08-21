@@ -55,6 +55,32 @@ decision.
 
 ### Fixed
 
+- **`SKILL.md` states the enforcement tiers a derived project actually
+  has** — the skill travels verbatim into every derived project, so its
+  sentences are read in two repositories at once, and two of them were
+  false in one. The tier paragraph promised "a GitHub Actions workflow
+  that runs the test suite and the full vault audit on every push and
+  pull request"; the suite was removed from a derived project together
+  with `.claude/skills/mechatronics-docs/tests` and the derived workflow
+  rewritten to a vault audit and an export-determinism diff, so the first
+  half has been false in every project derived since. The same paragraph
+  said both tiers "run" and that a hand or Obsidian edit "is covered"
+  while naming the pre-commit hook's install step in its own parenthesis:
+  `.git/hooks/` travels with no clone and no pull, so the hook ships
+  uninstalled and covers nothing until it is symlinked, and the
+  derivation leaves no repository behind at all. That paragraph is what
+  argues the editor hooks may miss Obsidian edits, `sed -i` and subagent
+  writes, so overstating it overstates the design. It now states
+  conditions instead of states — a state claim is false in at least one
+  of the environments the file is read in — and leaves the install
+  command with the hook's own header and the step list with the workflow
+  file. Second clause: "This repository's own workflow arms
+  `not-allocated` and `no-evidence-note`" is deictic in a file read in
+  two repositories, and only the template's workflow arms them; it now
+  names the template. The derivation block of `tests/run.sh` gains three
+  assertions over the derived `SKILL.md`, structural where a claim names
+  a path and a denylist where it does not. Nothing in a vault changes and
+  no rule moves; corrected documentation: MINOR.
 - **The IMP README states the whole `host=` rule it teaches** — the
   "Artifacts on Other Machines" section explained the declaration but not
   its failure mode: a `host=` naming no machine is reported as an error
