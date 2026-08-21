@@ -6,6 +6,7 @@ last-verified: 2026-08-08
 ---
 Date: 2026-08-08
 Status: Accepted
+Corrected by: [[DEC_Per_File_Checks_Follow_The_Role_Map]] – the row-grammar refusal below priced a cost belonging to the 'verifies' requirement alone; measured for the row checks it is nil
 
 ## Context
 

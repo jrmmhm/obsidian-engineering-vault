@@ -6,6 +6,7 @@ last-verified: 2026-08-08
 ---
 Date: 2026-08-05
 Status: Accepted
+Corrected by: [[DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own]] – the pointer may carry a short reason, as its sibling line always has
 
 ## Context
 
