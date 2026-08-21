@@ -5015,6 +5015,102 @@ if [ -f "$NP" ]; then
   if contains "$npwf" "validate_vault.py 00_documentation/01_projectvault"; then
     ok x; else fail "derived workflow lost the project vault audit"; fi
 
+  # SKILL.md travels verbatim - the derivation neither strips it nor rewrites
+  # it - so every sentence in it is read in two repositories at once. Issue
+  # #117: it promised a tier a derived project does not have ("a GitHub Actions
+  # workflow that runs the test suite ...", removed with tests/ by #85) and said
+  # "This repository's own workflow" about a workflow only the template has.
+  #
+  # Three assertions guard that and they are NOT interchangeable. A1 and A2 are
+  # structural: they read the derived tree and survive any rewording. A3 is a
+  # denylist over the three phrasings that were wrong - it is the assertion that
+  # would have caught #117 and it catches nothing else, because the same
+  # falsehood in new words walks straight through it. So: when you add a claim
+  # to SKILL.md, extend A2 by giving the claim a PATH the derived tree can be
+  # checked against, or drop the claim. Do not extend A3 hoping to cover a
+  # class; it cannot.
+  #
+  # A full correspondence check - "every tier SKILL.md calls active exists in an
+  # active state" - would need a machine-readable marker in SKILL.md naming the
+  # steps it claims. That is self-defeating here: the template workflow has
+  # seven steps and a derived one has two, so the marker would itself have to be
+  # repository-dependent, which is the split SKILL.md is written to avoid. The
+  # workable rule runs the other way - a claim about a state the file cannot
+  # know is removed, not tested.
+
+  # A1 (structural): the derivation leaves no repository behind, so no tier can
+  # be installed in a freshly derived project - '.git' is in JUNK_NAMES and the
+  # script prints 'git init' as the reader's own next step. This is the fact
+  # SKILL.md's "neither runs by merely being present" rests on.
+  TESTS=$((TESTS + 1))
+  if [ ! -e "$ND/.git" ]; then ok x; else
+    fail "derivation left a git repository behind - SKILL.md assumes none"; fi
+
+  # A2 (structural): every concrete backticked path SKILL.md names exists in the
+  # derived tree. What counts as a path is decided by an extension whitelist and
+  # a trailing slash, and that is a real limit, not only a filter for globs and
+  # template placeholders: a backticked path whose extension is not in the list
+  # below is SILENTLY NOT CHECKED, and so is any path containing a space, which
+  # vault note names routinely have. Widen the alternation when SKILL.md starts
+  # naming a new kind of file - the check cannot tell you that it skipped one.
+  # The allowlist holds the paths that are absent BY DESIGN, each with its
+  # reason, and is checked in BOTH directions: an entry that starts existing is
+  # a finding, because an allowlist that excludes nothing has quietly stopped
+  # meaning anything and is about to be copied by the next author.
+  #   traceability_index.md  export_traceability.py writes these into a
+  #   traceability_graph.mmd  directory outside the vault; they are never files
+  #                          in the tree.
+  #   .git/hooks/            named precisely BECAUSE it does not travel with a
+  #                          clone or a pull - that absence is the point of the
+  #                          sentence naming it.
+  SKILL_ALLOW_PATHS="traceability_index.md traceability_graph.mmd .git/hooks/"
+  np_skill="$ND/.claude/skills/mechatronics-docs/SKILL.md"
+  np_missing=""; np_stale_allow=""
+  for p in $(grep -o '`[^`]*`' "$np_skill" | tr -d '`' \
+      | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json|\.mmd|\.html|\.csv)$' \
+      | grep -v -E '[*{}$~]|YYYY|ABBR|NN_|DOMAIN' | sort -u); do
+    if [ -e "$ND/$p" ] || [ -e "$ND/.claude/skills/mechatronics-docs/$p" ]; then
+      exists=1; else exists=0; fi
+    case " $SKILL_ALLOW_PATHS " in
+      *" $p "*) [ $exists -eq 1 ] && np_stale_allow="$np_stale_allow $p"; continue ;;
+    esac
+    [ $exists -eq 1 ] || np_missing="$np_missing $p"
+  done
+  TESTS=$((TESTS + 1))
+  if [ -z "$np_missing" ]; then ok x; else
+    fail "derived SKILL.md names path(s) the derived tree lacks:$np_missing"; fi
+  TESTS=$((TESTS + 1))
+  if [ -z "$np_stale_allow" ]; then ok x; else
+    fail "SKILL_ALLOW_PATHS entries now exist - drop them:$np_stale_allow"; fi
+
+  # A3 (denylist): the three retired phrasings, one assertion each so a
+  # regression names the sentence it reintroduced. Read the note above before
+  # extending this. The file is whitespace-normalised first: SKILL.md wraps at
+  # ~72 characters, and a claim straddling a line break is invisible to the
+  # line-oriented grep behind contains().
+  np_skill_flat=$(tr '\n' ' ' < "$np_skill" | tr -s ' ')
+  for phrase in "runs the test suite" "Two further tiers run" \
+      "This repository's own workflow"; do
+    TESTS=$((TESTS + 1))
+    if contains "$np_skill_flat" "$phrase"; then
+      fail "derived SKILL.md still carries the retired phrasing: $phrase"
+    else ok x; fi
+  done
+
+  # A4 (structural, template-side): SKILL.md's one surviving claim about the
+  # CONTENTS of a workflow - that the template repository's own workflow arms
+  # not-allocated and no-evidence-note - is pinned here. This is the
+  # correspondence check the note above calls self-defeating, and it works in
+  # this one direction because both the claim and the file it is about live in
+  # THIS repository: no marker and no repository-dependent variant is needed.
+  # Drop that step and SKILL.md goes silently false in every derived project
+  # already shipped, which is issue #117 a second time.
+  np_tmpl_wf=$(cat "$NP_ROOT/.github/workflows/validate-vault.yml" 2>/dev/null)
+  TESTS=$((TESTS + 1))
+  if contains "$np_tmpl_wf" "fail-on not-allocated,no-evidence-note"; then
+    ok x; else
+    fail "template workflow no longer arms the --fail-on classes SKILL.md names"; fi
+
   # No prose in the derived tree may still point at the worked example or
   # the method vault - the leftover-link defect of issue #70.
   TESTS=$((TESTS + 1))

@@ -103,6 +103,35 @@ decision.
 
 ### Fixed
 
+- **`SKILL.md` states the enforcement tiers a derived project actually
+  has** — the skill travels verbatim into every derived project, so its
+  sentences are read in two repositories at once, and two of them were
+  false in one. The tier paragraph promised "a GitHub Actions workflow
+  that runs the test suite and the full vault audit on every push and
+  pull request"; the suite was removed from a derived project together
+  with `.claude/skills/mechatronics-docs/tests` and the derived workflow
+  rewritten to a vault audit and an export-determinism diff, so the first
+  half has been false in every project derived since. The same paragraph
+  said both tiers "run" and that a hand or Obsidian edit "is covered"
+  while naming the pre-commit hook's install step in its own parenthesis:
+  `.git/hooks/` travels with no clone and no pull, so the hook ships
+  uninstalled and covers nothing until it is symlinked, and the
+  derivation leaves no repository behind at all. That paragraph is what
+  argues the editor hooks may miss Obsidian edits, `sed -i` and subagent
+  writes, so overstating it overstates the design. It now states
+  conditions instead of states — a state claim is false in at least one
+  of the environments the file is read in — and leaves the install
+  command with the hook's own header and the step list with the workflow
+  file. Second clause: "This repository's own workflow arms
+  `not-allocated` and `no-evidence-note`" is deictic in a file read in
+  two repositories, and only the template's workflow arms them; it now
+  names the template. `METHOD.md`, the other file that travels verbatim,
+  carried the same present-tense claim about the pre-commit hook above
+  the install command it prints, and is corrected the same way. The
+  derivation block of `tests/run.sh` gains four assertions, structural
+  where a claim names a path or a file in this repository and a denylist
+  where it names neither. Nothing in a vault changes and no rule moves;
+  corrected documentation: MINOR.
 - **The decision checks and the requirement-row identifier follow the role
   map** (PATCH; the codes are named below) — `check_dec_status` compared the
   folder abbreviation to the literal `DEC`, so a vault spelling its decisions
