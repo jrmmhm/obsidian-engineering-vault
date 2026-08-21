@@ -101,12 +101,13 @@ REQ_ID_RE = re.compile(r"REQ-[A-Z]{2,4}-\d{3}")
 # constant for the three places that ask the question - check_req_table,
 # Vault.req_index and the global duplicate scan - because the unrecognised-
 # table WARN states that the index reads a row no check reads, and that
-# claim is only true while both sides ask it the same way. The exception
-# is a vault whose requirements role is aliased (ANF): the index and the
-# duplicate scan follow the role map since issue #66, while check_req_table
-# stays on the literal REQ folder - extending four blocking row codes to
-# translated vaults is a rollout, not a fix - so there the index reads
-# rows no row check reads, and the WARN stays dark on purpose.
+# claim is only true while both sides ask it the same way. All three read
+# the requirements ROLE since issue #115 - the index and the duplicate scan
+# had followed it since #66 while check_req_table compared the folder to
+# the literal REQ, which left a translated vault in the state the WARN
+# describes on every file at once. A vault carrying both spellings still
+# has that state in the folder that lost the role, by construction: a
+# per-file check needs no winner and the index does.
 ROW_NNN_RE = re.compile(r"\d{3}")
 # Columns a requirement table carries. A table may be wider - a project that
 # appends a column keeps the five positional roles the row checks read - and
@@ -1412,7 +1413,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     if role == "TAE":
         check_tae_verifies(vault, fm, path, findings)
     if role == "DEC":
-        check_dec_status(vault, path, lines, findings)
+        check_dec_status(vault, path, lines, findings, abbr)
 
     body = [l for l in lines[fm_end:] if l.strip()]
     if len(body) < STUB_MIN_LINES:
@@ -2054,10 +2055,21 @@ def check_tae_verifies(vault, fm, path, findings):
                                     f"{rid} is not defined in any {abbr} file"))
 
 
-def check_dec_status(vault, path, lines, findings):
+def check_dec_status(vault, path, lines, findings, abbr="DEC"):
     # The value list is data. The companion rule below - Superseded needs a
     # successor link - stays here: it is a cross-reference requirement, not a
     # vocabulary (vault_schema.json, domains.DEC.body_fields.Status).
+    #
+    # A folder reached through the alias map is named as such in the
+    # message. The map claims ENT means decisions, and a project that means
+    # something else by that token would otherwise read a finding about
+    # "DEC" in a folder where the word does not appear, with no way to see
+    # which rule decided that (issue #115). The remedy is in the message
+    # because the remedy is the project's own schema.
+    via = "" if vault.role_of(abbr) == abbr else (
+        f" (folder {abbr} is read as the DEC domain through "
+        "domain_aliases.map; drop that entry in vault_schema.json if this "
+        "folder means something else)")
     desc = _dict(_dict(_dict(_dict(vault.schema(), "domains"), "DEC"),
                        "body_fields"), "Status")
     allowed = _strlist(desc, "values") if desc.get("enforced") == "schema-driven" else []
@@ -2068,17 +2080,17 @@ def check_dec_status(vault, path, lines, findings):
             status = m.group(1).strip()
             if allowed and status not in allowed:
                 findings.append(Finding("ERROR", "dec-status", str(path), i,
-                                        f"Status '{status}' not in {sorted(allowed)}"))
+                                        f"Status '{status}' not in {sorted(allowed)}{via}"))
             if status == "Superseded":
                 joined = "\n".join(lines)
                 if not re.search(r"Superseded by.*\[\[", joined):
                     findings.append(Finding("ERROR", "dec-superseded", str(path), i,
                                             "Status Superseded requires a "
-                                            "'Superseded by: [[DEC_...]]' link"))
+                                            f"'Superseded by: [[DEC_...]]' link{via}"))
             break
     if status is None:
         findings.append(Finding("ERROR", "dec-status", str(path), 1,
-                                "DEC file has no 'Status:' line"))
+                                f"DEC file has no 'Status:' line{via}"))
 
 
 def check_inb_age(path, findings):
