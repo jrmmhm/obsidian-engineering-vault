@@ -77,10 +77,13 @@ decision.
   file. Second clause: "This repository's own workflow arms
   `not-allocated` and `no-evidence-note`" is deictic in a file read in
   two repositories, and only the template's workflow arms them; it now
-  names the template. The derivation block of `tests/run.sh` gains three
-  assertions over the derived `SKILL.md`, structural where a claim names
-  a path and a denylist where it does not. Nothing in a vault changes and
-  no rule moves; corrected documentation: MINOR.
+  names the template. `METHOD.md`, the other file that travels verbatim,
+  carried the same present-tense claim about the pre-commit hook above
+  the install command it prints, and is corrected the same way. The
+  derivation block of `tests/run.sh` gains four assertions, structural
+  where a claim names a path or a file in this repository and a denylist
+  where it names neither. Nothing in a vault changes and no rule moves;
+  corrected documentation: MINOR.
 - **The IMP README states the whole `host=` rule it teaches** — the
   "Artifacts on Other Machines" section explained the declaration but not
   its failure mode: a `host=` naming no machine is reported as an error
