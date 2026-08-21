@@ -7,6 +7,7 @@ last-verified: 2026-08-05
 Date: 2026-08-04
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-04g — One abbreviation, one folder, chosen by a rule (Accepted)".
+Corrected by: [[DEC_Reachability_Is_Decided_From_A_Self_Declared_Overview]] – the template union can now make the check stricter in one place, where a file satisfies one template completely and carries another's exclusive section; see that note's Decision, "A file is held to every contract it claims".
 
 ## Context
 

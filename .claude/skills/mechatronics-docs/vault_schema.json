@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.4",
+  "schema_version": "0.5",
   "decision": "DECISIONS.md, amendments 2026-07-28b, 2026-07-28d and 2026-07-31b",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",
@@ -55,6 +55,20 @@
     ],
     "fallback": "If this file is missing or unparseable the validator falls back to a minimal embedded field set and reports schema-unreadable (WARN) once per vault. Validating nothing silently is the failure mode this project has already been bitten by (DECISIONS.md, amendment 2026-07-28).",
     "enforced": "schema-driven"
+  },
+
+  "system_overview": {
+    "field": "vault-role",
+    "value": "system-overview",
+    "scope": "A Markdown file directly in the vault root. Exactly one file per vault carries it; zero or several means the vault has no entry point, which is reported as overview-unidentified rather than passed over.",
+    "note": "The vault's entry point is the file that declares itself one, not the file with a particular name. Two checks used to compare a file name to the literal 'system_overview.md' and were therefore dark in every vault that renamed it: arc-not-in-overview and the hub link budget (issue #116, DEC-MTH-051).",
+    "not_the_domain_role": "'vault-role' and not 'role': role already names the canonical domain token everywhere else in these tools - Vault.role_of, resolve_role_map, the graph's node role - and a later 'role: ARC' in a frontmatter block would read as obviously correct while meaning something entirely different.",
+    "rejected": [
+      "A tuple of known spellings in the validator, the shape DEC-MTH-047 gave the reference-section names. A domain folder carries its abbreviation in parentheses and a template carries the Latin root 'template', so both are per-language vocabularies with a closed shape; an overview file name is a per-project choice and the tuple would close one vault and reopen at the next.",
+      "A per-vault configuration file naming the overview, which is what Sphinx (root_doc), Antora (nav in antora.yml) and Doorstop (.doorstop.yml) do. discovery.rejected_override already decided there is no project layer, and this file is vendored byte-identically into every derived project - a project-specific file name in it makes the copies differ by construction and the first re-vendoring that forgets the hand-edited line reverts another project's configuration. In those tools the configuration is required to build at all and cannot go stale unnoticed; here it would point at a renamed file and rebuild the same silent skip one level further out."
+    ],
+    "enforced": "validator-internal",
+    "enforced_detail": "validate_vault.py reads the pair through overview_marker and carries the same pair in FALLBACK_SCHEMA, so an unreadable schema cannot switch the capability off behind one WARN. Root files carry no frontmatter contract, so nothing checks the block itself; a file whose frontmatter cannot be parsed, or that carries the key with another value, is quoted back by overview-unidentified instead."
   },
 
   "identifier": {
@@ -380,6 +394,7 @@
       "outgoing": "contains",
       "incoming": "belongs to",
       "authored_in_secondary": "arc_main_module_table",
+      "read_by_the_validator": "The ARC-to-ARC half is the containment half of the reachability rule behind arc-not-in-overview: a module its parent contains is reachable and is not a documentation island. validate_vault.arc_containment reads it off the exporter's graph rather than re-reading the table, so one definition of the relation serves both tools. Where this entry declares no object_domains_secondary the half is unknown rather than empty, and the check reports arc-containment-unreadable instead of calling every submodule an island (DEC-MTH-051).",
       "note": "The two sources reach different domains, so the domains are declared per source and 'object_domains' is their union, kept for readers that ask what a contains edge may point at. The split is load-bearing: the ARC file template puts a 'Related Modules' bullet in the Context section, and an annotated peer-module link there is navigation, not containment. ARC-to-ARC containment is authored in the submodule table of the main-module template and nowhere else - amendment 2026-08-05d.",
       "enforced": "export-driven"
     },

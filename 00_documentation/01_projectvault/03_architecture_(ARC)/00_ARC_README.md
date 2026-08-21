@@ -45,6 +45,8 @@ If an ARC module directly owns components, interfaces, and requirement allocatio
 - `ARC_Electrical` (parent with sub-ARCs for power supply, safety circuit, status indication) --> Main Module template
 - `ARC_Electrical__Safety_Circuit` (directly owns components, interfaces, allocations) --> Full ARC template
 
+The submodule table is not decoration: it is the only place ARC-to-ARC containment is authored, so it is what makes a submodule reachable without a row in the system overview. A module that no overview names and no parent contains is reported as `arc-not-in-overview`. A module that does both — contains submodules *and* allocates requirements of its own — is held to both templates; see the section-headings rules in [[00_documentation_file_creation_and_conventions]].
+
 
 ---
 

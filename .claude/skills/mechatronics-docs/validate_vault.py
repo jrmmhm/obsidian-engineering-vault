@@ -268,6 +268,12 @@ FALLBACK_SCHEMA = {
                         "required": False, "code": "test-object-format",
                         "enforced": "schema-driven"},
     }},
+    # In the essentials for the alias map's reason (issue #66): without it
+    # a vault read under this fallback would have no entry point at all,
+    # and the ARC reachability rule would switch off behind the single
+    # schema-unreadable WARN. The relations block is deliberately NOT
+    # mirrored here - see arc_containment.
+    "system_overview": {"field": "vault-role", "value": "system-overview"},
     "domains": {
         "DEC": {"fields": {"status": {"required": False}},
                 "body_fields": {"Status": {
@@ -341,6 +347,28 @@ def _read_schema(path):
     if not isinstance(data, dict):
         return FALLBACK_SCHEMA, f"{path.name} is not a JSON object"
     return data, None
+
+
+def overview_marker(schema):
+    """(frontmatter key, value) that marks a vault's system overview.
+
+    The vault's entry point is the file that says it is one. A file name
+    cannot carry that claim: it is a per-project choice, not a per-language
+    vocabulary like a domain abbreviation, and every check keyed on the
+    literal 'system_overview.md' was dark in every vault that renamed it
+    (01_methodvault, DEC-MTH-051).
+
+    Read from the schema and, failing that, from FALLBACK_SCHEMA, which is
+    the only other place the pair is written. None when neither declares it
+    - and then no file can be identified, which the overview finding says
+    out loud rather than leaving the check to opt out silently.
+    """
+    for src in (schema, FALLBACK_SCHEMA):
+        spec = _dict(src, "system_overview")
+        field, value = spec.get("field"), spec.get("value")
+        if isinstance(field, str) and field and isinstance(value, str) and value:
+            return field, value
+    return None
 
 
 class Finding:
@@ -554,6 +582,9 @@ class Vault:
         self._schema_error = None
         self._schema_reported = False
         self._fields = {}
+        self._overviews = None
+        self._analysis = None
+        self._analysis_error = None
 
     def schema(self):
         if self._schema is None:
@@ -679,6 +710,64 @@ class Vault:
         except ValueError:
             return str(self.index_root())
 
+    def overview_scan(self):
+        """(marked root files, near misses) - who claims to be the overview.
+
+        Only files directly in the vault root are asked: the entry point of
+        a vault is a root file in every layout this method describes, and
+        widening the search would make a marker inside a domain note into a
+        second answer to a question that has one.
+
+        The near misses are why this returns a pair. Root files carry no
+        frontmatter contract - validate_file parses frontmatter for 'infra'
+        and not for 'root' - so a block that cannot be read, or the key
+        with a misspelled value, would otherwise be indistinguishable from
+        a vault that never adopted the marker. They are carried out of here
+        so the finding can quote them back at the author.
+        """
+        if self._overviews is None:
+            marker = overview_marker(self.schema())
+            found, near = [], []
+            for p in sorted(self.root.glob("*.md")):
+                try:
+                    lines = read_lines(p)
+                except OSError:
+                    continue
+                fm, _end, bad = parse_frontmatter(lines)
+                if bad:
+                    near.append((p, bad))
+                    continue
+                if marker is None or not fm:
+                    continue
+                value = fm.get(marker[0])
+                if not isinstance(value, str):
+                    continue
+                if fold_key(value) == fold_key(marker[1]):
+                    found.append(p)
+                else:
+                    near.append((p, f"{marker[0]}: {value}"))
+            self._overviews = (found, near)
+        return self._overviews
+
+    def overview(self):
+        """The one file that is this vault's entry point, or None.
+
+        None for zero claimants and for several: a vault has one entry
+        point, and picking one of two would grant the looser half of this
+        rule - the hub link budget - while the stricter half cannot run.
+        """
+        found, _near = self.overview_scan()
+        return found[0] if len(found) == 1 else None
+
+    def is_overview(self, path: Path):
+        ov = self.overview()
+        if ov is None:
+            return False
+        try:
+            return Path(path).resolve() == ov.resolve()
+        except OSError:
+            return False
+
     def templates_for(self, abbr):
         """H2 heading sets of each template of a domain (empty sets excluded).
 
@@ -692,10 +781,18 @@ class Vault:
         which would fail the CI audit and block the stop gate on a
         correct file (DECISIONS.md, amendment 2026-08-04g).
 
-        The union cannot make the check stricter. check_sections already
-        scores a file against every template of its domain and keeps the
-        best, so one more candidate can only be met or ignored. The
-        folder name is carried into the template's label where an
+        The union can make the check stricter in exactly one place, and
+        only since DEC-MTH-051: a file that satisfies one template
+        COMPLETELY and carries a section only a second template of the
+        domain requires is held to that second contract as well. Everywhere
+        else check_sections still keeps the best-scoring template alone, so
+        one more candidate can only be met or ignored - which is what
+        DEC_One_Abbreviation_One_Folder_By_Rule relied on when it made this
+        a union, and the reason the narrower rule was chosen over holding
+        every claimed contract at once. A vault mid-translation is
+        unaffected by construction: its two folders' templates are written
+        in two languages, so no file carries a section of the other one.
+        The folder name is carried into the template's label where an
         abbreviation has more than one folder, because 'closest template:
         00_ARC_file_template.md' names two files there.
         """
@@ -1373,9 +1470,12 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                 # into every file copied from it, so the template is the one
                 # place where catching it is worth the most.
                 check_undeclared(vault, fm, abbr, path, findings)
-        # infra/root files carry placeholder example links - never strict
+        # infra/root files carry placeholder example links - never strict.
+        # The hub budget goes to the file that DECLARES itself the overview,
+        # never to a file name: a hub is a hub in every language, and the
+        # literal here was dark in every vault that renamed it (issue #116).
         check_links(vault, path, lines, findings, strict=False,
-                    hub=path.name == "system_overview.md")
+                    hub=vault.is_overview(path))
         return findings
 
     # ---- full domain-file checks ----
@@ -1604,27 +1704,87 @@ def render_headings(pairs):
                      for req, h, line in pairs)
 
 
+def exclusive_sections(templates):
+    """Per template, the required H2s no other template of the domain wants.
+
+    Folded, because that is the tolerance a heading is compared with
+    everywhere else, and empty titles dropped for classify_sections'
+    reason: a bare '## ' in a template requires nothing.
+
+    A domain whose templates require identical sets has no exclusive
+    section anywhere, and one whose set is a subset of another's has none
+    of its own; check_sections then behaves exactly as it did before this
+    function existed. That is a property, not an oversight: nothing in
+    such a pair can tell which of the two a file was written from.
+    """
+    sets = [{fold_key(s) for s in th2 if s.strip()} for _tname, th2 in templates]
+    out = []
+    for i, own in enumerate(sets):
+        others = set()
+        for j, other in enumerate(sets):
+            if j != i:
+                others |= other
+        out.append(own - others)
+    return out
+
+
 def check_sections(vault, abbr, path, lines, findings):
     templates = vault.templates_for(abbr)
     if not templates:
         return  # domain without templates (e.g. ADM): nothing to enforce
     file_h2 = h2_index(lines)
-    best = None
-    for tname, th2 in templates:
-        absent, mismatch, near = classify_sections(th2, file_h2)
+    scored = [(tname,) + classify_sections(th2, file_h2) for tname, th2 in templates]
+    best_i, best = 0, None
+    for i, (_tname, absent, mismatch, near) in enumerate(scored):
         # Unmet promises decide which template a file was written from;
         # near misses only break a tie, so a file matching one template
         # loosely never outranks one it satisfies.
         score = (len(absent) + len(mismatch), len(near))
-        if best is None or score < best[0]:
-            best = (score, tname, absent, mismatch, near)
-        if score == (0, 0):
-            return
-    _, tname, absent, mismatch, near = best
+        if best is None or score < best:
+            best, best_i = score, i
+    claimed = [best_i]
+    if best == (0, 0):
+        # A file that satisfies one contract completely is where this check
+        # used to fall silent, and the ARC folder is where that costs
+        # something: a file carrying the main-module template's two
+        # sections stopped being measured against the seven-section one, so
+        # losing any of the other five was silent (issue #116). A section
+        # only ONE template of the domain requires is evidence of which
+        # template a file was written from, so a file carrying a second
+        # template's exclusive section is held to that contract too.
+        #
+        # Only from a perfect match. Where the best template already
+        # reports, the file is measured against it alone, exactly as
+        # before - the narrow form, because it changes behaviour only in
+        # the state that was silent (01_methodvault, DEC-MTH-051).
+        exclusive = exclusive_sections(templates)
+        for i, (_tname, absent, mismatch, _near) in enumerate(scored):
+            if i == best_i:
+                continue
+            unmet = {fold_key(s) for s in absent}
+            unmet |= {fold_key(req) for req, _h, _l in mismatch}
+            if exclusive[i] - unmet:
+                claimed.append(i)
+    absent, mismatch, near = [], [], []
+    for i in claimed:
+        absent += [s for s in scored[i][1] if s not in absent]
+        mismatch += [e for e in scored[i][2] if e not in mismatch]
+        near += [e for e in scored[i][3] if e not in near]
+    if len(claimed) == 1:
+        tname = f"closest template: {scored[best_i][0]}"
+    else:
+        # Only the templates that actually report are named: a file can
+        # claim two contracts and fall short of one, and naming the
+        # satisfied one beside it would send the author to a template that
+        # has nothing to say about the finding.
+        reporting = [scored[i][0] for i in claimed
+                     if scored[i][1] or scored[i][2] or scored[i][3]]
+        word = "template" if len(reporting) == 1 else "templates"
+        tname = f"{word}: " + ", ".join(reporting)
     if absent:
         findings.append(Finding("ERROR", "template-sections", str(path), None,
                                 f"missing required sections {sorted(absent)} "
-                                f"(closest template: {tname})"))
+                                f"({tname})"))
     if mismatch:
         findings.append(Finding("ERROR", "section-mismatch", str(path),
                                 min(e[2] for e in mismatch),
@@ -1739,7 +1899,7 @@ def check_links(vault, path, lines, findings, strict, hub=False):
                 findings.append(Finding(sev, "link-unresolved", str(path), i,
                                         f"[[{target}]] does not resolve to any file "
                                         f"under {vault.index_root_label()}"))
-    budget = LINK_BUDGET_HUB if (hub or path.name == "system_overview.md") else LINK_BUDGET
+    budget = LINK_BUDGET_HUB if hub else LINK_BUDGET
     if total > budget:
         findings.append(Finding("WARN", "link-budget", str(path), None,
                                 f"{total} outgoing links > {budget}. Link the responsible "
@@ -2325,31 +2485,92 @@ def allocation_index(vault: Vault):
     requirements folder and the ids agree by construction
     (export-duplicate-role still names the folder that lost).
 
+    Where the graph cannot be built the verification half of the rule
+    still runs - the check loses reach, not its voice.
+    """
+    a = export_analysis(vault)
+    if a is None:
+        return None
+    _roles, bindings, _graph, _back, coverage = a
+    if not (bindings.get("arc_allocation_table") or {}).get("section"):
+        return None     # no template declares one - no row to read
+    return {rid: "not-allocated" not in c["gaps"] for rid, c in coverage.items()}
+
+
+def export_analysis(vault: Vault):
+    """(roles, bindings, graph, back, coverage) of this vault, or None.
+
+    One build per vault for the two checks that need the graph: the
+    allocation half of the coverage rule and the ARC-to-ARC containment the
+    reachability rule reads. Cached, because building it twice reads every
+    file of the vault twice for one answer - measured 0.12 s of a 0.68 s
+    audit on a 398-file vault.
+
     Never raises, and never lets the exporter's exit path become this
     process's: SystemExit is not an Exception, and exit 2 releases both
-    hooks. Where the graph cannot be built the verification half of the
-    rule still runs - the check loses reach, not its voice.
+    hooks. The failure is remembered rather than swallowed, so the caller
+    that must say a check did not run can name what stopped it.
     """
-    try:
-        # One module, not two. Run as a script this file lives in
-        # sys.modules as '__main__', so the exporter's own
-        # 'from validate_vault import ...' loads a SECOND copy of it - two
-        # Vault classes, two schema caches, and the identity the test suite
-        # asserts between the two tools silently false. Registering this
-        # module under its import name first is what makes the pair one.
-        here = Path(__file__).resolve()
-        sys.modules.setdefault(here.stem, sys.modules[__name__])
-        if str(here.parent) not in sys.path:
-            sys.path.insert(0, str(here.parent))
-        import export_traceability
+    if vault._analysis is None:
+        try:
+            # One module, not two. Run as a script this file lives in
+            # sys.modules as '__main__', so the exporter's own
+            # 'from validate_vault import ...' loads a SECOND copy of it -
+            # two Vault classes, two schema caches, and the identity the
+            # test suite asserts between the two tools silently false.
+            # Registering this module under its import name first is what
+            # makes the pair one.
+            here = Path(__file__).resolve()
+            sys.modules.setdefault(here.stem, sys.modules[__name__])
+            if str(here.parent) not in sys.path:
+                sys.path.insert(0, str(here.parent))
+            import export_traceability
 
-        _roles, bindings, _graph, _back, coverage = export_traceability.analyse(
-            vault, vault.schema())
-        if not (bindings.get("arc_allocation_table") or {}).get("section"):
-            return None     # no template declares one - no row to read
-        return {rid: "not-allocated" not in c["gaps"] for rid, c in coverage.items()}
-    except (Exception, SystemExit):
+            vault._analysis = export_traceability.analyse(vault, vault.schema())
+        except (Exception, SystemExit) as e:
+            vault._analysis = False
+            vault._analysis_error = type(e).__name__
+    return vault._analysis or None
+
+
+def arc_containment(vault: Vault):
+    """{ARC file stem: the stems it names as submodules} - or None.
+
+    The ARC-to-ARC half of 'contains', which vault_schema.json declares is
+    authored in the submodule table of the main-module template and nowhere
+    else. Read off the exporter's graph rather than re-read here, for
+    allocation_index's reason: one definition of a relation, never two.
+
+    None is the third answer - "cannot say" - and the caller reports it
+    instead of continuing, because both halves of the reachability rule
+    have to be readable for its finding to mean anything. Two ways to get
+    there, and the second is the one that bites: FALLBACK_SCHEMA declares
+    no relations at all, so a vault read under an unreadable schema would
+    show an EMPTY containment set rather than an unknown one, and every
+    submodule of a correctly nested vault would be reported as a
+    documentation island behind a single schema-unreadable WARN.
+
+    An empty dict is a different answer again and is not None: a vault
+    whose templates declare no submodule table cannot author ARC-to-ARC
+    containment, so every ARC module must be named in the overview. That
+    is the rule for a vault without a hierarchy.
+    """
+    if not _strlist(_dict(_dict(vault.schema(), "relations"), "contains"),
+                    "object_domains_secondary"):
         return None
+    a = export_analysis(vault)
+    if a is None:
+        return None
+    _roles, _bindings, graph, _back, _coverage = a
+    out = {}
+    for e in graph.edges:
+        if e["kind"] != "contains":
+            continue
+        src = graph.nodes.get(e["source"]) or {}
+        dst = graph.nodes.get(e["target"]) or {}
+        if src.get("role") == "ARC" and dst.get("role") == "ARC":
+            out.setdefault(src["name"], set()).add(dst["name"])
+    return out
 
 
 def validate_vault_wide(vault: Vault):
@@ -2440,18 +2661,79 @@ def validate_vault_wide(vault: Vault):
                        f"one; {tail}")
             findings.append(Finding("WARN", "req-uncovered", str(f), i, msg))
 
-    # system_overview lists every ARC module
-    so = vault.root / "system_overview.md"
-    so_text = corpus.get(so, "")
+    # Every ARC module is reachable from the overview. The overview names
+    # the top-level modules and a main module names its submodules, so an
+    # island is a module no chain of submodule tables reaches from the
+    # entry point. Transitive and not one hop: a module listing itself, and
+    # two modules listing each other, would otherwise cancel their own
+    # findings - the two suppression paths that decided this
+    # (01_methodvault, DEC-MTH-051).
+    #
+    # Both ways this can fail to run report themselves. A check that opts
+    # out without a word is indistinguishable from a clean result, which is
+    # the defect this whole rule was rewritten for; it must not be rebuilt
+    # one layer in.
     arcdir = vault.domains.get("ARC")
-    if arcdir and so.exists():
-        for f in arcdir.rglob("*.md"):
-            if f.name.startswith("00_"):
-                continue
-            if f.stem not in so_text:
-                findings.append(Finding("WARN", "arc-not-in-overview", str(f), None,
-                                        f"ARC module {f.stem} missing from system_overview.md - "
-                                        "documentation island"))
+    arc_files = [f for f in sorted(arcdir.rglob("*.md"))
+                 if not f.name.startswith("00_")] if arcdir else []
+    marked, near = vault.overview_scan()
+    if len(marked) != 1:
+        # Reported for EVERY vault, not only one with ARC notes in it. The
+        # entry point decides the hub link budget as well as the
+        # reachability scan, so a vault whose ARC folder is still empty -
+        # which every project derived with the three-domain profile is on
+        # day one - would otherwise have its overview drop to the ordinary
+        # budget with nothing said. That is the silence this rule exists
+        # against, and gating the finding on ARC content would have kept a
+        # smaller copy of it.
+        marker = overview_marker(vault.schema())
+        line = f"'{marker[0]}: {marker[1]}'" if marker else "the overview marker"
+        if marked:
+            msg = (f"{len(marked)} files in the vault root declare {line} "
+                   f"({', '.join(p.name for p in marked)}) - a vault has one "
+                   "entry point")
+        else:
+            msg = (f"no file in the vault root declares {line} - the vault's "
+                   "entry point is the file carrying that line, whatever it "
+                   "is called")
+        if near:
+            msg += ". Nearest candidates: " + "; ".join(
+                f"{p.name} carries {d}" for p, d in near)
+        findings.append(Finding(
+            "WARN", "overview-unidentified", str(vault.root), None,
+            msg + " - the hub link budget is granted to no file and the ARC "
+            "reachability check did not run"))
+    if arc_files and len(marked) == 1:
+        contained = arc_containment(vault)
+        if contained is None:
+            why = vault._analysis_error or "the schema declares no ARC-to-ARC 'contains'"
+            findings.append(Finding(
+                "WARN", "arc-containment-unreadable", str(vault.root), None,
+                f"the submodule tables could not be read ({why}) - the ARC "
+                "reachability check did not run. Reporting every submodule as "
+                "unreachable instead would be a confident wrong answer on a "
+                "correctly nested vault"))
+        else:
+            # A work list, not one hop: reachability follows the containment
+            # chain to whatever depth the vault nests it, which is what makes
+            # a self-naming row and a two-module cycle harmless.
+            reach = {f.stem for f in arc_files
+                     if f.stem in corpus.get(marked[0], "")}
+            stack = list(reach)
+            while stack:
+                for child in contained.get(stack.pop(), ()):
+                    if child not in reach:
+                        reach.add(child)
+                        stack.append(child)
+            for f in arc_files:
+                if f.stem in reach:
+                    continue
+                findings.append(Finding(
+                    "WARN", "arc-not-in-overview", str(f), None,
+                    f"ARC module {f.stem} is not reachable from "
+                    f"{marked[0].name}: named neither there nor in the "
+                    "submodule table of a module that is - documentation "
+                    "island"))
 
     # orphans: domain files nobody links to
     for f in domain_files:
