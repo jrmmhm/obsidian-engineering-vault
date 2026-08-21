@@ -82,7 +82,7 @@ baseline pass.
 | --- | --- |
 | `outside`, `skip` | none — returns immediately |
 | `inbox` | `check_links`, then `check_inb_age` (disk pass only) |
-| `root` | `check_links` only, never strict, hub budget for `system_overview.md` |
+| `root` | `check_links` only, never strict, hub budget for the file `Vault.is_overview` recognises |
 | `infra` | frontmatter vocabulary via `check_undeclared`, `template-unreadable` for an unparseable template, then `check_links` |
 | `domain` | the full chain below |
 
@@ -106,6 +106,18 @@ The domain chain, in the order it executes:
 | 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered on the **evidence role** |
 | 11 | `check_dec_status` | `dec-status`, `dec-superseded` | ERROR; triggered on the **decisions role** |
 | 12 | `validate_file` | `stub` | WARN |
+
+Step 4 is the one that asks which contract a file is under. `check_sections`
+scores the file against every template of its domain and reports the
+best-scoring one — and where that best score is a perfect `(0, 0)`, it also
+holds the file to any other template of the domain whose *exclusive* section
+it carries: a section exactly one template requires is what says which
+template a file was written from. That second half exists for the ARC folder,
+which ships two templates, and it only reaches the state where the check used
+to be silent — a main-module file matching its own two-section template and
+never being measured against the seven-section one. A domain whose templates
+require identical or nested section sets has no exclusive section and is
+unaffected by construction.
 
 Steps 9 to 11 are the three that ask what a folder MEANS. `validate_file`
 derives `role` once, through `Vault.role_of`, and carries it beside `abbr`
@@ -152,14 +164,32 @@ and membership against a named constant is invisible to it.
    `id-duplicate`, `id-scope-mismatch`, `id-vanished`
 4. the coverage rule, inline, fed by `Vault.req_index`, `evidence_index` and
    `allocation_index` → `req-uncovered`
-5. the overview scan, inline → `arc-not-in-overview`
+5. the ARC reachability scan, inline → `arc-not-in-overview`,
+   `overview-unidentified`, `arc-containment-unreadable`. Three findings for
+   one rule, because the rule has two inputs and either can be missing. The
+   entry point is `Vault.overview_scan`'s single marked root file; the edges
+   are `arc_containment`, the ARC-to-ARC half of `contains` read off the
+   exporter's graph. Reachability is transitive over those edges, so a
+   module naming itself and two modules naming each other cannot cancel
+   their own findings. Where an input is missing the scan does not run and
+   says which one — the whole rule exists because a check that opts out
+   without a word reads exactly like a clean result.
 6. the orphan scan, inline → `orphan`
 7. the basename scan, inline → `duplicate-basename`
 
-`allocation_index` is the one that reaches outside this file: it imports the
-exporter and reads the allocation half of the coverage rule off the graph. It
+`export_analysis` is the one that reaches outside this file: it imports the
+exporter and builds the graph once per vault for the two checks that need it.
+`allocation_index` reads the allocation half of the coverage rule off it and
 returns `None` — a third answer, distinct from "not allocated" — whenever the
 graph cannot see a requirement, so a closed loop is never reported as a gap.
+`arc_containment` reads the ARC-to-ARC `contains` edges off the same build and
+returns `None` on the same third answer, but that one is *reported*
+(`arc-containment-unreadable`) rather than absorbed: an unknown containment
+set and an empty one are the difference between saying nothing and calling
+every submodule of a correctly nested vault an island. It is `None` for one
+case the graph never raises on, too — `FALLBACK_SCHEMA` declares no
+`relations`, so a vault read under an unreadable schema has no ARC-to-ARC
+relation in force at all.
 
 ---
 
@@ -215,6 +245,7 @@ Python, which is why a grep of the source alone does not find them.
 
 | Code | Owner | Scope | Severity |
 | --- | --- | --- | --- |
+| `arc-containment-unreadable` | `validate_vault_wide` | vault-wide | WARN |
 | `arc-not-in-overview` | `validate_vault_wide` | vault-wide | WARN |
 | `code-fence` | `check_fence` | domain, banned domains only | ERROR |
 | `dec-status` | `check_dec_status`, `check_field_value` | domain, decisions role | ERROR, schema-declared |
@@ -243,6 +274,7 @@ Python, which is why a grep of the source alone does not find them.
 | `link-repeat` | `check_links` | every file read | WARN |
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
+| `overview-unidentified` | `validate_vault_wide` | vault-wide | WARN |
 | `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere |
 | `req-class` | `check_req_table` | domain, requirements role | ERROR |
 | `req-criterion` | `check_req_table` | domain, requirements role | ERROR |

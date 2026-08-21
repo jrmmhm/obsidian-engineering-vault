@@ -1,3 +1,6 @@
+---
+vault-role: system-overview
+---
 ## Context
 This file provides an overview of the major system modules and is the entry point into the architecture.
 
