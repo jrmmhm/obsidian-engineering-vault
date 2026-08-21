@@ -18,11 +18,17 @@ Every DEC file uses the fixed schema:
 1. Date
 2. Status
 3. optional "Superseded by" link
-4. Context
-5. Options
-6. Decision
-7. Justification
-8. Consequences
+4. optional "Corrected by" link
+5. Context
+6. Options
+7. Decision
+8. Justification
+9. Consequences
+
+"Superseded by" and "Corrected by" are not two spellings of one thing. A
+superseded decision has been replaced and says so in its Status. A corrected
+one still stands: a later decision overturned a statement it makes, and the
+pointer says which — the Status does not change.
 
 ## 2) Status
 

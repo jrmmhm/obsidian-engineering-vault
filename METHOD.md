@@ -274,7 +274,7 @@ throwaway one.
 
 **Against a safety standard.**
 [IEC_61508_MAPPING.md](IEC_61508_MAPPING.md) places the nine domains and the
-eight typed relations against the clause structure of IEC 61508, and states
+nine typed relations against the clause structure of IEC 61508, and states
 what the standard has titles for that this vault has no home for. It is a
 structural correspondence and explicitly **not** a claim of conformance; the
 file says that first, and says exactly how far the reading behind it went —

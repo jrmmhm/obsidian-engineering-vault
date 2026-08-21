@@ -1492,7 +1492,8 @@ def write_index(path, graph, prov, section_title):
 # The drawn graph
 # --------------------------------------------------------------------------
 
-# The three relations coverage is decided on. Drawing all eight was measured
+# The three relations coverage is decided on. Drawing every relation that
+# existed at the time (eight) was measured
 # against the shipped worked example first and produced ten nodes, twenty
 # edges and seven relation words above the fold - the containment and
 # interface edges pull the eye, and the only closed cycles in that picture
