@@ -1614,13 +1614,15 @@ done
 # domain (TAE / TUE), identical up to those tokens: req-uncovered,
 # verifies-unknown-req and req-duplicate-global must fire identically in
 # both, which the multiset assertion below and the issue #66 block at the
-# end of this file pin. Still out of scope by decision: the row-grammar
-# checks (req-class/req-nnn/req-criterion/req-duplicate) stay on the
-# literal REQ folder, and the system_overview.md heuristic stays
-# English-only and dark - the twins therefore carry no overview file. The
-# "References"/"Sources" section names are no longer English-only: since
-# REF_SECTION_TOKENS (DEC-MTH-047) the seeded dead path under
-# '## Referenzen' is the strict-zone ERROR in both twins alike.
+# end of this file pin. Since issue #115 the twins also carry a decisions
+# domain (DEC / ENT) and a file of defective requirement rows, because the
+# per-file domain checks decide by canonical role too: dec-status,
+# dec-superseded and the four row-grammar codes are asserted by name on
+# the German side below. The system_overview.md heuristic is the one that
+# stays English-only and dark - the twins therefore carry no overview
+# file. The "References"/"Sources" section names are no longer
+# English-only: since REF_SECTION_TOKENS (DEC-MTH-047) the seeded dead
+# path under '## Referenzen' is the strict-zone ERROR in both twins alike.
 #
 # Separate mktemp roots on purpose: check_paths probes project_root.parent,
 # so a shared root would let one twin resolve the other twin's artifacts.
@@ -1631,8 +1633,10 @@ trap 'rm -rf "$TMP" "$DE_TMP" "$EN_TMP"' EXIT
 
 build_twin() { # build_twin <vault_dir> <arc_dir> <imp_dir> <ref_dir> <template_infix>
                #            <req_dir> <tae_dir> <req_abbr> <tae_abbr>
+               #            <dec_dir> <dec_abbr>
   local V="$1" A="$2" I="$3" R="$4" T="$5" RQ="$6" TA="$7" P="$8" EV="$9"
-  mkdir -p "$V/$A" "$V/$I" "$V/$R" "$V/$RQ" "$V/$TA"
+  local DC="${10}" DA="${11}"
+  mkdir -p "$V/$A" "$V/$I" "$V/$R" "$V/$RQ" "$V/$TA" "$V/$DC"
 
   cat > "$V/$A/00_ARC_$T.md" <<'EOF'
 ## Kontext
@@ -1737,12 +1741,13 @@ EOF
   # (row 002), req-duplicate-global (row 001 defined again in *_Doppelt,
   # which sorts FIRST and takes the index slot - the finding fires at
   # *_Messung naming it). Constraints that keep the twin finding multisets
-  # identical: every row stays well-formed with a three-digit number (the
-  # row-grammar checks run only on the English side), no file here carries
-  # a frontmatter id (an English REQ-MES-000 would enter the identifier
-  # checks while a German ANF-MES-000 would not), and 'verifies' is present
-  # and non-empty (its requiredness, format and empty-list WARN are
-  # enforced only in the English TAE domain).
+  # identical: the rows in THESE two files stay well-formed, so the
+  # defective ones live in a file of their own below and stay countable;
+  # no file here carries a frontmatter id (an English REQ-MES-000 would
+  # enter the identifier checks while a German ANF-MES-000 would not); and
+  # 'verifies' is present and non-empty, because its requiredness and its
+  # empty-list WARN hang on the schema's TAE field profile, which
+  # Vault.fields_for still looks up by folder abbreviation.
   printf '## Kontext\n\n| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n| --- | --: | --- | --- | --- |\n|  |  |  |  |  |\n' \
     > "$V/$RQ/00_${P}_$T.md"
   printf '## Kontext\n' > "$V/$TA/00_${EV}_$T.md"
@@ -1793,16 +1798,92 @@ die nirgends definiert ist. Die gedeckte Zeile 001 bleibt dadurch ohne
 Befund, Zeile 002 wird als ungedeckt gemeldet, und die unbekannte
 Nummer 999 ist der gesaete verifies-unknown-req.
 EOF
+
+  # Decisions domain and row grammar (issue #115): the per-file domain
+  # checks decide by canonical role, so every seeded violation below must
+  # be reported in BOTH twins. Written by this one function like everything
+  # else here, so the two sides stay byte-identical in content - which is
+  # what makes the finding-multiset assertion a statement about the role
+  # resolution rather than about the fixture.
+  #
+  # 'status' is present in both: the schema exempts a literal DEC folder
+  # from the frontmatter status key and a translated one keeps the default,
+  # so omitting it would seed an asymmetry that has nothing to do with the
+  # checks under test. The headings stay German in both twins, which keeps
+  # the DEC leak scan dark on both sides - it tests the section title for
+  # the English 'context' and is not part of this change.
+  printf '## Kontext\n' > "$V/$DC/00_${DA}_$T.md"
+
+  cat > "$V/$DC/${DA}_Statuswert (STA).md" <<EOF
+---
+domain: $DA
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+Date: 2026-01-05
+Status: Angenommen
+
+## Kontext
+Entscheidung mit einem Statuswert, den die Werteliste des Schemas nicht
+kennt. Der Wert ist die deutsche Uebersetzung von 'Accepted' und genau
+deshalb ein Befund: das Vokabular ist englisch, der Ordner nicht.
+EOF
+
+  cat > "$V/$DC/${DA}_Ohne_Nachfolger (NAF).md" <<EOF
+---
+domain: $DA
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+Date: 2026-01-05
+Status: Superseded
+
+## Kontext
+Entscheidung, die sich selbst als ueberholt erklaert und keinen
+Nachfolger nennt. Der Zeiger auf die ablesende Entscheidung fehlt, also
+ist der Zustand nicht aufloesbar und wird gemeldet.
+EOF
+
+  cat > "$V/$RQ/${P}_Grammatik (GRA).md" <<EOF
+---
+domain: $P
+status: active
+created: 2026-01-05
+last-verified: 2026-07-01
+---
+## Kontext
+Anforderungsdatei mit vier defekten Zeilen und einer Tabelle, die kein
+Zeilencheck liest. Jede Zeile saet genau einen Code.
+
+| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |
+| --- | --: | --- | --- | --- |
+| X | 001 | Klasse ausserhalb der Werteliste | Pass wenn gemessen | keine |
+| M | 12 | Nummer mit zwei Stellen | Pass wenn gemessen | keine |
+| M | 001 | Nummer ein zweites Mal vergeben | Pass wenn gemessen | keine |
+| M | 002 | Zeile ohne Abnahmekriterium |  | keine |
+
+Die Tabelle darunter ist zu schmal fuer einen Zeilencheck, traegt aber
+eine Nummer in der zweiten Zelle - der Index liest sie, kein Zeilencheck
+liest sie, und genau das meldet req-table-unrecognized.
+
+| Klasse | NNN | Inhalt |
+| --- | --: | --- |
+| M | 003 | Schmale Tabelle |
+EOF
 }
 
 DE_V="$DE_TMP/Deproj/00_Dokumentation/01_Projektvault"
 EN_V="$EN_TMP/Enproj/00_documentation/01_projectvault"
 build_twin "$DE_V" "03_Architektur_(ARC)" "06_Implementierung_(IMP)" \
            "09_Referenzen_(REF)" "Dateitemplate" \
-           "01_Anforderungen_(ANF)" "07_Test_und_Evidenz_(TUE)" "ANF" "TUE"
+           "01_Anforderungen_(ANF)" "07_Test_und_Evidenz_(TUE)" "ANF" "TUE" \
+           "02_Entscheidungen_(ENT)" "ENT"
 build_twin "$EN_V" "03_architecture_(ARC)" "06_implementation_(IMP)" \
            "09_references_(REF)" "file_template" \
-           "01_requirements_(REQ)" "07_testing_and_evidence_(TAE)" "REQ" "TAE"
+           "01_requirements_(REQ)" "07_testing_and_evidence_(TAE)" "REQ" "TAE" \
+           "02_decisions_(DEC)" "DEC"
 
 # 02_Dokumente mirror: same German domain folder names, NO template files.
 # It must stay unrecognized - link resolution depends on that distinction.
@@ -1839,6 +1920,37 @@ if [ "$(codes_of "$de_out")" = "$(codes_of "$en_out")" ]; then ok x; else
   fail "German and English twin must produce identical findings:"
   diff <(codes_of "$de_out") <(codes_of "$en_out") | sed 's/^/    /'
 fi
+
+# Issue #115: the per-file domain checks decide by canonical role, so each
+# seeded violation is asserted on the GERMAN path by name. The multiset
+# assertion above cannot carry this alone - it is equally satisfied when
+# both sides go silent, which is exactly the state this fixture is here to
+# rule out. One assertion per call site, so a partial regression names the
+# check it lost rather than a diff of everything.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "ERROR .*ENT_Statuswert.*\[dec-status\]"; then ok x; else
+  fail "check_dec_status must reach the translated decisions folder (dec-status)"; fi
+TESTS=$((TESTS + 1))
+if contains "$de_out" "ERROR .*ENT_Ohne_Nachfolger.*\[dec-superseded\]"; then ok x; else
+  fail "check_dec_status must reach the translated decisions folder (dec-superseded)"; fi
+# A folder reached through the alias map says so in the finding. Without
+# this the reverse-alias risk is a paragraph in a changelog: a project that
+# means something else by ENT would read a finding about DEC in a folder
+# where the word never appears. The English twin must not carry the clause.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "\[dec-status\].*folder ENT is read as the DEC domain"; then ok x; else
+  fail "a dec-status finding on an aliased folder must name the translation it applied"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$en_out" "is read as the DEC domain"; then ok x; else
+  fail "the literal DEC folder must not carry the alias clause"; fi
+for code in req-class req-nnn req-duplicate req-criterion; do
+  TESTS=$((TESTS + 1))
+  if contains "$de_out" "ERROR .*ANF_Grammatik.*\[$code\]"; then ok x; else
+    fail "check_req_table must reach the translated requirements folder: [$code] missing"; fi
+done
+TESTS=$((TESTS + 1))
+if contains "$de_out" "WARN .*ANF_Grammatik.*\[req-table-unrecognized\]"; then ok x; else
+  fail "check_req_table_silence must reach the translated requirements folder"; fi
 
 # the identifier scheme is language-independent by construction: the id is
 # neither a folder name nor a section heading, so it must be detected in the
@@ -4573,7 +4685,22 @@ cp "$CV_D/01_requirements_(REQ)/00_REQ_file_template.md" \
   printf '| --- | --: | --- | --- | --- |\n'
   printf '| M | 001 | uebersetzte Anforderung | pass if measured | none |\n'
 } > "$CV_D/01_Anforderungen_(ANF)/ANF_Abdeckung (COV).md"
+# Issue #115: the ENGLISH folder lost the role here and must keep its row
+# checks anyway. A per-file check needs no winner, so Vault.role_of maps
+# both folders to REQ; asking Vault.roles() instead would answer ANF and
+# silently stop checking the rows this suite has always checked. This is
+# the only assertion that tells the two forms apart.
+{
+  printf -- '---\ndomain: REQ\nstatus: active\ncreated: 2026-08-05\nlast-verified: 2026-08-05\n---\n'
+  printf '## Context\nThe English half of a vault mid-translation.\n\n'
+  printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+  printf '| --- | --: | --- | --- | --- |\n'
+  printf '| X | 001 | class outside the value list | pass if measured | none |\n'
+} > "$CV_D/01_requirements_(REQ)/REQ_Grammar (GRB).md"
 cvd_out=$(python3 "$VALIDATOR" "$CV_D" 2>&1); cvd_rc=$?
+TESTS=$((TESTS + 1))
+if contains "$cvd_out" "ERROR .*REQ_Grammar.*\[req-class\]"; then ok x; else
+  fail "the English folder of a mid-translation vault must keep its row checks"; fi
 TESTS=$((TESTS + 1))
 if [ $cvd_rc -ne 2 ]; then ok x; else
   fail "a vault carrying two requirement folders must not crash the validator"; fi
@@ -5928,6 +6055,163 @@ rm -rf "$RT_TMP"
 # ==========================================================================
 # END the name-index boundary
 # ==========================================================================
+
+# ==========================================================================
+# Issue #115: the requirement-row identifier has ONE spelling per vault,
+# and both readers of 'verifies' read it. check_field_value used the
+# module constant REQ_ID_RE while check_tae_verifies built its pattern from
+# the vault's own requirements abbreviation, so a vault carrying an English
+# evidence folder beside a translated requirements folder had the format
+# check reject what the reference check resolved, at ERROR severity.
+#
+# The canonical REQ- spelling stays tolerated, but only while a literal REQ
+# folder exists: that is the mid-translation state and its whole extent.
+# Three vaults, because the three states behave differently and only one of
+# them is reachable from the twins above.
+# ==========================================================================
+I5_TMP=$(mktemp -d)
+
+i5_domain() { # i5_domain <vault> <folder> <abbr>
+  mkdir -p "$1/$2"
+  printf '## Kontext\n' > "$1/$2/00_$3_Dateitemplate.md"
+}
+i5_rows() { # i5_rows <vault> <folder> <abbr>
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-21\nlast-verified: 2026-08-21\n---\n' "$3"
+    printf '## Kontext\nAnforderungen der Messkette.\n\n'
+    printf '| Class (M/S/O) | NNN | Content | Acceptance Criterion | Source |\n'
+    printf '| --- | --: | --- | --- | --- |\n'
+    printf '| M | 001 | Gedeckte Anforderung | Pass wenn gemessen | keine |\n'
+  } > "$1/$2/$3_Messung (MES).md"
+}
+i5_evidence() { # i5_evidence <vault> <folder> <abbr> <stem> <verifies-entry>
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-08-21\nlast-verified: 2026-08-21\n' "$3"
+    printf 'verifies: [%s]\n---\n' "$5"
+    printf '## Kontext\nNachweis der Messkette, gebaut fuer die Formatpruefung\n'
+    printf 'des Anforderungsbezeichners.\n'
+  } > "$1/$2/$3_$4.md"
+}
+
+# (a) Translation finished: ANF holds the requirements role, the evidence
+# folder is spelled English. The vault's own prefix is accepted; the
+# canonical one is not, because nothing here answers to it.
+I5_A="$I5_TMP/Fertig/00_documentation/01_projectvault"
+i5_domain "$I5_A" "03_Architektur_(ARC)" "ARC"
+i5_domain "$I5_A" "01_Anforderungen_(ANF)" "ANF"
+i5_domain "$I5_A" "07_testing_and_evidence_(TAE)" "TAE"
+i5_rows "$I5_A" "01_Anforderungen_(ANF)" "ANF"
+i5_evidence "$I5_A" "07_testing_and_evidence_(TAE)" "TAE" "Eigen" "ANF-MES-001"
+i5_evidence "$I5_A" "07_testing_and_evidence_(TAE)" "TAE" "Fremd" "REQ-MES-001"
+i5a_out=$(python3 "$VALIDATOR" "$I5_A" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$i5a_out" "TAE_Eigen.*\[verifies-format\]"; then ok x; else
+  fail "the vault's own requirement prefix must pass the verifies format check:"
+  printf '%s\n' "$i5a_out" | grep verifies-format | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$i5a_out" "ERROR .*TAE_Fremd.*\[verifies-format\]"; then ok x; else
+  fail "a canonical REQ- entry in a fully translated vault names nothing and must be reported"; fi
+
+# (b) Mid-translation: both requirement folders exist, so the canonical
+# spelling is what the English half was written with and stays tolerated.
+# Without this bound the fix would sweep findings over correct rows - the
+# state the coverage block's fixture (d) exists to protect.
+I5_B="$I5_TMP/Halb/00_documentation/01_projectvault"
+i5_domain "$I5_B" "01_Anforderungen_(ANF)" "ANF"
+i5_domain "$I5_B" "01_requirements_(REQ)" "REQ"
+i5_domain "$I5_B" "07_testing_and_evidence_(TAE)" "TAE"
+i5_rows "$I5_B" "01_Anforderungen_(ANF)" "ANF"
+i5_evidence "$I5_B" "07_testing_and_evidence_(TAE)" "TAE" "Fremd" "REQ-MES-001"
+i5b_out=$(python3 "$VALIDATOR" "$I5_B" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$i5b_out" "\[verifies-format\]"; then ok x; else
+  fail "a vault mid-translation must keep its English-spelled entries readable:"
+  printf '%s\n' "$i5b_out" | grep verifies-format | sed 's/^/    /'; fi
+
+# (c) Both evidence folders. TAE sorts first and holds the role, so before
+# issue #115 check_tae_verifies read only that one. A per-file check needs
+# no winner: the dangling entry in the folder that LOST the role is a
+# dangling entry either way, and it is reported for the first time here.
+I5_C="$I5_TMP/Beide/00_documentation/01_projectvault"
+i5_domain "$I5_C" "01_Anforderungen_(ANF)" "ANF"
+i5_domain "$I5_C" "07_testing_and_evidence_(TAE)" "TAE"
+i5_domain "$I5_C" "07_Test_und_Evidenz_(TUE)" "TUE"
+i5_rows "$I5_C" "01_Anforderungen_(ANF)" "ANF"
+i5_evidence "$I5_C" "07_Test_und_Evidenz_(TUE)" "TUE" "Verloren" "ANF-MES-999"
+i5c_out=$(python3 "$VALIDATOR" "$I5_C" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$i5c_out" "ERROR .*TUE_Verloren.*\[verifies-unknown-req\]"; then ok x; else
+  fail "check_tae_verifies must also read the evidence folder that lost the role"; fi
+
+rm -rf "$I5_TMP"
+
+# The guard against the fifth literal. It states the invariant rather than
+# counting occurrences: a per-file check must not decide a domain ROLE by
+# comparing the folder abbreviation to an English token. Pinning the set of
+# functions that merely CONTAIN such a token would have been green on the
+# defect this issue fixed - `role == "REQ"` carries the same literal as
+# `abbr == "REQ"` - so the comparison operand is what is asserted.
+#
+# Every entry below is a folder question, not a role question, and that is
+# what earns it a place here:
+#   classify      - INB is a vault section, not a domain role; ID_EXCLUDED_DOMAINS
+#                   names it beside ADM and no alias map translates either.
+#   validate_file - the hub link budget is a property of the architecture
+#                   FOLDER; ARC is spelled identically in every language the
+#                   alias map knows, so the question never arises.
+#   check_leaks   - decides by folder on purpose and is left there by this
+#                   change: it carries a second English lock of its own, the
+#                   'context' section title, and opening one without the
+#                   other emits nothing. Owned by its own issue.
+# Adding an entry means writing the argument for it, not extending a list.
+#
+# What it does NOT see: membership against a named constant, which is the
+# shape check_fence has (FENCE_BANNED_DOMAINS). Resolving the name would
+# mean interpreting the module, and the three gates this guard was built
+# for are covered behaviourally by the fixtures above either way.
+TESTS=$((TESTS + 1))
+if python3 - "$VALIDATOR" <<'PY'
+import ast, sys
+TOKENS = {"REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF", "ADM", "INB"}
+EXPECTED = ["check_leaks:ARC", "check_leaks:ARC", "check_leaks:ARC,DEC",
+            "check_leaks:DEC", "classify:INB", "validate_file:ARC"]
+
+def tokens_of(node):
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return {node.value} & TOKENS
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return set().union(*(tokens_of(e) for e in node.elts)) if node.elts else set()
+    return set()
+
+hits, stack = [], []
+
+class Walk(ast.NodeVisitor):
+    def visit_FunctionDef(self, node):
+        stack.append(node.name)
+        self.generic_visit(node)
+        stack.pop()
+
+    def visit_Compare(self, node):
+        operands = [node.left, *node.comparators]
+        if any(isinstance(o, ast.Name) and o.id == "abbr" for o in operands):
+            found = set().union(*(tokens_of(o) for o in operands))
+            if found:
+                hits.append(f"{stack[-1] if stack else '<module>'}:{','.join(sorted(found))}")
+        self.generic_visit(node)
+
+Walk().visit(ast.parse(open(sys.argv[1]).read()))
+got = sorted(hits)
+if got != EXPECTED:
+    new = [h for h in got if h not in EXPECTED]
+    gone = [h for h in EXPECTED if h not in got]
+    if new:
+        print(f"unlisted abbr-vs-domain-token comparison(s): {new}")
+    if gone:
+        print(f"listed comparison(s) no longer present: {gone}")
+    sys.exit(1)
+PY
+then ok x; else
+  fail "a per-file check decides a domain role by folder abbreviation - see the allowlist above"; fi
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
