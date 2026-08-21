@@ -101,16 +101,41 @@ The domain chain, in the order it executes:
 | 7 | `check_leaks` | `impl-leak` | ERROR in ARC, WARN in a DEC Context section; no other domain is scanned, and a References/Sources section (`REF_SECTION_TOKENS`, English and German spellings) is exempt |
 | 7a | `check_fence` | `code-fence`, `fence-host`, `fence-record` | only in the banned domains; a declared over-long block is WARN, an undeclared one ERROR |
 | 8 | `check_paths` | `path-missing` | ERROR under a References or Sources heading (`REF_SECTION_TOKENS` — `Referenzen`, `Verweise` and `Quelle(n)` open the zone too), WARN in the rest of the body |
-| 9 | `check_req_table` | `req-class`, `req-nnn`, `req-duplicate`, `req-criterion` | all ERROR; triggered on the literal `REQ` folder |
+| 9 | `check_req_table` | `req-class`, `req-nnn`, `req-duplicate`, `req-criterion` | all ERROR; triggered on the **requirements role** |
 | 9a | `check_req_table_silence` | `req-table-unrecognized` | WARN |
-| 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered through the **role map**, so a translated evidence domain is covered |
-| 11 | `check_dec_status` | `dec-status`, `dec-superseded` | ERROR |
+| 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered on the **evidence role** |
+| 11 | `check_dec_status` | `dec-status`, `dec-superseded` | ERROR; triggered on the **decisions role** |
 | 12 | `validate_file` | `stub` | WARN |
 
-Note the asymmetry at steps 9 and 10. The requirement-row checks stay on the
-literal `REQ` folder while the evidence check follows the role map. That is
-deliberate, not an oversight: extending four blocking row-grammar codes to
-translated vaults is a convention rollout, not a fix.
+Steps 9 to 11 are the three that ask what a folder MEANS. `validate_file`
+derives `role` once, through `Vault.role_of`, and carries it beside `abbr`
+for the rest of the chain; every other step above decides by `abbr`, because
+for them the folder is the question — `filename-prefix` demands a file in the
+ANF folder be named `ANF_*`, and the `folder-abbreviation` type behind
+`frontmatter-domain` compares the field to that same spelling.
+
+**Which answer arbitrates, and which does not.** `Vault.roles()` decides which
+folder holds a role and picks one when two claim it, because `req_index`,
+`evidence_index` and the global duplicate scan need a single key space.
+`Vault.role_of` decides what one folder means and never picks, because a
+per-file check reads one file and needs no winner. In a vault carrying both
+spellings of a domain the two therefore disagree on purpose: both folders are
+checked file by file, while only the winner's rows enter the index. A row in
+the folder that lost can be reported as `req-duplicate` inside its own file
+and never as `req-duplicate-global`, and that is the shape to expect rather
+than a defect. `domain-duplicate-folder` names the pair.
+
+Two domain-specific checks are still keyed on `abbr`, for different reasons.
+`check_leaks` carries a second English lock of its own — the DEC branch tests
+the section title for `context`, which a German file spells `Kontext` — so
+resolving the domain alone emits nothing; it is left whole for the issue that
+owns both locks. `check_fence` decides on `FENCE_BANNED_DOMAINS` and
+`FENCE_EXEMPT_DOMAINS`, and the question never arises today because `ARC` and
+`IMP` are spelled identically in every language the alias map knows. That is
+an argument from the shipped map, not from the code: a map that ever aliases
+either token turns this into the same defect issue #115 fixed, and the AST
+guard in `tests/run.sh` cannot warn about it — it reads comparison operands,
+and membership against a named constant is invisible to it.
 
 ---
 
@@ -192,8 +217,8 @@ Python, which is why a grep of the source alone does not find them.
 | --- | --- | --- | --- |
 | `arc-not-in-overview` | `validate_vault_wide` | vault-wide | WARN |
 | `code-fence` | `check_fence` | domain, banned domains only | ERROR |
-| `dec-status` | `check_dec_status`, `check_field_value` | domain, DEC | ERROR, schema-declared |
-| `dec-superseded` | `check_dec_status` | domain, DEC | ERROR |
+| `dec-status` | `check_dec_status`, `check_field_value` | domain, decisions role | ERROR, schema-declared |
+| `dec-superseded` | `check_dec_status` | domain, decisions role | ERROR |
 | `domain-duplicate-folder` | `check_domain_folders` | vault-wide | WARN |
 | `duplicate-basename` | `validate_vault_wide` | vault-wide | WARN |
 | `encoding-not-utf8` | `validate_file` | every file read | ERROR |
@@ -219,12 +244,12 @@ Python, which is why a grep of the source alone does not find them.
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
 | `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere |
-| `req-class` | `check_req_table` | domain, REQ | ERROR |
-| `req-criterion` | `check_req_table` | domain, REQ | ERROR |
-| `req-duplicate` | `check_req_table` | domain, REQ | ERROR |
+| `req-class` | `check_req_table` | domain, requirements role | ERROR |
+| `req-criterion` | `check_req_table` | domain, requirements role | ERROR |
+| `req-duplicate` | `check_req_table` | domain, requirements role | ERROR |
 | `req-duplicate-global` | `validate_vault_wide` | vault-wide | ERROR |
-| `req-nnn` | `check_req_table` | domain, REQ | ERROR |
-| `req-table-unrecognized` | `check_req_table_silence` | domain, REQ | WARN |
+| `req-nnn` | `check_req_table` | domain, requirements role | ERROR |
+| `req-table-unrecognized` | `check_req_table_silence` | domain, requirements role | WARN |
 | `req-uncovered` | `validate_vault_wide` | vault-wide | WARN |
 | `schema-unreadable` | `validate_file` | once per vault | WARN |
 | `section-mismatch` | `check_sections` | domain | ERROR |
