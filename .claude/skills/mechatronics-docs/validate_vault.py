@@ -427,6 +427,21 @@ def pick_domain_dir(abbr, dirs):
     return next((d for d in dirs if has_domain_files(d, abbr)), dirs[0])
 
 
+def canonical_role(abbr, schema):
+    """-> the domain role an abbreviation MEANS, or None if nothing knows it.
+
+    The one per-abbreviation rule, asked by both questions this module has
+    about a folder. An abbreviation is its own role when the schema's
+    identity list names it, and is translated through domain_aliases.map
+    otherwise (ANF -> REQ). Never raises: it feeds both hook paths, where
+    an exception exits 2 and fails the gates open.
+    """
+    aliases = _dict(schema, "domain_aliases")
+    identity = _strlist(aliases, "identity") or [
+        "REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"]
+    return abbr if abbr in identity else _dict(aliases, "map").get(abbr)
+
+
 def resolve_role_map(vault, schema):
     """-> ({canonical role token: folder abbreviation}, dropped abbreviations).
 
@@ -437,10 +452,13 @@ def resolve_role_map(vault, schema):
     Two resolvers would disagree exactly where it costs the most, a vault
     mid-translation.
 
-    An abbreviation is its own role when the schema's identity list names
-    it, and is translated through domain_aliases.map otherwise (ANF ->
-    REQ). The first in sorted order wins a contested role - the exporter's
-    rule, unchanged. 'dropped' lists every non-excluded abbreviation that
+    What an abbreviation means is canonical_role's rule, shared with
+    Vault.role_of. What this function adds is the arbitration: the first
+    in sorted order wins a contested role - the exporter's rule,
+    unchanged. That arbitration belongs HERE and not in canonical_role,
+    because it exists for the index, which needs one key space; a check
+    over a single file needs no winner and must not inherit one.
+    'dropped' lists every non-excluded abbreviation that
     took no role: (abbr, None) for a token the schema does not know,
     (abbr, role) for a role another folder already holds. The exporter
     turns those into export-unknown-domain and export-duplicate-role; the
@@ -450,15 +468,11 @@ def resolve_role_map(vault, schema):
     Never raises - this feeds both hook paths, where an exception exits 2
     and fails the gates open.
     """
-    aliases = _dict(schema, "domain_aliases")
-    amap = _dict(aliases, "map")
-    identity = _strlist(aliases, "identity") or [
-        "REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"]
     roles, dropped = {}, []
     for abbr in sorted(vault.domain_dirs):
         if abbr in ID_EXCLUDED_DOMAINS:
             continue
-        role = abbr if abbr in identity else amap.get(abbr)
+        role = canonical_role(abbr, schema)
         if role is None:
             dropped.append((abbr, None))
         elif role in roles:
@@ -586,6 +600,19 @@ class Vault:
         if self._roles is None:
             self._roles = resolve_role_map(self, self.schema())[0]
         return self._roles
+
+    def role_of(self, abbr):
+        """The canonical role THIS folder means - the other question.
+
+        roles() asks which folder holds a role and arbitrates, because the
+        requirement index needs one key space. This asks what a folder
+        means and never arbitrates, because a check over a single file
+        needs no winner: in a vault mid-translation both halves are read
+        file by file and neither loses what it had (issue #115). An
+        abbreviation nothing knows means itself, so an unlisted folder
+        triggers no role check rather than a wrong one.
+        """
+        return canonical_role(abbr, self.schema()) or abbr
 
     def git_root(self):
         """Repo root enclosing the vault, or None outside version control.
@@ -1351,6 +1378,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         return findings
 
     # ---- full domain-file checks ----
+    role = vault.role_of(abbr)
     if not path.name.startswith(f"{abbr}_"):
         findings.append(Finding("ERROR", "filename-prefix", str(path), None,
                                 f"file in {abbr} domain folder must be named {abbr}_*"))
@@ -1371,16 +1399,19 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     check_links(vault, path, lines, findings, strict_links, hub=abbr == "ARC")
     check_leaks(abbr, path, lines, fm_end, findings)
     check_paths(vault, path, lines, fm_end, findings)
-    if abbr == "REQ":
+    # The three domain-specific checks decide by canonical ROLE, the rest
+    # of this chain by the folder ABBREVIATION - and the two names stand
+    # side by side here so the difference is a choice rather than an
+    # oversight (issue #115). filename-prefix and the folder-abbreviation
+    # type behind frontmatter-domain need the folder and nothing else;
+    # these three ask what the folder means. role_of does not arbitrate a
+    # contested role, so a vault carrying both spellings keeps both halves
+    # checked.
+    if role == "REQ":
         check_req_table(vault, path, lines, findings)
-    # The evidence trigger follows the role map (issue #66): a German
-    # vault's TUE notes carry 'verifies' too, and a dangling entry there is
-    # the same defect. The REQ trigger above stays literal on purpose -
-    # four blocking row-grammar codes on translated files would be a
-    # convention rollout, not a fix.
-    if abbr == (vault.roles().get("TAE") or "TAE"):
+    if role == "TAE":
         check_tae_verifies(vault, fm, path, findings)
-    if abbr == "DEC":
+    if role == "DEC":
         check_dec_status(vault, path, lines, findings)
 
     body = [l for l in lines[fm_end:] if l.strip()]
@@ -1413,11 +1444,32 @@ def check_frontmatter(vault, fm, abbr, path, findings):
                     msg += f" ({hint})"
                 findings.append(Finding("ERROR", "frontmatter-key", str(path), 1, msg))
             continue
-        check_field_value(key, fm[key], desc, abbr, path, findings)
+        check_field_value(key, fm[key], desc, abbr, path, findings, vault)
     check_undeclared(vault, fm, abbr, path, findings)
 
 
-def check_field_value(key, value, desc, abbr, path, findings):
+def req_row_id_re(vault):
+    """-> (prefix, pattern) of a requirement-row identifier in THIS vault.
+
+    One derivation for the two readers of 'verifies'. check_field_value
+    judges the spelling and check_tae_verifies resolves it, and a format
+    check that rejects what the reference check resolves is the validator
+    contradicting itself - measured at ERROR severity on every correctly
+    written ANF-BAK-001 in a vault whose evidence folder is still spelled
+    English (issue #115).
+
+    The prefix is the requirements domain's own abbreviation, per
+    domain_aliases.requirement_id_prefix and the index built from it.
+    Without a requirements domain the English prefix keeps today's
+    contract: a REQ-shaped entry in a vault that defines no requirement
+    anywhere is a dangling reference either way.
+    """
+    prefix = (vault.roles().get("REQ") or "REQ") if vault else "REQ"
+    return prefix, (REQ_ID_RE if prefix == "REQ" else
+                    re.compile(rf"{re.escape(prefix)}-[A-Z]{{2,4}}-\d{{3}}"))
+
+
+def check_field_value(key, value, desc, abbr, path, findings, vault=None):
     """One frontmatter value against its declared type. Never raises.
 
     str() before every comparison: parse_frontmatter returns a list for
@@ -1437,10 +1489,19 @@ def check_field_value(key, value, desc, abbr, path, findings):
                                         f"'{key}' names no requirement - "
                                         "what does this file prove?"))
         elif desc.get("item") == "req-row-identifier":
+            prefix, rid_re = req_row_id_re(vault)
+            # The canonical REQ- spelling is accepted beside the vault's
+            # own only while a literal REQ folder still exists: that is
+            # the mid-translation state and its whole extent, and the
+            # English half's entries were correct when they were written.
+            # Once the translation is finished such an entry names
+            # nothing, and saying so is the point of the check.
+            mid = vault is not None and "REQ" in vault.domain_dirs
             for item in value:
-                if not (isinstance(item, str) and REQ_ID_RE.fullmatch(item)):
+                if not (isinstance(item, str) and (rid_re.fullmatch(item)
+                                                   or (mid and REQ_ID_RE.fullmatch(item)))):
                     findings.append(Finding("ERROR", code, str(path), 1,
-                                            f"'{item}' is not a REQ-DOM-NNN id"))
+                                            f"'{item}' does not match {prefix}-DOM-NNN"))
         elif desc.get("item") == "object-identifier":
             for item in value:
                 if not (isinstance(item, str) and OBJECT_ID_RE.fullmatch(item)):
@@ -1955,12 +2016,13 @@ def check_req_table_silence(path, unread, recognized, findings):
     and that is this project's line for anything that blocks. One grouped
     finding per file, as every per-file class here is aggregated.
 
-    Both cases are asked in REQ domain files only. A vault whose
-    requirements role is aliased (ANF) has the first shape everywhere by
-    construction - the index follows the role map since issue #66, the row
-    checks stay on the literal REQ folder - and this WARN deliberately
-    stays dark there: firing on every translated file would be a
-    convention rollout, not a defect report.
+    Both cases are asked in the requirements domain only, which since
+    issue #115 means the folder that HOLDS that role rather than the one
+    literally spelled REQ. Before then the index followed the role map
+    while the row checks did not, so a translated vault had the first
+    shape everywhere by construction and this WARN was held dark to keep
+    it from firing on every file. Both halves read the same folder now,
+    so the finding is a defect report again wherever it appears.
     """
     hits = [(line, width) for line, width, indexed in unread
             if indexed or (width >= REQ_ROW_COLUMNS and not recognized)]
@@ -1983,14 +2045,9 @@ def check_tae_verifies(vault, fm, path, findings):
     if not isinstance(ver, list):
         return
     index = vault.req_index()
-    # What counts as a requirement id here is spelled with the vault's own
-    # requirements abbreviation (issue #66) - homelab's evidence notes
-    # write ANF-BAK-001, and the index is keyed that way. Without a
-    # requirements domain the English prefix keeps today's contract: a
-    # REQ-shaped entry in a vault that defines no requirement anywhere is
-    # a dangling reference either way.
-    abbr = vault.roles().get("REQ") or "REQ"
-    rid_re = re.compile(rf"{re.escape(abbr)}-[A-Z]{{2,4}}-\d{{3}}")
+    # Same derivation as the format check reads (req_row_id_re): what one
+    # of them resolves, the other must not reject.
+    abbr, rid_re = req_row_id_re(vault)
     for rid in ver:
         if rid_re.fullmatch(rid) and rid not in index:
             findings.append(Finding("ERROR", "verifies-unknown-req", str(path), 1,
