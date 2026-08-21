@@ -79,6 +79,14 @@ field — Obsidian's own `tags`, `aliases`, `cssclasses` and the
 effect nowhere. Adding a field to the vault's vocabulary is an edit to
 the schema file, not a change to the validator.
 
+One file outside the domains carries frontmatter too. The vault's system
+overview declares itself with `vault-role: system-overview`, and that
+line — not the file name — is how the validator finds the entry point:
+rename or translate the file and every check that reads it follows.
+Exactly one file in the vault root carries it; zero or two are reported
+as `overview-unidentified`, and the ARC reachability check below does not
+run until that is settled.
+
 ### Section headings
 The H2 headings a file must carry are the ones its domain template
 declares. Write them as the template spells them: the heading is the
@@ -95,6 +103,15 @@ carry is a different section: `## Ablauf (Monatlich empfohlen)` for a
 required `## Ablauf`, or `## Zuordnung` for a required
 `## Zuordnung und Verifikation`, is a `section-mismatch` ERROR. Keep the
 template's title and put the qualifier one level down:
+
+A domain may ship more than one template — ARC has a full one and a
+main-module one, CMP an assembly and an individual-part one. The file is
+measured against the template it was written from, and a section only one
+of them requires is what says which that is. A file that satisfies one
+template completely and also carries another's exclusive section is held
+to both: an ARC main module that allocates requirements of its own owes
+the full template's sections as well, and carrying `## Submodules` is not
+a way out of them.
 
 ```markdown
 ## Ablauf
@@ -214,7 +231,8 @@ escaped — `[[TAE_ADC_Linearity\|linearity proof]]` — otherwise it is read
 as a column separator; the same applies to an embed size. Link the
 responsible file once where it matters —
 do not link every mention (guideline: under ~20 outgoing links per
-file; hub files like ARC and system_overview may carry more). Two further
+file; hub files carry more — ARC notes, and the file marked as the
+system overview). Two further
 link findings sit in the quick reference at the end of this file: the same
 target linked too often in one file (`link-repeat`), and two files sharing
 a basename, which makes every link to that name ambiguous
