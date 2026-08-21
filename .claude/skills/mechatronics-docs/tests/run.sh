@@ -1936,6 +1936,25 @@ TESTS=$((TESTS + 1))
 if contains "$de_out" "Zuordnung und Verifikation"; then ok x; else
   fail "German template section name must appear in the template-sections message"; fi
 
+# The overview is found by its marker in both twins, so the reachability
+# check runs in a vault whose entry point is called Systemuebersicht.md -
+# the state issue #116 measured as silent. Neither twin owns a file named
+# system_overview.md, so a name-keyed check reports nothing here.
+TESTS=$((TESTS + 1))
+if contains "$de_out" "ARC_Unvollstaendig\.md.*\[arc-not-in-overview\]"; then
+  ok x; else fail "a renamed overview must still be found in the German twin"; fi
+TESTS=$((TESTS + 1))
+if contains "$en_out" "ARC_Unvollstaendig\.md.*\[arc-not-in-overview\]"; then
+  ok x; else fail "a renamed overview must still be found in the English twin"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$de_out" "ARC_Messkette\.md.*\[arc-not-in-overview\]" \
+   && ! contains "$en_out" "ARC_Messkette\.md.*\[arc-not-in-overview\]"; then
+  ok x; else fail "a module the overview names must not be reported as an island"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$de_out" "\[overview-unidentified\]" \
+   && ! contains "$en_out" "\[overview-unidentified\]"; then
+  ok x; else fail "a marked overview must not be reported as unidentified"; fi
+
 # identical findings for identical content
 codes_of() { printf '%s\n' "$1" | grep -E '^(ERROR|WARN) ' | awk '{print $1, $3}' | sort; }
 TESTS=$((TESTS + 1))
@@ -5202,6 +5221,466 @@ fi
 # ==========================================================================
 # END tools/new_project.py
 # ==========================================================================
+
+# ==========================================================================
+# The overview declares itself, and reachability is transitive (DEC-MTH-051)
+# ==========================================================================
+# Issue #116 and the nesting blind spot behind it. Three properties are
+# pinned here and each of them was silent before:
+#
+#   - the entry point is the vault-root file carrying the marker, whatever
+#     it is called, and a vault without one says so once instead of
+#     skipping the check;
+#   - a module its parent contains is reachable, and reachability is
+#     TRANSITIVE, so a module listing itself and two modules listing each
+#     other cannot cancel their own findings - the two suppression paths a
+#     one-hop rule has, and the reason it was rejected;
+#   - a check that cannot read its containment source reports that rather
+#     than reporting every submodule as an island.
+#
+# The vault below is deliberately the shape the derived German vault has:
+# two ARC templates, one main module with a submodule table, submodules
+# that appear in no overview.
+OVW_TMP=$(mktemp -d)
+
+build_overview_vault() { # build_overview_vault <vault_dir> <overview_filename>
+  local O="$1" OVW="$2"
+  mkdir -p "$O/03_architecture_(ARC)" "$O/04_components_(CMP)" \
+           "$O/09_references_(REF)"
+  # Two empty domains beside ARC, because the vault-root predicate wants
+  # three domain folders carrying a template. They hold no note and
+  # therefore contribute no finding.
+  printf '## Context\n' > "$O/04_components_(CMP)/00_CMP_file_template.md"
+  printf '## Context\n' > "$O/09_references_(REF)/00_REF_file_template.md"
+
+  cat > "$O/03_architecture_(ARC)/00_ARC_file_template.md" <<'EOF'
+## Context
+## Requirements (Files)
+## Decisions (Files)
+## Components (Files)
+## Interfaces
+## Implementation (Files)
+## Allocation and Verification
+EOF
+  cat > "$O/03_architecture_(ARC)/00_ARC_main_module_file_template.md" <<'EOF'
+## Context
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+EOF
+
+  # 25 root notes, so the overview can carry more links than the ordinary
+  # budget allows without a single unresolved target. Root files are
+  # link-checked and nothing else, so they add no findings of their own.
+  local i=1
+  while [ $i -le 25 ]; do
+    printf 'A root note that exists so the overview has something to link.\n' \
+      > "$O/note$i.md"
+    i=$((i + 1))
+  done
+
+  {
+    printf -- '---\nvault-role: system-overview\n---\n'
+    printf '## Context\nThe entry point of this vault. It names the top-level\n'
+    printf 'modules and leaves every submodule to its own parent module.\n\n'
+    printf '| Module (ARC) | Brief Description |\n| --- | --- |\n'
+    printf '| [[ARC_Top]] | The top-level module of this vault |\n'
+    printf '| [[ARC_Hybrid]] | A module that both contains and allocates |\n\n'
+    i=1
+    # '--' is load-bearing: a format string opening with '- ' is read as an
+    # option and printf writes nothing at all, which would leave the
+    # overview under the ordinary budget and pass the hub assertion below
+    # for the wrong reason.
+    while [ $i -le 25 ]; do printf -- '- [[note%s]]\n' "$i"; i=$((i + 1)); done
+  } > "$O/$OVW"
+
+  # main module: two sections, and the submodule table that authors the
+  # only ARC-to-ARC contains edge the schema recognises.
+  cat > "$O/03_architecture_(ARC)/ARC_Top.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+The top-level module of this vault. It delegates every requirement to the
+submodules listed below and owns no component of its own. The overview
+names it, so it is the root of this vault's architecture.
+
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+| [[ARC_Child]] | The submodule no overview names |
+EOF
+
+  # reachable ONLY through the table above - the case that used to be
+  # reported as a documentation island. It carries a submodule table of its
+  # own, so the chain is two hops deep: a rule that expanded one hop from
+  # the overview would satisfy every other assertion in this block and
+  # still call ARC_Grandchild an island.
+  cat > "$O/03_architecture_(ARC)/ARC_Child.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+A submodule that its parent contains and that contains one of its own, so
+the vault nests two levels below its entry point. No overview names either
+this module or the one below it.
+
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+| [[ARC_Grandchild]] | The module two hops from the overview |
+EOF
+  arc_full_note "$O" "ARC_Grandchild" "A module two hops from the entry point."
+  # named nowhere at all: the finding the rule exists for.
+  arc_full_note "$O" "ARC_Island" "A module nothing names anywhere."
+
+  # the two suppression paths of a one-hop rule: a module naming ITSELF,
+  # and two modules naming each other. None of the three is named by the
+  # overview, so all three are islands and a transitive rule says so.
+  cat > "$O/03_architecture_(ARC)/ARC_Selfish.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+A module that lists itself in its own submodule table. Under a rule that
+asks only whether some ARC file names it, this row would delete its own
+island finding, which is why reachability is decided from the overview.
+
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+| [[ARC_Selfish]] | Itself |
+EOF
+  cat > "$O/03_architecture_(ARC)/ARC_Ping.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+One half of a containment cycle that no overview reaches. It names its
+counterpart and its counterpart names it, so a one-hop rule would call
+both of them reachable and report neither.
+
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+| [[ARC_Pong]] | The other half of the cycle |
+EOF
+  cat > "$O/03_architecture_(ARC)/ARC_Pong.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+The other half of the containment cycle. It names its counterpart and is
+named by it, and neither of the two is reachable from the entry point of
+this vault.
+
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+| [[ARC_Ping]] | The other half of the cycle |
+EOF
+
+  # A file that carries BOTH contracts and is one section short of the
+  # seven-section one. It matches the main-module template perfectly, which
+  # is exactly how it used to escape being measured at all.
+  cat > "$O/03_architecture_(ARC)/ARC_Hybrid.md" <<'EOF'
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+A module that contains submodules and allocates requirements of its own.
+It carries the main-module contract and all but one section of the full
+one, and the missing section is what has to be reported.
+
+## Submodules
+| Submodule (ARC) | Brief Description |
+| --- | --- |
+
+## Requirements (Files)
+- None yet.
+
+## Decisions (Files)
+- None yet.
+
+## Components (Files)
+- None yet.
+
+## Implementation (Files)
+- None yet.
+
+## Allocation and Verification
+| Submodule (ARC/CMP/IFC) | Allocated Requirements (REQ-IDs) | Verification (TAE) | Status |
+| --- | --- | --- | --- |
+EOF
+}
+
+arc_full_note() { # arc_full_note <vault_dir> <stem> <first sentence>
+  cat > "$1/03_architecture_(ARC)/$2.md" <<EOF
+---
+domain: ARC
+status: active
+created: 2026-08-21
+last-verified: 2026-08-21
+---
+## Context
+$3 It is written from the full ARC template and carries every section
+that template requires, so nothing about its sections is in question here.
+
+## Requirements (Files)
+- None yet.
+
+## Decisions (Files)
+- None yet.
+
+## Components (Files)
+- None yet.
+
+## Interfaces
+| Interface (IFC) | Endpoint A | Endpoint B | Context |
+| --- | --- | --- | --- |
+
+## Implementation (Files)
+- None yet.
+
+## Allocation and Verification
+| Submodule (ARC/CMP/IFC) | Allocated Requirements (REQ-IDs) | Verification (TAE) | Status |
+| --- | --- | --- | --- |
+EOF
+}
+
+OVW_A="$OVW_TMP/marked/00_documentation/01_projectvault"
+build_overview_vault "$OVW_A" "Uebersicht.md"
+ovw_a=$(python3 "$VALIDATOR" "$OVW_A" 2>&1)
+
+# The check runs at all, in a vault whose overview is called something else.
+TESTS=$((TESTS + 1))
+if contains "$ovw_a" "ARC_Island\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "a renamed but marked overview must still be read:"
+  printf '%s\n' "$ovw_a" | sed 's/^/    /'
+fi
+# The nesting blind spot: a module its parent contains is not an island.
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_a" "ARC_Child\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "a submodule its parent contains must not be a documentation island"; fi
+# ... and reachability follows the chain rather than one hop. Without this
+# an implementation that expanded a single level would pass every other
+# assertion here.
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_a" "ARC_Grandchild\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "reachability must follow the containment chain, not one hop:"
+  printf '%s\n' "$ovw_a" | grep arc-not-in-overview | sed 's/^/    /'
+fi
+# The two suppression paths a one-hop rule has.
+TESTS=$((TESTS + 1))
+if contains "$ovw_a" "ARC_Selfish\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "a module listing ITSELF must not silence its own island finding"; fi
+TESTS=$((TESTS + 1))
+if contains "$ovw_a" "ARC_Ping\.md.*\[arc-not-in-overview\]" \
+   && contains "$ovw_a" "ARC_Pong\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "two modules listing each other must not silence both island findings"; fi
+# The hub link budget follows the marker, not the file name.
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_a" "Uebersicht\.md.*\[link-budget\]"; then ok x; else
+  fail "the marked overview must be measured against the hub budget:"
+  printf '%s\n' "$ovw_a" | grep link-budget | sed 's/^/    /'
+fi
+# A file carrying both contracts is held to both.
+TESTS=$((TESTS + 1))
+if contains "$ovw_a" "ARC_Hybrid\.md.*\[template-sections\].*Interfaces"; then
+  ok x; else fail "a file carrying two template contracts must be held to both:"
+  printf '%s\n' "$ovw_a" | grep -E "ARC_Hybrid|template-sections" | sed 's/^/    /'
+fi
+# ... and a file carrying ONE of them is not. This one is green before and
+# after on purpose: it is the guard against the over-strict reading, which
+# would demand seven sections of a main module the ARC README defines as
+# carrying two.
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_a" "ARC_Top\.md.*\[template-sections\]"; then ok x; else
+  fail "a main module must not be held to the full ARC contract"; fi
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_a" "\[overview-unidentified\]" \
+   && ! contains "$ovw_a" "\[arc-containment-unreadable\]"; then ok x; else
+  fail "a vault with exactly one marked overview must report neither gap code"; fi
+
+# The same vault with its overview called system_overview.md, which is the
+# one name the check used to key on. Everything about it is reachable the
+# same way, and ARC_Child - reachable ONLY through its parent's submodule
+# table - is the file a name-keyed rule reports here and a reachability
+# rule does not. Without this vault the containment leg would be asserted
+# only where the old code was silent for the other reason.
+OVW_E="$OVW_TMP/englishname/00_documentation/01_projectvault"
+build_overview_vault "$OVW_E" "system_overview.md"
+ovw_e=$(python3 "$VALIDATOR" "$OVW_E" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_e" "ARC_Child\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "containment must count even where the overview carries the old name:"
+  printf '%s\n' "$ovw_e" | grep arc-not-in-overview | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_e" "ARC_Grandchild\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "the chain must be followed to its end where the old rule reported:"
+  printf '%s\n' "$ovw_e" | grep arc-not-in-overview | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if contains "$ovw_e" "ARC_Island\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "a module nothing names must stay a finding under the old file name"; fi
+
+# No marker at all: one finding that says so, and no island scan - a vault
+# that never adopted the marker must not be swept with findings.
+OVW_B="$OVW_TMP/unmarked/00_documentation/01_projectvault"
+build_overview_vault "$OVW_B" "Uebersicht.md"
+python3 - "$OVW_B/Uebersicht.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+t = p.read_text(encoding="utf-8")
+p.write_text(t.replace("---\nvault-role: system-overview\n---\n", "", 1), encoding="utf-8")
+PY
+ovw_b=$(python3 "$VALIDATOR" "$OVW_B" 2>&1)
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$ovw_b" | grep -c 'overview-unidentified')" = "1" ] \
+   && contains "$ovw_b" "vault-role: system-overview"; then ok x; else
+  fail "a vault with no marked overview must say so once, naming the line:"
+  printf '%s\n' "$ovw_b" | grep -E 'overview' | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_b" "\[arc-not-in-overview\]"; then ok x; else
+  fail "without an entry point the island scan must not run"; fi
+
+# Two marked files: the same finding, and the hub budget granted to
+# neither - the looser half must not survive the stricter one.
+OVW_C="$OVW_TMP/twice/00_documentation/01_projectvault"
+build_overview_vault "$OVW_C" "Uebersicht.md"
+printf -- '---\nvault-role: system-overview\n---\nA second claimant.\n' \
+  > "$OVW_C/Zweitfassung.md"
+ovw_c=$(python3 "$VALIDATOR" "$OVW_C" 2>&1)
+# Both names have to appear in the FINDING, not merely somewhere in the
+# run: 'Uebersicht.md' also occurs in the link-budget line the next
+# assertion requires, so a substring test over the whole output would pass
+# without the finding naming both claimants at all.
+TESTS=$((TESTS + 1))
+if printf '%s\n' "$ovw_c" | grep "overview-unidentified" \
+   | grep -q "Uebersicht.md, Zweitfassung.md"; then
+  ok x; else fail "two marked overviews must be reported once, naming both:"
+  printf '%s\n' "$ovw_c" | grep overview | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if contains "$ovw_c" "Uebersicht\.md.*\[link-budget\]"; then ok x; else
+  fail "with no single entry point the hub budget must not be granted"; fi
+
+# A marker that is nearly right: the value misspelled. The finding names
+# what it found, so the author fixes a line instead of hunting a file.
+OVW_D="$OVW_TMP/typo/00_documentation/01_projectvault"
+build_overview_vault "$OVW_D" "Uebersicht.md"
+python3 - "$OVW_D/Uebersicht.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text(encoding="utf-8").replace(
+    "vault-role: system-overview", "vault-role: system-overwiew", 1), encoding="utf-8")
+PY
+ovw_d=$(python3 "$VALIDATOR" "$OVW_D" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$ovw_d" "\[overview-unidentified\]" \
+   && contains "$ovw_d" "system-overwiew"; then ok x; else
+  fail "a misspelled marker value must be quoted back at the author:"
+  printf '%s\n' "$ovw_d" | grep overview | sed 's/^/    /'
+fi
+
+# A root file whose frontmatter block is never closed. Root files carry no
+# frontmatter contract, so nothing else in the run would mention it, and
+# the marker inside it is unreachable: without this the author is told the
+# vault has no overview while looking at a file that plainly declares one.
+OVW_F="$OVW_TMP/malformed/00_documentation/01_projectvault"
+build_overview_vault "$OVW_F" "Uebersicht.md"
+python3 - "$OVW_F/Uebersicht.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text(encoding="utf-8").replace(
+    "vault-role: system-overview\n---\n", "vault-role: system-overview\n", 1),
+    encoding="utf-8")
+PY
+ovw_f=$(python3 "$VALIDATOR" "$OVW_F" 2>&1)
+TESTS=$((TESTS + 1))
+if printf '%s\n' "$ovw_f" | grep "overview-unidentified" \
+   | grep -q "Uebersicht.md carries"; then ok x; else
+  fail "an unreadable frontmatter block must be named, not counted as absent:"
+  printf '%s\n' "$ovw_f" | grep overview | sed 's/^/    /'
+fi
+
+# A vault whose ARC folder holds no note yet - the state every project
+# derived with the three-domain profile starts in. The reachability scan
+# has nothing to do, but the entry point still decides the hub budget, so
+# the missing marker must still be reported: a check that goes quiet
+# because the vault is young is the same silence one size smaller.
+OVW_G="$OVW_TMP/noarcnotes/00_documentation/01_projectvault"
+build_overview_vault "$OVW_G" "Uebersicht.md"
+rm -f "$OVW_G/03_architecture_(ARC)"/ARC_*.md
+python3 - "$OVW_G/Uebersicht.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+t = p.read_text(encoding="utf-8")
+p.write_text(t.replace("---\nvault-role: system-overview\n---\n", "", 1), encoding="utf-8")
+PY
+ovw_g=$(python3 "$VALIDATOR" "$OVW_G" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$ovw_g" "\[overview-unidentified\]"; then ok x; else
+  fail "a vault whose ARC folder is still empty must still be told about the marker:"
+  printf '%s\n' "$ovw_g" | grep -E 'overview|link-budget' | sed 's/^/    /'
+fi
+
+# The containment source cannot be read: the exporter is not beside the
+# validator, which is what a project that vendored one file has. The check
+# must say it did not run - reporting every submodule as an island would be
+# eleven confident wrong findings on the vault this was measured against.
+mkdir -p "$OVW_TMP/noexp"
+cp "$VALIDATOR" "$SKILL_DIR/vault_schema.json" "$OVW_TMP/noexp/"
+ovw_ne=$(python3 "$OVW_TMP/noexp/validate_vault.py" "$OVW_A" 2>&1); ovw_ne_rc=$?
+TESTS=$((TESTS + 1))
+if [ $ovw_ne_rc -ne 2 ] && contains "$ovw_ne" "\[arc-containment-unreadable\]"; then
+  ok x; else fail "a missing exporter must be reported, not silently skipped (rc=$ovw_ne_rc):"
+  printf '%s\n' "$ovw_ne" | grep -E 'arc-|error' | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_ne" "ARC_Child\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "without the containment source no submodule may be called an island"; fi
+
+# The same question through the other door: a schema that cannot be parsed
+# falls back to the built-in field set, which declares no relations at all.
+# The containment set would be EMPTY rather than unknown, and every
+# submodule of a correctly nested vault would be reported - behind one
+# pre-existing schema-unreadable WARN.
+mkdir -p "$OVW_TMP/badschema"
+cp "$VALIDATOR" "$SKILL_DIR/export_traceability.py" "$OVW_TMP/badschema/"
+printf 'not json at all\n' > "$OVW_TMP/badschema/vault_schema.json"
+ovw_bs=$(python3 "$OVW_TMP/badschema/validate_vault.py" "$OVW_A" 2>&1); ovw_bs_rc=$?
+TESTS=$((TESTS + 1))
+if [ $ovw_bs_rc -ne 2 ] && contains "$ovw_bs" "\[schema-unreadable\]" \
+   && contains "$ovw_bs" "\[arc-containment-unreadable\]"; then ok x; else
+  fail "an unreadable schema must make containment unknown, not empty (rc=$ovw_bs_rc):"
+  printf '%s\n' "$ovw_bs" | grep -E 'schema-|arc-' | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$ovw_bs" "ARC_Child\.md.*\[arc-not-in-overview\]"; then ok x; else
+  fail "an unreadable schema must not turn a contained submodule into an island"; fi
+
+rm -rf "$OVW_TMP"
 
 # ==========================================================================
 # ARCHITECTURE.md - the finding-code index is complete in both directions
