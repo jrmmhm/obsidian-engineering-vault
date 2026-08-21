@@ -428,7 +428,11 @@ defect in the documentation, not a property of the system.
    Evidence first.
 6. **Both Assembly AND Individual Parts for PCBs.** The board gets a CMP
    Assembly file; each significant IC gets a CMP Individual Part file.
-7. **Always update system_overview.md** for new ARC modules.
+7. **Keep every ARC module reachable.** A top-level module goes into the
+   vault's system overview — the root file carrying
+   `vault-role: system-overview`, whatever it is named; a submodule goes
+   into its parent's submodule table instead. `arc-not-in-overview` names
+   what neither reaches.
 8. **Testdata campaigns need metadata.txt** linking back to the TAE file.
    Raw data in 31_testdata_raw is IMMUTABLE.
 9. **DEC files for discoveries start as Draft.** Never make irreversible

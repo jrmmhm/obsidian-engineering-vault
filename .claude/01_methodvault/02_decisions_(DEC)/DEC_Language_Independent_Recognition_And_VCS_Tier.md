@@ -8,6 +8,7 @@ Date: 2026-07-28
 Status: Accepted
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-07-28 — Language-independent recognition, VCS tier (Accepted)". Its title names two questions; the record argues both from one Context and is therefore kept whole — see [[DEC_The_Decision_Log_Moves_Into_A_Vault]].
 Corrected by: [[DEC_Identifier_Enforcement]]
+Corrected by: [[DEC_Reachability_Is_Decided_From_A_Self_Declared_Overview]] – the `system_overview.md` half of residual 2, and follow-up 5 with it, are closed: neither check keys on that file name any more.
 
 ## Context
 

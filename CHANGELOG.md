@@ -33,6 +33,31 @@ decision.
 
 ### Added
 
+- **The system overview declares itself, and two new WARNs say when the ARC
+  reachability check did not run** — `arc-not-in-overview` resolved
+  `system_overview.md` as a literal path and returned without a word when
+  that file did not exist, and the hub link budget went to the same name.
+  Both were dark in every vault that renamed the file:
+  measured on a derived German vault whose overview is `Systemuebersicht.md`,
+  16 ARC modules and 0 findings. The overview is now the file in the vault
+  root whose frontmatter carries `vault-role: system-overview`.
+  **What an existing project has to do: put a frontmatter block carrying
+  `vault-role: system-overview` at the top of its overview file** — until it
+  does, every run reports `overview-unidentified`, the island check does not
+  run, and that file loses the hub link budget. `vault-role` and not `role`,
+  because `role` already names the canonical domain token in these tools.
+  The second new code, `arc-containment-unreadable`, is the same principle
+  one layer in: where the containment source cannot be read at all — no
+  exporter beside the validator, or a schema the validator could not parse —
+  the check says so instead of reporting every submodule as unreachable.
+  **MAJOR** by the table in
+  [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
+  — a rule is newly introduced and a frontmatter field starts deciding
+  behaviour — recorded as MINOR while the repository is at 0.x. `schema_version`
+  moves to `0.5`. The reasoning, with the four rejected alternatives and what
+  each was measured against, is
+  [`DEC_Reachability_Is_Decided_From_A_Self_Declared_Overview`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Reachability_Is_Decided_From_A_Self_Declared_Overview.md).
+
 - **`corrected-by` is a declared typed relation** — the `Corrected by:
   [[DEC_...]]` line has been authored in decision records since the
   decision-log migration without being declared anywhere: not a relation, not
@@ -58,6 +83,22 @@ decision.
   [`DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own.md).
 
 ### Changed
+
+- **A module its parent contains is no longer a documentation island** —
+  `arc-not-in-overview` demanded that every ARC file appear in the overview,
+  while `vault_schema.json` declares that ARC-to-ARC containment is authored
+  in the submodule table of the main-module template and nowhere else. A
+  vault that uses that table correctly got one island finding per submodule:
+  measured on a derived vault that adopted it, 12 containment edges from one
+  main module and 11 findings that would have been wrong. Reachability is now
+  transitive from the overview over those edges. **Grep your vault for
+  `arc-not-in-overview` after updating:** in a nested vault the count falls,
+  and in a flat one nothing changes — a vault whose templates declare no
+  submodule table cannot author containment, so every ARC module must still
+  be named in the overview. Transitive and not one hop, because a module
+  listing itself in its own submodule table, and two modules listing each
+  other, would otherwise delete their own findings. A rule redefined:
+  **MAJOR** by the table, recorded as MINOR while the repository is at 0.x.
 
 - **The requirement-row checks follow the requirements role** —
   `check_req_table` and `check_req_table_silence` compared the folder
@@ -102,6 +143,25 @@ decision.
   recorded as MINOR while the repository is at 0.x.
 
 ### Fixed
+
+- **A file carrying two template contracts is held to both** —
+  `check_sections` scored a file against every template of its domain and
+  kept the best, so an ARC file carrying the main-module template's two
+  sections stopped being measured against the seven-section one and could
+  lose any of the other five in silence. Where the best-matching template
+  scores a perfect match, the file is now also held to any other template of
+  the domain whose *exclusive* section it carries — a section exactly one
+  template requires is what says which template a file was written from.
+  **Grep your vault for `template-sections`, `section-mismatch` and
+  `section-near-miss` before updating.** Measured across four vaults and 455
+  domain files: no file changes its findings, and the one deliberately broken
+  probe — a main module with an allocation table minus its `Interfaces`
+  section — goes from silent to one ERROR. A domain whose templates require
+  identical or nested section sets is unaffected by construction. PATCH: the
+  rule did not move, the tool stopped guessing which template a file came
+  from. It narrows a sentence of
+  [`DEC_One_Abbreviation_One_Folder_By_Rule`](.claude/01_methodvault/02_decisions_(DEC)/DEC_One_Abbreviation_One_Folder_By_Rule.md),
+  which now carries a `Corrected by:` line saying so.
 
 - **`SKILL.md` states the enforcement tiers a derived project actually
   has** — the skill travels verbatim into every derived project, so its
