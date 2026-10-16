@@ -1887,50 +1887,62 @@ def anchor_resolves(anchor, heads, blocks):
     return bool(segs) and all(fold_key(s) in heads for s in segs)
 
 
+def iter_wikilinks(lines, mask=None):
+    """(line number, line, match) of every wikilink Obsidian would resolve.
+
+    Fenced blocks and inline code spans are skipped - Obsidian resolves
+    neither. One reader for check_links and for the vault-wide question
+    which names a link targets, so the two cannot disagree about what a
+    link is.
+    """
+    if mask is None:
+        mask = fence_mask(lines)
+    for i, line in enumerate(lines, 1):
+        if mask[i]:
+            continue
+        for m in WIKILINK_RE.finditer(re.sub(r"`[^`]*`", " ", line)):
+            yield i, line, m
+
+
 def check_links(vault, path, lines, findings, strict, hub=False):
     md_names, all_names = vault.md_names(), vault.all_names()
     targets = Counter()
     total = 0
     mask = fence_mask(lines)
     anchors = None      # built on the first same-file link, never for a file without one
-    for i, line in enumerate(lines, 1):
-        if mask[i]:
-            continue
-        # Obsidian does not resolve links inside code spans
-        line = re.sub(r"`[^`]*`", " ", line)
-        for m in WIKILINK_RE.finditer(line):
-            target = m.group(2).strip()
-            anchor = (m.group(3) or "").strip()
-            if not target:
-                # A link into this file. It names no other file, so it is
-                # resolved against this one - and it is deliberately kept
-                # out of the budget and the repeat counter below, both of
-                # which are about OUTGOING links: "link the responsible
-                # file once" has no addressee when the target is the file
-                # the reader is already in.
-                if not anchor.strip("#^"):
-                    # '[[]]', '[[#]]', '[[|alias]]' - a link naming nothing
-                    # at all. Skipped rather than reported, which is what
-                    # the old regex did by not matching it; a finding for
-                    # the empty placeholder is a rollout of its own.
-                    continue
-                if anchors is None:
-                    anchors = anchor_index(lines, mask)
-                if not anchor_resolves(anchor, *anchors):
-                    sev = "ERROR" if strict else "WARN"
-                    findings.append(Finding(sev, "link-unresolved", str(path), i,
-                                            f"[[{anchor}]] names no heading and no "
-                                            "block identifier in this file"))
+    for i, line, m in iter_wikilinks(lines, mask):
+        target = m.group(2).strip()
+        anchor = (m.group(3) or "").strip()
+        if not target:
+            # A link into this file. It names no other file, so it is
+            # resolved against this one - and it is deliberately kept
+            # out of the budget and the repeat counter below, both of
+            # which are about OUTGOING links: "link the responsible
+            # file once" has no addressee when the target is the file
+            # the reader is already in.
+            if not anchor.strip("#^"):
+                # '[[]]', '[[#]]', '[[|alias]]' - a link naming nothing
+                # at all. Skipped rather than reported, which is what
+                # the old regex did by not matching it; a finding for
+                # the empty placeholder is a rollout of its own.
                 continue
-            total += 1
-            targets[target] += 1
-            resolved = (target in md_names or target in all_names
-                        or f"{target}.md" in all_names)
-            if not resolved:
+            if anchors is None:
+                anchors = anchor_index(lines, mask)
+            if not anchor_resolves(anchor, *anchors):
                 sev = "ERROR" if strict else "WARN"
                 findings.append(Finding(sev, "link-unresolved", str(path), i,
-                                        f"[[{target}]] does not resolve to any file "
-                                        f"under {vault.index_root_label()}"))
+                                        f"[[{anchor}]] names no heading and no "
+                                        "block identifier in this file"))
+            continue
+        total += 1
+        targets[target] += 1
+        resolved = (target in md_names or target in all_names
+                    or f"{target}.md" in all_names)
+        if not resolved:
+            sev = "ERROR" if strict else "WARN"
+            findings.append(Finding(sev, "link-unresolved", str(path), i,
+                                    f"[[{target}]] does not resolve to any file "
+                                    f"under {vault.index_root_label()}"))
     budget = LINK_BUDGET_HUB if hub else LINK_BUDGET
     if total > budget:
         findings.append(Finding("WARN", "link-budget", str(path), None,
@@ -2774,13 +2786,39 @@ def validate_vault_wide(vault: Vault):
             findings.append(Finding("WARN", "orphan", str(f), None,
                                     "no inbound links - unreachable except by search"))
 
-    # ambiguous wikilink targets
+    # Ambiguous wikilink targets. Two files sharing a stem are a defect only
+    # where a link names that stem: the template ships two README.md that no
+    # vault links, and reporting them made the finding fire on every derived
+    # vault forever (01_methodvault, DEC-MTH-053). The link is matched as a
+    # parsed target, not as a '[[name' substring, which '[[README_x' also
+    # carries.
+    linked = {}
+    for p, text in corpus.items():
+        for i, _line, m in iter_wikilinks(text.splitlines()):
+            target = m.group(2).strip()
+            if target.endswith(".md"):
+                target = target[:-3]
+            if target:
+                linked.setdefault(target, []).append(f"{p.name}:{i}")
+    label = vault.index_root_label()
     for name, paths in vault.md_names().items():
-        if len(paths) > 1:
-            findings.append(Finding("WARN", "duplicate-basename", str(paths[0]), None,
-                                    f"'{name}' exists {len(paths)}x under "
-                                    f"{vault.index_root_label()} - "
-                                    "wikilinks to it are ambiguous"))
+        if len(paths) < 2 or name not in linked:
+            continue
+        sources = linked[name]
+        where = ", ".join(sources[:3]) + (f", +{len(sources) - 3} more"
+                                          if len(sources) > 3 else "")
+        files = []
+        for p in paths:
+            try:
+                files.append(str(p.relative_to(vault.index_root())))
+            except ValueError:
+                files.append(str(p))
+        findings.append(Finding(
+            "WARN", "duplicate-basename", str(paths[0]), None,
+            f"[[{name}]] (linked from {where}) matches {len(paths)} files under "
+            f"{label}: {', '.join(files)} - the link is ambiguous, and a "
+            "path-qualified link does not resolve here either; rename one of "
+            "the files"))
     return findings
 
 
