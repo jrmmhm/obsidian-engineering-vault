@@ -41,7 +41,8 @@ each reads, and the lists they read it with, are owned by the
 Python because they decide what is read at all.
 
 - **`pointer-drift`** — a project file a note names (the file-shaped token
-  `check_paths` reads, here also inside inline code) was last changed after
+  `check_paths` reads, here also inside inline code and inside fenced
+  blocks other than those declaring `host=`) was last changed after
   the note's `last-verified`. Changed means: on the first-parent line of
   the vault's own repository, so a branch merged after the date counts on
   the merge day; and not in the same commit as the note itself, so a note
@@ -72,7 +73,8 @@ names its host; the conventions file states the rule.
   hold), and what cannot tell those apart never blocks here.
 - D adds stored state to every link; `last-verified` already is the stamp a
   writer sets when re-checking a note.
-- Each check says nothing rather than guess where git cannot answer: no
+- The two checks that read git say nothing rather than guess where git
+  cannot answer (pending-stale reads only the disk): no
   repository, a shallow one (its boundary commit carries every file, and
   'missing' there proves nothing), a failing call. One query per
   repository and run: one first-parent `git log` restricted to the cited
@@ -85,7 +87,10 @@ names its host; the conventions file states the rule.
 - Measured on the two working vaults at their current heads, read-only:
   opensource gains one finding, kernel ten. pointer-drift flags three notes
   (prototype: fourteen with five false) - all three hold a stale claim on
-  re-reading, one of them caused by the flagged change itself.
+  re-reading, one of them caused by the flagged change itself. Of the five
+  notes the audit confirmed stale, pointer-drift flags three; the clone
+  root it no longer reads leaves ARC_Linux_Kernel to pending-stale, and
+  IMP_Repository_Split's directory pointer to nobody.
   ref-unresolved flags four: two are the id a history rewrite killed, two
   are foreign or pre-rewrite ids that `repo@id` qualifies. pending-stale
   flags four markers, all on paths that exist. The template vault stays at
@@ -120,6 +125,8 @@ names its host; the conventions file states the rule.
 - Follow-up, not built: R5 F19 `verifies-suspect` - a REQ file changed
   after the `last-verified` of a TAE that verifies it - is one more pair on
   the same walk.
-- Follow-up, not built: `git_head_content` (`git show HEAD:<path>` for the
-  stop gate's baseline) runs without the network block and can make a
-  partial vault repository fetch a blob on demand.
+- Follow-up, not built: the git reads that predate this decision run
+  without the network block - `git_head_content` (`git show HEAD:<path>`,
+  the stop gate's baseline) and `head_identifiers` (`git grep` at HEAD, the
+  full audit's `id-vanished`) - and can make a partial vault repository
+  fetch a blob on demand.
