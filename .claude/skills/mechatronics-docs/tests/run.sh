@@ -5125,6 +5125,7 @@ if [ -f "$NP" ]; then
       ".claude/skills/mechatronics-docs/hooks/stop_gate.sh" \
       ".claude/skills/mechatronics-docs/DECISIONS.md" \
       ".claude/skills/mechatronics-docs/SKILL.md" \
+      ".claude/skills/mechatronics-docs/REFERENCE.md" \
       ".claude/skills/mechatronics-docs/ARCHITECTURE.md" \
       ".github/workflows/validate-vault.yml" "IEC_61508_MAPPING.md" \
       "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "METHOD.md" "LICENSE" \
@@ -5156,7 +5157,9 @@ if [ -f "$NP" ]; then
     ok x; else fail "derived workflow lost the project vault audit"; fi
 
   # SKILL.md travels verbatim - the derivation neither strips it nor rewrites
-  # it - so every sentence in it is read in two repositories at once. Issue
+  # it - so every sentence in it is read in two repositories at once. The same
+  # holds for REFERENCE.md beside it, which carries the tool reference that
+  # used to sit in SKILL.md (DEC-MTH-057), so A2 and A3 read both files. Issue
   # #117: it promised a tier a derived project does not have ("a GitHub Actions
   # workflow that runs the test suite ...", removed with tests/ by #85) and said
   # "This repository's own workflow" about a workflow only the template has.
@@ -5181,7 +5184,7 @@ if [ -f "$NP" ]; then
   # A1 (structural): the derivation leaves no repository behind, so no tier can
   # be installed in a freshly derived project - '.git' is in JUNK_NAMES and the
   # script prints 'git init' as the reader's own next step. This is the fact
-  # SKILL.md's "neither runs by merely being present" rests on.
+  # REFERENCE.md's "neither runs by merely being present" rests on.
   TESTS=$((TESTS + 1))
   if [ ! -e "$ND/.git" ]; then ok x; else
     fail "derivation left a git repository behind - SKILL.md assumes none"; fi
@@ -5204,52 +5207,54 @@ if [ -f "$NP" ]; then
   #                          clone or a pull - that absence is the point of the
   #                          sentence naming it.
   SKILL_ALLOW_PATHS="traceability_index.md traceability_graph.mmd .git/hooks/"
-  np_skill="$ND/.claude/skills/mechatronics-docs/SKILL.md"
-  np_missing=""; np_stale_allow=""
-  for p in $(grep -o '`[^`]*`' "$np_skill" | tr -d '`' \
-      | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json|\.mmd|\.html|\.csv)$' \
-      | grep -v -E '[*{}$~]|YYYY|ABBR|NN_|DOMAIN' | sort -u); do
-    if [ -e "$ND/$p" ] || [ -e "$ND/.claude/skills/mechatronics-docs/$p" ]; then
-      exists=1; else exists=0; fi
-    case " $SKILL_ALLOW_PATHS " in
-      *" $p "*) [ $exists -eq 1 ] && np_stale_allow="$np_stale_allow $p"; continue ;;
-    esac
-    [ $exists -eq 1 ] || np_missing="$np_missing $p"
-  done
-  TESTS=$((TESTS + 1))
-  if [ -z "$np_missing" ]; then ok x; else
-    fail "derived SKILL.md names path(s) the derived tree lacks:$np_missing"; fi
-  TESTS=$((TESTS + 1))
-  if [ -z "$np_stale_allow" ]; then ok x; else
-    fail "SKILL_ALLOW_PATHS entries now exist - drop them:$np_stale_allow"; fi
-
-  # A3 (denylist): the three retired phrasings, one assertion each so a
-  # regression names the sentence it reintroduced. Read the note above before
-  # extending this. The file is whitespace-normalised first: SKILL.md wraps at
-  # ~72 characters, and a claim straddling a line break is invisible to the
-  # line-oriented grep behind contains().
-  np_skill_flat=$(tr '\n' ' ' < "$np_skill" | tr -s ' ')
-  for phrase in "runs the test suite" "Two further tiers run" \
-      "This repository's own workflow"; do
+  for np_doc in SKILL.md REFERENCE.md; do
+    np_skill="$ND/.claude/skills/mechatronics-docs/$np_doc"
+    np_missing=""; np_stale_allow=""
+    for p in $(grep -o '`[^`]*`' "$np_skill" | tr -d '`' \
+        | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json|\.mmd|\.html|\.csv)$' \
+        | grep -v -E '[*{}$~]|YYYY|ABBR|NN_|DOMAIN' | sort -u); do
+      if [ -e "$ND/$p" ] || [ -e "$ND/.claude/skills/mechatronics-docs/$p" ]; then
+        exists=1; else exists=0; fi
+      case " $SKILL_ALLOW_PATHS " in
+        *" $p "*) [ $exists -eq 1 ] && np_stale_allow="$np_stale_allow $p"; continue ;;
+      esac
+      [ $exists -eq 1 ] || np_missing="$np_missing $p"
+    done
     TESTS=$((TESTS + 1))
-    if contains "$np_skill_flat" "$phrase"; then
-      fail "derived SKILL.md still carries the retired phrasing: $phrase"
-    else ok x; fi
+    if [ -z "$np_missing" ]; then ok x; else
+      fail "derived $np_doc names path(s) the derived tree lacks:$np_missing"; fi
+    TESTS=$((TESTS + 1))
+    if [ -z "$np_stale_allow" ]; then ok x; else
+      fail "SKILL_ALLOW_PATHS entries now exist in $np_doc - drop them:$np_stale_allow"; fi
+
+    # A3 (denylist): the three retired phrasings, one assertion each so a
+    # regression names the sentence it reintroduced. Read the note above before
+    # extending this. The file is whitespace-normalised first: both files wrap
+    # at ~76 characters, and a claim straddling a line break is invisible to
+    # the line-oriented grep behind contains().
+    np_skill_flat=$(tr '\n' ' ' < "$np_skill" | tr -s ' ')
+    for phrase in "runs the test suite" "Two further tiers run" \
+        "This repository's own workflow"; do
+      TESTS=$((TESTS + 1))
+      if contains "$np_skill_flat" "$phrase"; then
+        fail "derived $np_doc still carries the retired phrasing: $phrase"
+      else ok x; fi
+    done
   done
 
-  # A4 (structural, template-side): SKILL.md's one surviving claim about the
+  # A4 (structural, template-side): REFERENCE.md's one surviving claim about the
   # CONTENTS of a workflow - that the template repository's own workflow arms
   # not-allocated and no-evidence-note - is pinned here. This is the
   # correspondence check the note above calls self-defeating, and it works in
   # this one direction because both the claim and the file it is about live in
   # THIS repository: no marker and no repository-dependent variant is needed.
-  # Drop that step and SKILL.md goes silently false in every derived project
-  # already shipped, which is issue #117 a second time.
+  # Drop that step and REFERENCE.md goes silently false in every derived
+  # project already shipped, which is issue #117 a second time.
   np_tmpl_wf=$(cat "$NP_ROOT/.github/workflows/validate-vault.yml" 2>/dev/null)
   TESTS=$((TESTS + 1))
   if contains "$np_tmpl_wf" "fail-on not-allocated,no-evidence-note"; then
     ok x; else
-    fail "template workflow no longer arms the --fail-on classes SKILL.md names"; fi
+    fail "template workflow no longer arms the --fail-on classes REFERENCE.md names"; fi
 
   # No prose in the derived tree may still point at the worked example or
   # the method vault - the leftover-link defect of issue #70.
@@ -7312,6 +7317,75 @@ rm -rf "$NC_TMP"
 # ==========================================================================
 # END the validator noise cut
 # ==========================================================================
+
+# ==========================================================================
+# SKILL.md's activation guard is the validator's own recognition
+# (DEC-MTH-057). The prose used to demand >=3 folders numbered 01_-09_ and
+# so told the agent to refuse a vault of 02/09/98 folders that the validator
+# and the hooks accept. The guard now runs the validator with stdout dropped
+# and reads stderr: nothing for a vault, one phrase for a non-vault, another
+# for a crash. Each phrase SKILL.md quotes is pinned against what the
+# validator really prints, so rewording either side turns this red.
+# ==========================================================================
+skill_flat=$(tr '\n' ' ' < "$SKILL_DIR/SKILL.md" | tr -s ' ')
+TESTS=$((TESTS + 1))
+if contains "$skill_flat" '"<candidate>" 2>&1 >/dev/null'; then ok x; else
+  fail "SKILL.md's activation guard no longer runs the validator with stdout dropped"; fi
+for gd_vault in "$REAL_VAULT" "$METHOD_VAULT"; do
+  gd_out=$(python3 "$VALIDATOR" "$gd_vault" 2>&1 >/dev/null)
+  TESTS=$((TESTS + 1))
+  if [ -z "$gd_out" ]; then ok x; else
+    fail "the guard reads 'no output' as a vault, but $gd_vault printed:"
+    printf '%s\n' "$gd_out" | sed 's/^/    /'
+  fi
+done
+GD_TMP=$(mktemp -d)
+gd_out=$(python3 "$VALIDATOR" "$GD_TMP" 2>&1 >/dev/null)
+rm -rf "$GD_TMP"
+TESTS=$((TESTS + 1))
+if contains "$skill_flat" '`is not a vault root`' && contains "$gd_out" "is not a vault root"; then
+  ok x; else
+  fail "SKILL.md's non-vault phrase must match the validator's output, got: $gd_out"; fi
+gd_out=$(printf 'not json at all' | python3 "$VALIDATOR" --hook post 2>&1 >/dev/null)
+TESTS=$((TESTS + 1))
+if contains "$skill_flat" '`validator crash`' && contains "$gd_out" "^validator crash"; then
+  ok x; else
+  fail "SKILL.md's crash phrase must match the validator's output, got: $gd_out"; fi
+
+# SKILL.md quotes the question and timeline of every role from the template
+# conventions file, which owns them. The copy had drifted (RESEARCH-R5 F9:
+# CMP read "What are the building blocks?"), so each row is compared, one
+# assertion per domain so a failure names the row. A conventions table that
+# cannot be read leaves every row unmatched - red, never silently green.
+gd_rows=$(python3 - "$SKILL_DIR/SKILL.md" \
+    "$REAL_VAULT/00_documentation_file_creation_and_conventions.md" <<'PY' 2>&1
+import re, sys
+def cells(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+conv = {}
+for line in open(sys.argv[2], encoding="utf-8-sig").read().splitlines():
+    m = re.match(r"\|\s*`\d\d_[^`]*_\((\w+)\)`\s*\|", line)
+    if m and len(cells(line)) == 4:
+        c = cells(line)
+        conv[m.group(1)] = (c[3], c[2])
+skill = {}
+for line in open(sys.argv[1], encoding="utf-8-sig").read().splitlines():
+    c = cells(line) if line.startswith("|") else []
+    if len(c) == 4 and c[0] in conv:
+        skill[c[0]] = (c[1], c[2])
+for abbr in ("REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"):
+    if abbr in skill and skill[abbr] == conv.get(abbr):
+        print(abbr, "ok")
+    else:
+        print(abbr, "skill=%r conventions=%r" % (skill.get(abbr), conv.get(abbr)))
+PY
+)
+for gd_abbr in REQ DEC ARC CMP IFC IMP TAE OAU REF; do
+  gd_line=$(printf '%s\n' "$gd_rows" | grep "^$gd_abbr ")
+  TESTS=$((TESTS + 1))
+  if [ "$gd_line" = "$gd_abbr ok" ]; then ok x; else
+    fail "SKILL.md role row $gd_abbr differs from the conventions file: ${gd_line:-no row}"; fi
+done
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
