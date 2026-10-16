@@ -6,8 +6,9 @@ last-verified: 2026-10-16
 ---
 Date: 2026-07-25
 Status: Accepted
-Migrated 2026-08-05 from the appended decision log, base record "Decision Record — AI Documentation Enforcement Layer". Corrected 2026-10-16: six research citations — in Context, option A, option B, the leak-detection design point and follow-up 1 — said more than their sources report; each now states what its source reports, and option B stands on the corrected evidence.
+Migrated 2026-08-05 from the appended decision log, base record "Decision Record — AI Documentation Enforcement Layer". Corrected 2026-10-16: six research citations — in Context, option A, option B, the leak-detection design point and follow-up 1 — said more than their sources report; each now states what its source reports, and option B stands on the corrected evidence; and the stop gate's "max 2 blocks per session" no longer holds - it blocks once per stop sequence.
 Corrected by: [[DEC_A_Citation_States_What_Its_Source_Reports]] – the DocPrism figures were misquoted, "collapse" and "only" overstated their sources, and caveats the sources attach were dropped
+Corrected by: [[DEC_Enforcement_State_Is_Derived_Not_Kept]] – the gate decides from the Stop payload's `stop_hook_active` and blocks once per stop sequence; the per-session counter behind "max 2 blocks per session" is gone
 
 ## Context
 
