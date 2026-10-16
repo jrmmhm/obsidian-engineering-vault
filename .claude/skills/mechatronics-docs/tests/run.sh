@@ -7152,6 +7152,81 @@ if contains "$gn_out" "^ERROR .*IMP_Pointers\.md:12 \[path-missing\] .*60_clones
   fail "outside version control a missing path stays an ERROR:"
   printf '%s\n' "$gn_out" | grep path-missing | sed 's/^/    /'; fi
 
+# --- Unit 7: the post hook shows only WARNs that are new since HEAD -------
+# A committed stub carries its WARN at HEAD. Editing it - which moves the
+# count in the message - is no news; a new WARN is, and comes with one line
+# saying how many known ones were not repeated. A file with no HEAD shows
+# everything.
+HP="$NC_TMP/Post"
+HPV="$HP/00_documentation/01_projectvault"
+nc_vault "$HPV"
+printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-10-16\nlast-verified: 2026-10-16\n---\n## Context\nA committed stub.\n' \
+  > "$HPV/03_architecture_(ARC)/ARC_Stub.md"
+ngit init -q "$HP"
+ngit -C "$HP" add -A >/dev/null 2>&1
+ngit -C "$HP" commit -q --no-verify --no-gpg-sign -m "post-hook fixture" >/dev/null 2>&1
+SIDP="testsession-post-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDP" "/tmp/claude-mechdocs/baseline-$SIDP" \
+      "/tmp/claude-mechdocs/widehash-$SIDP"
+post() { printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDP" "$1" \
+  | python3 "$VALIDATOR" --hook post 2>&1; }
+printf 'A second line, still a stub.\n' >> "$HPV/03_architecture_(ARC)/ARC_Stub.md"
+hp1=$(post "$HPV/03_architecture_(ARC)/ARC_Stub.md")
+TESTS=$((TESTS + 1))
+if [ -z "$hp1" ]; then ok x; else
+  fail "a WARN the file carried at HEAD must not be injected again:"
+  printf '%s\n' "$hp1" | sed 's/^/    /'; fi
+python3 - "$HPV/03_architecture_(ARC)/ARC_Stub.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace("created:", "crated: 2026-10-16\ncreated:", 1))
+PY
+hp2=$(post "$HPV/03_architecture_(ARC)/ARC_Stub.md")
+TESTS=$((TESTS + 1))
+if contains "$hp2" "frontmatter-undeclared" && ! contains "$hp2" "\[stub\]" \
+   && contains "$hp2" "1 pre-existing WARN(s) unchanged since git HEAD"; then ok x; else
+  fail "a new WARN must be shown with the count of known ones, the known ones not:"
+  printf '%s\n' "$hp2" | sed 's/^/    /'; fi
+printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-10-16\nlast-verified: 2026-10-16\n---\n## Context\nNew.\n' \
+  > "$HPV/03_architecture_(ARC)/ARC_Fresh.md"
+hp3=$(post "$HPV/03_architecture_(ARC)/ARC_Fresh.md")
+TESTS=$((TESTS + 1))
+if contains "$hp3" "ARC_Fresh\.md \[stub\]" && ! contains "$hp3" "pre-existing WARN"; then ok x; else
+  fail "a file without a HEAD must show every WARN:"
+  printf '%s\n' "$hp3" | sed 's/^/    /'; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDP" "/tmp/claude-mechdocs/baseline-$SIDP" \
+      "/tmp/claude-mechdocs/widehash-$SIDP"
+
+# --- Unit 8: the vault-wide block once per session or when it changed -----
+WS="$NC_TMP/Wide/00_documentation/01_projectvault"
+build_coverage_vault "$WS"
+SIDW="testsession-wide-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDW" "/tmp/claude-mechdocs/baseline-$SIDW" \
+      "/tmp/claude-mechdocs/widehash-$SIDW"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDW" \
+  "$WS/03_architecture_(ARC)/ARC_Coverage.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+wstop() { field systemMessage "$(printf '{"session_id":"%s"}' "$SIDW" \
+  | python3 "$VALIDATOR" --hook stop 2>&1)"; }
+ws1=$(wstop); ws2=$(wstop)
+TESTS=$((TESTS + 1))
+if contains "$ws1" "vault-wide findings (advisory" && contains "$ws1" "req-uncovered"; then ok x; else
+  fail "the first report of a session must show the vault-wide block:"
+  printf '%s\n' "$ws1" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$ws2" "vault-wide findings unchanged (" && ! contains "$ws2" "req-uncovered"; then ok x; else
+  fail "an unchanged vault-wide block must shrink to one line:"
+  printf '%s\n' "$ws2" | sed 's/^/    /'; fi
+# A change shows the block again: one more requirement nobody verifies.
+printf '| M | 008 | added later | pass if measured | none |\n' \
+  >> "$WS/01_requirements_(REQ)/REQ_Coverage (COV).md"
+ws3=$(wstop)
+TESTS=$((TESTS + 1))
+if contains "$ws3" "vault-wide findings (advisory" && contains "$ws3" "REQ-COV-008"; then ok x; else
+  fail "a changed vault-wide block must be shown in full again:"
+  printf '%s\n' "$ws3" | sed 's/^/    /'; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDW" "/tmp/claude-mechdocs/baseline-$SIDW" \
+      "/tmp/claude-mechdocs/widehash-$SIDW"
+
 rm -rf "$NC_TMP"
 # ==========================================================================
 # END the validator noise cut
