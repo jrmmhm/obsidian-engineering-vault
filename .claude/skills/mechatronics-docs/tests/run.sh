@@ -4644,7 +4644,9 @@ if grep -q "REQ-COV-002" "$CV/03_architecture_(ARC)/ARC_Coverage.md" && \
   ok x; else fail "the must-not-count identifiers are not in the fixture at all"; fi
 
 cv_out=$(python3 "$VALIDATOR" "$CV" 2>&1)
-uncovered() { contains "$cv_out" "\[req-uncovered\] $1"; }
+# One finding per REQ file and kind of gap since DEC-MTH-053: the
+# identifier is one of a list that ends at the first colon.
+uncovered() { contains "$cv_out" "\[req-uncovered\] [^:]*\b$1\b"; }
 
 # The closed loop: silent. Paired with the five below, so a check that
 # stopped running cannot pass as a pass.
@@ -4662,13 +4664,19 @@ done
 # The finding has to name which half of the loop is missing, or it cannot
 # be acted on. Three shapes, three sentences.
 TESTS=$((TESTS + 1))
-if contains "$cv_out" "\[req-uncovered\] REQ-COV-002 has no allocation row naming it and no TAE"; then
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-002, REQ-COV-003, REQ-COV-004: no allocation row names them and no TAE"; then
   ok x; else fail "a mention-only requirement must be reported as missing BOTH halves"; fi
 TESTS=$((TESTS + 1))
-if contains "$cv_out" "\[req-uncovered\] REQ-COV-005 is named by no TAE in 'verifies'"; then
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-005: named by no TAE in 'verifies'"; then
   ok x; else fail "an allocated requirement must be reported as missing the evidence half"; fi
+# ... and one line per kind, not one per requirement (DEC-MTH-053): five
+# uncovered requirements of one file, three kinds, three lines.
 TESTS=$((TESTS + 1))
-if contains "$cv_out" "\[req-uncovered\] REQ-COV-006 is verified by TAE_Coverage but no allocation row"; then
+if [ "$(printf '%s\n' "$cv_out" | grep -c '\[req-uncovered\]')" = "3" ]; then ok x; else
+  fail "req-uncovered must group one REQ file's gaps by kind:"
+  printf '%s\n' "$cv_out" | grep req-uncovered | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-006: verified by TAE_Coverage but no allocation row"; then
   ok x; else fail "a verified requirement must be reported as missing the allocation half"; fi
 
 # A requirement row the graph does not carry - here one under a heading of
@@ -4700,11 +4708,11 @@ printf '## Context\n\n## Allocation and Verification\n' \
   > "$CV_B/03_architecture_(ARC)/00_ARC_file_template.md"
 cvb_out=$(python3 "$VALIDATOR" "$CV_B" 2>&1)
 TESTS=$((TESTS + 1))
-if ! contains "$cvb_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+if ! contains "$cvb_out" "\[req-uncovered\] [^:]*\bREQ-COV-006\b"; then ok x; else
   fail "without an allocation binding the allocation half must not be held against a REQ"; fi
 TESTS=$((TESTS + 1))
-if contains "$cvb_out" "\[req-uncovered\] REQ-COV-002" && \
-   contains "$cvb_out" "\[req-uncovered\] REQ-COV-005"; then ok x; else
+if contains "$cvb_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b" && \
+   contains "$cvb_out" "\[req-uncovered\] [^:]*\bREQ-COV-005\b"; then ok x; else
   fail "without an allocation binding the verification half must still be enforced"; fi
 
 # (c) The exporter missing beside the validator - what a project that
@@ -4718,8 +4726,8 @@ TESTS=$((TESTS + 1))
 if [ $cve_rc -ne 2 ]; then ok x; else
   fail "a missing exporter must not crash the validator"; fi
 TESTS=$((TESTS + 1))
-if contains "$cve_out" "\[req-uncovered\] REQ-COV-002" && \
-   ! contains "$cve_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+if contains "$cve_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b" && \
+   ! contains "$cve_out" "\[req-uncovered\] [^:]*\bREQ-COV-006\b"; then ok x; else
   fail "without the exporter the verification half must still decide alone"; fi
 
 # (d) A vault mid-translation: the requirements folder exists twice, and
@@ -4763,7 +4771,7 @@ TESTS=$((TESTS + 1))
 if [ $cvd_rc -ne 2 ]; then ok x; else
   fail "a vault carrying two requirement folders must not crash the validator"; fi
 TESTS=$((TESTS + 1))
-if ! contains "$cvd_out" "\[req-uncovered\] REQ-COV-001"; then ok x; else
+if ! contains "$cvd_out" "\[req-uncovered\] [^:]*\bREQ-COV-001\b"; then ok x; else
   fail "a mid-translation vault must not lose the coverage of a closed loop:"
   printf '%s\n' "$cvd_out" | grep "REQ-COV-001" | sed 's/^/    /'; fi
 
@@ -4906,8 +4914,8 @@ TESTS=$((TESTS + 1))
 if [ $cvf_rc -ne 2 ]; then ok x; else
   fail "a refused schema must not crash the validator"; fi
 TESTS=$((TESTS + 1))
-if contains "$cvf_out" "\[req-uncovered\] REQ-COV-002" && \
-   ! contains "$cvf_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+if contains "$cvf_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b" && \
+   ! contains "$cvf_out" "\[req-uncovered\] [^:]*\bREQ-COV-006\b"; then ok x; else
   fail "under a refused schema the verification half must still decide alone"; fi
 # Issue #66: the coverage checks fire in translated vaults. Fixture 3's
 # twin pair carries a requirements and an evidence domain since this
@@ -4926,7 +4934,7 @@ if contains "$de66_out" "\[verifies-unknown-req\] ANF-MES-999 is not defined in 
   fail "a dangling 'verifies' id in a German vault must be reported with its own prefix:"
   printf '%s\n' "$de66_out" | grep -i "verifies" | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
-if contains "$de66_out" "\[req-uncovered\] ANF-MES-002"; then ok x; else
+if contains "$de66_out" "\[req-uncovered\] [^:]*\bANF-MES-002\b"; then ok x; else
   fail "an unverified requirement in a German vault must be reported as uncovered:"
   printf '%s\n' "$de66_out" | grep "ANF-MES" | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
@@ -4935,13 +4943,13 @@ if contains "$de66_out" "\[req-duplicate-global\].*ANF-MES-001"; then ok x; else
 # The verified row stays silent - a check that fires on everything would
 # also satisfy the three assertions above.
 TESTS=$((TESTS + 1))
-if ! contains "$de66_out" "\[req-uncovered\] ANF-MES-001"; then ok x; else
+if ! contains "$de66_out" "\[req-uncovered\] [^:]*\bANF-MES-001\b"; then ok x; else
   fail "a verified requirement must not be reported as uncovered"; fi
 # The English twin fires the same three codes under its own prefix; the
 # fixture 3 multiset assertion compares the whole runs code by code.
 TESTS=$((TESTS + 1))
 if contains "$en66_out" "\[verifies-unknown-req\] REQ-MES-999" && \
-   contains "$en66_out" "\[req-uncovered\] REQ-MES-002" && \
+   contains "$en66_out" "\[req-uncovered\] [^:]*\bREQ-MES-002\b" && \
    contains "$en66_out" "\[req-duplicate-global\].*REQ-MES-001"; then ok x; else
   fail "the English twin must fire the same three codes under its own prefix"; fi
 
@@ -4953,11 +4961,11 @@ if contains "$en66_out" "\[verifies-unknown-req\] REQ-MES-999" && \
 # handoff itself is the exporter's export-duplicate-role finding, and the
 # absence asserted in fixture 10(d) still holds beside these.
 TESTS=$((TESTS + 1))
-if contains "$cvd_out" "\[req-uncovered\] ANF-COV-001"; then ok x; else
+if contains "$cvd_out" "\[req-uncovered\] [^:]*\bANF-COV-001\b"; then ok x; else
   fail "the mid-translation vault's own German row must be reported as uncovered:"
   printf '%s\n' "$cvd_out" | grep "ANF-COV" | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
-if ! contains "$cvd_out" "\[req-uncovered\] REQ-COV-002"; then ok x; else
+if ! contains "$cvd_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b"; then ok x; else
   fail "English rows of a mid-translation vault leave the coverage path with the role"; fi
 
 # The fallback must not switch the role map off silently: FALLBACK_SCHEMA
