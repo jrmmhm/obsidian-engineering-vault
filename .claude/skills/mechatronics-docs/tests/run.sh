@@ -7106,6 +7106,52 @@ PY
   esac
 done
 
+# --- Unit 6: a gitignored path that cannot exist here is unverifiable -----
+# A clone directory a fresh checkout never has: gitignored, folder absent -
+# WARN. A gitignored file whose folder IS there: the author's checkout can
+# tell a typo, so it stays an ERROR. Not ignored: ERROR. No repository:
+# nothing is known to be ignored, ERROR as before.
+GP="$NC_TMP/Paths"
+GPV="$GP/00_documentation/01_projectvault"
+nc_vault "$GPV"
+mkdir -p "$GPV/06_implementation_(IMP)" "$GP/30_testdata/run1"
+printf '## Context\n## References\n' > "$GPV/06_implementation_(IMP)/00_IMP_file_template.md"
+cat > "$GPV/06_implementation_(IMP)/IMP_Pointers.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-10-16
+last-verified: 2026-10-16
+---
+## Context
+Pointers of the gitignored-path fixture, each under References where a
+dead pointer is an ERROR. Three shapes, one per line below.
+
+## References
+- 60_clones/upstream/server.go
+- 30_testdata/run1/run_typo.log
+- 20_software/missing_tool.py
+EOF
+printf '60_clones/\n*.log\n' > "$GP/.gitignore"
+cp -a "$GP" "$NC_TMP/PathsNoGit"
+ngit init -q "$GP"
+gp_out=$(python3 "$VALIDATOR" "$GPV" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gp_out" "^WARN .*IMP_Pointers\.md:12 \[path-missing\] .*60_clones/upstream/server\.go' is unverifiable on this checkout" \
+   && ! contains "$gp_out" "^ERROR .*60_clones"; then ok x; else
+  fail "a gitignored path whose folder is absent must be a WARN, not an ERROR:"
+  printf '%s\n' "$gp_out" | grep path-missing | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$gp_out" "^ERROR .*IMP_Pointers\.md:13 \[path-missing\] .*run_typo\.log" \
+   && contains "$gp_out" "^ERROR .*IMP_Pointers\.md:14 \[path-missing\] .*missing_tool\.py"; then ok x; else
+  fail "an ignored file in a present folder and a path nothing ignores must stay ERRORs:"
+  printf '%s\n' "$gp_out" | grep path-missing | sed 's/^/    /'; fi
+gn_out=$(python3 "$VALIDATOR" "$NC_TMP/PathsNoGit/00_documentation/01_projectvault" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gn_out" "^ERROR .*IMP_Pointers\.md:12 \[path-missing\] .*60_clones"; then ok x; else
+  fail "outside version control a missing path stays an ERROR:"
+  printf '%s\n' "$gn_out" | grep path-missing | sed 's/^/    /'; fi
+
 rm -rf "$NC_TMP"
 # ==========================================================================
 # END the validator noise cut
