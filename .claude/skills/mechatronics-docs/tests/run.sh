@@ -2337,7 +2337,7 @@ if [ $rc -ne 2 ] && ! contains "$out" "id-vanished"; then ok x; else
 # - this asserts that mechanism rather than assuming it.
 SIDR="testsession-ratchet-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
-      "/tmp/claude-mechdocs/blocks-$SIDR"
+      "/tmp/claude-mechdocs/widehash-$SIDR"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDR" \
   "$I/03_architecture_(ARC)/ARC_Qualifier.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 rout=$(printf '{"session_id":"%s"}' "$SIDR" | python3 "$VALIDATOR" --hook stop 2>&1)
@@ -2370,7 +2370,7 @@ if ! contains "$rout" "^vault validator session report"; then ok x; else
   printf '%s\n' "$rout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
-      "/tmp/claude-mechdocs/blocks-$SIDR"
+      "/tmp/claude-mechdocs/widehash-$SIDR"
 
 # Issue #31 at the gate. A file that was already UTF-16 at HEAD must not
 # block the session that opens it: its baseline is computed from the blob
@@ -2383,7 +2383,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR"
 # that decodes the blob before the baseline is taken.
 SIDE="testsession-encoding-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
-      "/tmp/claude-mechdocs/blocks-$SIDE"
+      "/tmp/claude-mechdocs/widehash-$SIDE"
 for f in ARC_Powershell.md ARC_Empty.md; do
   printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDE" \
     "$I/03_architecture_(ARC)/$f" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
@@ -2412,7 +2412,7 @@ if ! contains "$emsg" "files created this session"; then ok x; else
   printf '%s\n' "$emsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
-      "/tmp/claude-mechdocs/blocks-$SIDE"
+      "/tmp/claude-mechdocs/widehash-$SIDE"
 
 # The repair path, which is the reason encoding-not-utf8 is added to a
 # file's findings instead of replacing them. The session does exactly what
@@ -2433,7 +2433,7 @@ body = ("---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\n"
 PY
 SIDF="testsession-encfix-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
-      "/tmp/claude-mechdocs/blocks-$SIDF"
+      "/tmp/claude-mechdocs/widehash-$SIDF"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDF" \
   "$I/03_architecture_(ARC)/ARC_Powershell.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 fout=$(printf '{"session_id":"%s"}' "$SIDF" | python3 "$VALIDATOR" --hook stop 2>&1)
@@ -2465,7 +2465,7 @@ if contains "$fmsg" "ARC_Powershell\.md \[encoding-not-utf8, frontmatter-missing
   printf '%s\n' "$fmsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
-      "/tmp/claude-mechdocs/blocks-$SIDF"
+      "/tmp/claude-mechdocs/widehash-$SIDF"
 
 # The object disappears from the worktree while HEAD still carries it.
 rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md" \
@@ -2523,7 +2523,7 @@ p.write_text(p.read_text(encoding="utf-8").replace("## Kontext", "## Context"),
 PY
 SIDG="testsession-resolved-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
-      "/tmp/claude-mechdocs/blocks-$SIDG"
+      "/tmp/claude-mechdocs/widehash-$SIDG"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDG" \
   "$I/03_architecture_(ARC)/ARC_Resolved.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 gout=$(printf '{"session_id":"%s"}' "$SIDG" | python3 "$VALIDATOR" --hook stop 2>&1)
@@ -2543,7 +2543,7 @@ if ! has_key decision "$gout"; then ok x; else
   printf '%s\n' "$gout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
-      "/tmp/claude-mechdocs/blocks-$SIDG"
+      "/tmp/claude-mechdocs/widehash-$SIDG"
 
 # ... and the decision that the report asks a yes/no rather than comparing
 # counts, pinned so the next refactor cannot quietly widen it. The session
@@ -2559,7 +2559,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG"
 # the assertion below would pass against any implementation at all.
 SIDH="testsession-partial-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
-      "/tmp/claude-mechdocs/blocks-$SIDH"
+      "/tmp/claude-mechdocs/widehash-$SIDH"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDH" \
   "$I/03_architecture_(ARC)/ARC_Linker.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 TESTS=$((TESTS + 1))
@@ -2587,7 +2587,7 @@ if ! contains "$pmsg" "ARC_Linker\.md \[link-unresolved\]"; then ok x; else
   printf '%s\n' "$pmsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
-      "/tmp/claude-mechdocs/blocks-$SIDH"
+      "/tmp/claude-mechdocs/widehash-$SIDH"
 
 # ==========================================================================
 # Fixture 5: the schema itself. The validator reads vault_schema.json from
@@ -2966,8 +2966,10 @@ if ! contains "$out" "ARC_Prefix\.md.*\[template-sections\]"; then ok x; else
 # Hook modes (violation vault, synthetic payloads)
 # ==========================================================================
 SID="testsession-$$"
+# blocks-* is the counter file an older validator kept; removed so that the
+# assertion below that none is written cannot be satisfied by a leftover.
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
-      "/tmp/claude-mechdocs/blocks-$SID"
+      "/tmp/claude-mechdocs/widehash-$SID" "/tmp/claude-mechdocs/blocks-$SID"
 payload() { printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID" "$1"; }
 
 hout=$(payload "$W/03_architecture_(ARC)/ARC_Leaky.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
@@ -3016,15 +3018,22 @@ if contains "$(field systemMessage "$sout")" "vault validator blocked the turn e
   fail "a blocking turn must tell the user who blocked it:"
   printf '%s\n' "$sout" | sed 's/^/    /'
 fi
-sout=$(printf '{"session_id":"%s","stop_hook_active":true}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
-TESTS=$((TESTS + 1))
-if [ "$(field decision "$sout")" = "block" ]; then ok x; else fail "stop hook must block on 2nd attempt"; fi
+# The second stop of the same sequence: Claude Code marks the continuation
+# with stop_hook_active, and the gate has demanded the fix once already, so
+# it releases (DEC-MTH-055). No counter file: the payload decides.
 sout=$(printf '{"session_id":"%s","stop_hook_active":true}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
 smsg=$(field systemMessage "$sout")
+TESTS=$((TESTS + 1))
+if ! has_key decision "$sout"; then ok x; else
+  fail "the gate must release when stop_hook_active is true:"
+  printf '%s\n' "$sout" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ ! -e "/tmp/claude-mechdocs/blocks-$SID" ]; then ok x; else
+  fail "the gate must keep no block counter file"; fi
 # The fail-open report goes to the user and NOT to the model. The gate has
-# demanded these fixes twice already; a third automatic attempt is the
-# user's call. Asserting the field is what separates the two - the text
-# occurs in the output either way.
+# demanded these fixes once in this sequence already; another automatic
+# attempt is the user's call. Asserting the field is what separates the
+# two - the text occurs in the output either way.
 TESTS=$((TESTS + 1))
 if contains "$smsg" "UNRESOLVED"; then ok x; else
   fail "the fail-open report must reach the user as systemMessage:"
@@ -3033,8 +3042,6 @@ fi
 TESTS=$((TESTS + 1))
 if ! contains "$(field reason "$sout")" "UNRESOLVED"; then ok x; else
   fail "the fail-open report must not be handed back to the model as a reason"; fi
-TESTS=$((TESTS + 1))
-if ! has_key decision "$sout"; then ok x; else fail "stop hook must not block a 3rd time"; fi
 TESTS=$((TESTS + 1))
 if contains "$smsg" "vault-wide findings (advisory" && contains "$smsg" "req-uncovered"; then ok x; else
   fail "fail-open report must carry vault-wide advisory incl. req-uncovered"; fi
@@ -3047,6 +3054,19 @@ TESTS=$((TESTS + 1))
 n=$(printf '%s' "$smsg" | wc -c)
 if [ "$n" -lt 10000 ]; then ok x; else
   fail "the session report must stay under the 10000-character hook cap, got $n"; fi
+# A later stop sequence of the same session blocks again: the ERRORs are
+# still there and nothing has demanded them in this sequence. The counter
+# this replaced stayed advisory for the rest of the session after two.
+sout=$(printf '{"session_id":"%s","stop_hook_active":false}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if [ "$(field decision "$sout")" = "block" ]; then ok x; else
+  fail "a later stop sequence must block again on the same new ERRORs"; fi
+# Only a JSON true releases. A string is not the flag Claude Code sends,
+# and reading it as one would be the cheapest way to switch the gate off.
+sout=$(printf '{"session_id":"%s","stop_hook_active":"true"}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if [ "$(field decision "$sout")" = "block" ]; then ok x; else
+  fail "stop_hook_active must release only as a JSON true"; fi
 
 # post hook outside any vault: silent no-op
 hout=$(payload "/tmp/not_a_vault_note.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
@@ -3056,7 +3076,7 @@ if [ $rc -eq 0 ] && [ -z "$hout" ]; then ok x; else fail "post hook outside vaul
 # clean precision file: post hook silent, stop report free of advisory noise
 SID2="testsession2-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2" \
-      "/tmp/claude-mechdocs/blocks-$SID2"
+      "/tmp/claude-mechdocs/widehash-$SID2"
 hout=$(printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID2" \
   "$V/06_implementation_(IMP)/IMP_MainBoard_ADC.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
 check "post hook on clean file exits 0" $rc
@@ -3067,7 +3087,7 @@ TESTS=$((TESTS + 1))
 if ! contains "$(field systemMessage "$sout")" "vault-wide"; then ok x; else
   fail "clean vault stop report must not add a vault-wide section"; fi
 rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2" \
-      "/tmp/claude-mechdocs/blocks-$SID2"
+      "/tmp/claude-mechdocs/widehash-$SID2"
 
 # Nothing to say -> say nothing. The report now renders in the transcript,
 # so an empty one is not a harmless newline any more: it would print
@@ -3077,7 +3097,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2"
 # no longer exists, so no vault root is ever collected either).
 SID3="testsession3-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SID3" "/tmp/claude-mechdocs/baseline-$SID3" \
-      "/tmp/claude-mechdocs/blocks-$SID3"
+      "/tmp/claude-mechdocs/widehash-$SID3"
 cp "$V/06_implementation_(IMP)/IMP_MainBoard_ADC.md" \
    "$V/06_implementation_(IMP)/IMP_Transient.md"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID3" \
@@ -3090,7 +3110,7 @@ if [ $rc -eq 0 ] && [ -z "$sout" ]; then ok x; else
   printf '%s\n' "$sout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SID3" "/tmp/claude-mechdocs/baseline-$SID3" \
-      "/tmp/claude-mechdocs/blocks-$SID3"
+      "/tmp/claude-mechdocs/widehash-$SID3"
 
 # ==========================================================================
 # Fixture 8: the advisory cap. The whole report travels as one
@@ -3133,7 +3153,7 @@ EOF
 done
 SIDC="testsession-cap-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDC" "/tmp/claude-mechdocs/baseline-$SIDC" \
-      "/tmp/claude-mechdocs/blocks-$SIDC"
+      "/tmp/claude-mechdocs/widehash-$SIDC"
 i=1
 while [ $i -le 20 ]; do
   printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDC" \
@@ -3179,7 +3199,7 @@ assert cap_report_lines([]) == []
 ' "$SKILL_DIR" 2>/dev/null; then ok x; else
   fail "the report cap must never drop an ERROR line"; fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDC" "/tmp/claude-mechdocs/baseline-$SIDC" \
-      "/tmp/claude-mechdocs/blocks-$SIDC"
+      "/tmp/claude-mechdocs/widehash-$SIDC"
 
 # ==========================================================================
 # Crash mode and real template vault
@@ -4460,7 +4480,7 @@ if [ $ci_rc -eq 1 ] && contains "$ci_out" "MISMATCH"; then ok x; else
 fi
 
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
-      "/tmp/claude-mechdocs/blocks-$SID"
+      "/tmp/claude-mechdocs/widehash-$SID"
 
 # ==========================================================================
 # Fixture 9b: which copy the hooks execute (DEC-MTH-045).
