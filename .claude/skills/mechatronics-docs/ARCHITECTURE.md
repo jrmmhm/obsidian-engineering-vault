@@ -189,7 +189,19 @@ and membership against a named constant is invisible to it.
    wikilink targets (`iter_wikilinks`, the reader `check_links` uses).
    The name index behind it walks the vault on disk and takes the rest of
    `index_root` from `git_listed_files`
-8. the acceptance filter over the vault-wide WARNs, by the same
+8. `git_advisories` → `pointer-drift`, `ref-unresolved`, `pending-stale`,
+   each check in its own `try` so one that raises cannot drop the others.
+   `advisory_notes` hands them the active domain notes - a superseded or
+   deprecated one is not asked - and `advisory_spec` the four lists of the
+   schema's `git_advisories` block. The first two read git through
+   `git_read`, which blocks every fetch (`GIT_NO_LAZY_FETCH`,
+   `protocol.allow=never`), and say nothing where `git_complete` finds a
+   shallow repository or a call fails: one first-parent `git log` over the
+   cited files and the notes, one `cat-file --batch-check` per repository.
+   `artifact_readings` resolves a token to the one path it means, narrower
+   than `check_paths`' candidates because an existing reading produces a
+   finding here instead of suppressing one
+9. the acceptance filter over the vault-wide WARNs, by the same
    `file_acceptance` as stage 2
 
 `export_analysis` is the one that reaches outside this file: it imports the
