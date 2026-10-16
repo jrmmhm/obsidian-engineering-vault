@@ -89,7 +89,9 @@ Option C, except for `link-repeat`, which is deleted.
 - Residual: a gitignored file whose folder exists but whose file is absent
   - an ignored log in a tracked folder on a fresh clone - stays an ERROR.
   The author's checkout cannot tell that from a typo, and a typo matters
-  more.
+  more. The converse holds one level deeper: a typo in a subfolder of an
+  ignored tree that does exist - a misspelled folder below a present clone
+  directory - has no folder either and is reported as unverifiable.
 - Residual: outside the vault, a case-only rename that git has not staged
   is indexed under its old name until it is.
 - The template vault and every derived vault report no warning by default;

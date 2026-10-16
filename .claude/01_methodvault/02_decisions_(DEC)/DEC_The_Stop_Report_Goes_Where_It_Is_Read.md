@@ -8,6 +8,7 @@ validator-accept-reason: the measured cost of a real decision recorded whole, ac
 ---
 Date: 2026-08-05
 Status: Accepted
+Corrected by: [[DEC_Enforcement_State_Is_Derived_Not_Kept]] – the gate no longer demands a fix twice per session before releasing: it blocks once per stop sequence, so the release follows the first demand of a sequence, not the second.
 Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-05b — The stop report goes where someone reads it (Accepted)". Its `Measured on …` section keeps its position directly behind the context, as the last subsection of `## Context`.
 
 ## Context

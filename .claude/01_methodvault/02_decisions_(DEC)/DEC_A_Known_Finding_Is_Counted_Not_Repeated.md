@@ -13,9 +13,9 @@ Status: Accepted
 Three channels repeated the same known state. The full audit of this
 repository's method vault printed 29 `length` WARNs that the CI workflow
 accepted in a comment - an acceptance with no place in the vault, so every
-audit repeated it. `req-uncovered` ignored a deferral written exactly the
-way the skill prescribes, an allocation row whose status says the
-requirement is blocked, with a DEC saying why. The post-write hook
+audit repeated it. `req-uncovered` ignored a deferral one real vault had
+recorded: an allocation row whose status says the requirement is blocked,
+with a DEC saying why. The post-write hook
 re-injected every WARN a legacy file carried at git HEAD on every edit of
 that file - 557 characters per edit of one measured note - and the stop
 report appended the same vault-wide advisory block at every turn end.
