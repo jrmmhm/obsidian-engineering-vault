@@ -315,6 +315,18 @@ superseded/deprecated in the same work session — never leave a stale
 claim standing. After changing an artifact (code, schematic, parameter),
 search the vault for files referencing it and update them.
 
+### Lifecycle state
+A status that changes after the work is done — sent, pushed, merged,
+published, approved, a phase or round state — goes stale faster than any
+path or version, because the event that changes it touches no file but
+the one somebody remembers to update. It is written in exactly one place:
+the row of the ADM tracker that tracks the item. Every other note links
+that tracker and says what role the state plays, never the state itself.
+A note's own status — its frontmatter `status`, a DEC's `Status:` line,
+the status column of an allocation row — is the note's, not an external
+action's, and stays where it is. How a tracker row is shaped, and the
+`_Closed` sibling a finished row moves to, is in [[00_ADM_README]].
+
 ### Validator-enforced rules (quick reference)
 
 Eight findings of `validate_vault.py` that the sections above do not name.
