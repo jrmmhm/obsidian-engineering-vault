@@ -27,7 +27,7 @@ Lifecycle state is the state of an external action or of a plan step after the w
 
 - Every other note links the tracker and names the role, never the state: a TAE writes "Upstream state: \[\[ADM_Upstream_Tracker]]", not "nothing has been sent yet". A TAE states what was tested; whether its result was sent or merged is the tracker's.
 - An item has one live row across all trackers. When it moves to another tracker — a candidate becomes a contribution — its old row goes to the old tracker's `_Closed` sibling with the state `promoted` and a link to the new tracker.
-- A note's own status is not lifecycle state and stays where it is: the frontmatter `status`, a DEC's `Status:` line, the status column of an ARC allocation row.
+- A note's own status is not lifecycle state and stays where it is: the frontmatter `status`, a DEC's `Status:` line, the status column of an ARC allocation row, the follow-ups a DEC lists in its own Consequences.
 
 
 ## Tracker shape

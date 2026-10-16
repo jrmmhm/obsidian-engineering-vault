@@ -328,8 +328,9 @@ the one somebody remembers to update. It is written in exactly one place:
 the row of the ADM tracker that tracks the item. Every other note links
 that tracker and says what role the state plays, never the state itself.
 A note's own status — its frontmatter `status`, a DEC's `Status:` line,
-the status column of an allocation row — is the note's, not an external
-action's, and stays where it is. How a tracker row is shaped, and the
+the status column of an allocation row, the follow-ups a DEC lists in its
+own Consequences — is the note's, not an external action's, and stays
+where it is. How a tracker row is shaped, and the
 `_Closed` sibling a finished row moves to, is in [[00_ADM_README]].
 
 ### Validator-enforced rules (quick reference)
