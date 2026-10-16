@@ -7351,6 +7351,16 @@ TESTS=$((TESTS + 1))
 if contains "$skill_flat" '`validator crash`' && contains "$gd_out" "^validator crash"; then
   ok x; else
   fail "SKILL.md's crash phrase must match the validator's output, got: $gd_out"; fi
+# The hooks' own crash notice, which SKILL.md tells the session to act on:
+# both scripts must still say the phrase SKILL.md quotes.
+for gd_hook in post_write_check.sh stop_gate.sh; do
+  gd_out=$(printf 'not json at all' | bash "$SKILL_DIR/hooks/$gd_hook" 2>/dev/null)
+  TESTS=$((TESTS + 1))
+  if contains "$skill_flat" '`vault validator crashed`' \
+      && contains "$(field systemMessage "$gd_out")" "vault validator crashed"; then
+    ok x; else
+    fail "SKILL.md's hook crash phrase must match what $gd_hook prints, got: $gd_out"; fi
+done
 
 # SKILL.md quotes the question and timeline of every role from the template
 # conventions file, which owns them. The copy had drifted (RESEARCH-R5 F9:
