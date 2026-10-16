@@ -115,6 +115,18 @@ decision.
 
 ### Changed
 
+- **`SKILL.md` is shorter and keeps the reasons it steers by** — the
+  traceability export, which copy of the skill enforces and the tiers
+  outside a session moved to a new `REFERENCE.md` beside it, which a session
+  reads only when it needs them; passages the conventions file or a domain
+  README already own were cut rather than kept as a second copy, and so was
+  one unsourced statistic. The Detail Ownership section, with its reasoning
+  and its measured example, stays word for word, because an A/B comparison
+  of a slimmer version that dropped them found more facts written into two
+  notes. No rule moved and no finding code changed: corrected
+  documentation, **MINOR** by the table. Why:
+  [DEC-MTH-063](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Skill_Text_Keeps_The_Reasons_It_Steers_By.md).
+
 - **`SKILL.md` no longer states what is not true** — the activation guard
   demanded folders numbered `01_`–`09_` and so refused vaults the validator
   accepts, the method vault's 02/09/98 among them; it now asks the
