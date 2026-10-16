@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.6",
+  "schema_version": "0.7",
   "decision": "DECISIONS.md, amendments 2026-07-28b, 2026-07-28d and 2026-07-31b",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",
@@ -226,6 +226,17 @@
     "why": "29 length WARNs of this repository's own method vault were accepted in a CI comment, the one place the vault could not see, so every audit repeated them (01_methodvault, DEC-MTH-054). The list is closed on purpose: a code whose severity depends on the run - link-unresolved is a WARN in the post hook and an ERROR at the stop gate - or a vault-wide code that speaks for every requirement of a file would let one line hide a defect nobody has looked at yet.",
     "enforced": "validator-internal",
     "enforced_detail": "validate_vault.py reads the two field names and the code list through accept_spec and carries the same three in FALLBACK_SCHEMA."
+  },
+
+  "git_advisories": {
+    "clone_parents": ["20_software"],
+    "drift_exempt_roles": ["TAE", "DEC"],
+    "ref_roles": ["IMP", "TAE", "DEC"],
+    "inactive_statuses": ["superseded", "deprecated"],
+    "statement": "Three vault-wide WARNs read from git. pointer-drift: a file a note names was last changed, on the first-parent line of the vault's repository, after the note's last-verified and not in the same commit as the note; bumping last-verified clears it. ref-unresolved: a commit id a note cites resolves to no object in the vault's repository nor in a git clone directly below one of clone_parents. pending-stale: a pending/planned/TBD/not-yet marker sits right after a path that exists. A note whose status is one of inactive_statuses is not asked; roles in drift_exempt_roles record a point in time and are not asked about drift; only roles in ref_roles are asked about commit ids.",
+    "why": "Every other check is structural, and a truth audit of two project vaults found half of their sampled claims wrong with no gate able to see one of them (01_methodvault, DEC-MTH-060). WARN and never blocking: none of the three can tell a mistake from an intention - a comment-only commit, an id of a repository this project does not hold.",
+    "enforced": "validator-internal",
+    "enforced_detail": "validate_vault.py reads the four lists through advisory_spec and carries the same four in FALLBACK_SCHEMA; the id shapes and the marker window stay in Python because they decide what is read at all. Every git query runs with GIT_NO_LAZY_FETCH=1 and protocol.allow=never, so a partial clone is never asked to fetch; a repository that cannot answer, or a shallow one, makes the check say nothing rather than guess."
   },
 
   "domains": {

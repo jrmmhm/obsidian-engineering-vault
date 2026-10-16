@@ -35,6 +35,7 @@ import sys
 import time
 import unicodedata
 from collections import Counter
+from datetime import date, timedelta
 from pathlib import Path
 
 STATE_DIR = Path("/tmp/claude-mechdocs")
@@ -278,6 +279,12 @@ FALLBACK_SCHEMA = {
                          "reason_field": "validator-accept-reason",
                          "acceptable_codes": ["length", "structure", "stub",
                                               "link-budget"]},
+    # In the essentials so an unreadable schema does not switch the three
+    # git-aware advisories off behind the single schema-unreadable WARN.
+    "git_advisories": {"clone_parents": ["20_software"],
+                       "drift_exempt_roles": ["TAE", "DEC"],
+                       "ref_roles": ["IMP", "TAE", "DEC"],
+                       "inactive_statuses": ["superseded", "deprecated"]},
     "consistency_rules": [{"id": "requirement-coverage",
                            "deferral_status_values": ["Blocked", "Deferred", "TBD"]}],
     # In the essentials for the alias map's reason (issue #66): without it
@@ -410,6 +417,26 @@ def deferral_values(schema):
                 if values:
                     return values
     return []
+
+
+ADVISORY_KEYS = ("clone_parents", "drift_exempt_roles", "ref_roles",
+                 "inactive_statuses")
+
+
+def advisory_spec(schema):
+    """The four lists the git-aware advisories read (DEC-MTH-060), or None.
+
+    Read like accept_spec: from the schema and, failing that, from
+    FALLBACK_SCHEMA. An empty list is a legitimate value - a project may
+    exempt no role - so what is required is that each key IS a list.
+    """
+    for src in (schema, FALLBACK_SCHEMA):
+        spec = _dict(src, "git_advisories")
+        if spec and all(isinstance(spec.get(k), list) for k in ADVISORY_KEYS):
+            out = {k: _strlist(spec, k) for k in ADVISORY_KEYS}
+            out["inactive_statuses"] = [s.lower() for s in out["inactive_statuses"]]
+            return out
+    return None
 
 
 def is_deferral(status, values):
@@ -2153,6 +2180,40 @@ def check_leaks(abbr, path, lines, fm_end, findings):
                                        " - Context frames the problem; concrete numbers "
                                        "belong in Options or in IMP/CMP")))
 
+def artifact_shaped(segs):
+    """Is a path token, split at '/', shaped like a project artifact?
+
+    An NN_ first segment, or an NN_ second one behind a project folder name
+    when at least three segments follow - the one shape rule check_paths
+    and the git-aware advisories share.
+    """
+    return bool(ARTIFACT_SEG_RE.match(segs[0])
+                or (len(segs) > 2 and ARTIFACT_SEG_RE.match(segs[1])))
+
+
+def artifact_readings(vault, token):
+    """The paths a project-artifact token means, for checks that REPORT on what exists.
+
+    Narrower than check_paths' candidates on purpose. There, every extra
+    reading can only suppress a path-missing finding; here a reading that
+    exists produces one. '30_hw/README.md' must not become the project's
+    own README.md, so a token starting with its NN_ folder has exactly one
+    reading, and only a token led by a project folder name gets the two
+    readings that drop or keep that name. A '..' segment reads nothing: it
+    could only lead out of the project.
+    """
+    token = token.rstrip("/")
+    if token.startswith(("http", "Projectname/", "www.")):
+        return []
+    segs = token.split("/")
+    if ".." in segs or not artifact_shaped(segs):
+        return []
+    if ARTIFACT_SEG_RE.match(segs[0]):
+        return [vault.project_root / token]
+    return [vault.project_root / "/".join(segs[1:]),
+            vault.project_root.parent / token]
+
+
 def check_paths(vault, path, lines, fm_end, findings):
     """Dead-pointer check over the whole body.
 
@@ -2221,8 +2282,7 @@ def check_paths(vault, path, lines, fm_end, findings):
             if token.startswith(("http", "Projectname/", "www.")):
                 continue
             segs = token.split("/")
-            if not (ARTIFACT_SEG_RE.match(segs[0])
-                    or (len(segs) > 2 and ARTIFACT_SEG_RE.match(segs[1]))):
+            if not artifact_shaped(segs):
                 continue
             candidates = [
                 vault.project_root / token,
@@ -2766,6 +2826,206 @@ def arc_containment(vault: Vault):
     return out
 
 
+def git_read(repo, args, stdin=None):
+    """Stdout BYTES of a read-only git query in repo, or None if it cannot answer.
+
+    Never touches the network. A partial clone fetches a missing object
+    from its promisor remote on demand - measured on a blob:none clone, an
+    unknown full id cost a round trip to its remote - so GIT_NO_LAZY_FETCH
+    switches that off, and protocol.allow=never refuses every transport on
+    a git too old to know the variable. Bytes, for git_head_content's
+    reason: a path that is not UTF-8 must not raise inside subprocess.
+    """
+    env = git_env()
+    env["GIT_NO_LAZY_FETCH"] = "1"
+    try:
+        r = subprocess.run(["git", "--no-pager", "-c", "protocol.allow=never",
+                            "-C", str(repo), *args],
+                           input=stdin, capture_output=True, timeout=30, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def git_complete(repo):
+    """Does repo hold its whole history? A shallow clone cannot say what it lacks."""
+    out = git_read(repo, ["rev-parse", "--is-shallow-repository"])
+    return out is not None and out.strip() == b"false"
+
+
+def advisory_notes(vault, corpus, inactive):
+    """(path, role, frontmatter, lines, fm_end, fence blocks) of every active note.
+
+    Domain notes only, in corpus order. A note marked superseded or
+    deprecated - in its frontmatter, or on the body Status line a DEC
+    carries instead - is the repair the method names for a stale note, so
+    it is not asked again.
+    """
+    out = []
+    for p, text in corpus.items():
+        kind, abbr = vault.classify(p)
+        if kind != "domain":
+            continue
+        lines = text.splitlines()
+        fm, fm_end, bad = parse_frontmatter(lines)
+        if bad or fm is None:
+            fm, fm_end = {}, 0
+        status = fm.get("status")
+        if not isinstance(status, str):
+            status = None
+            for line in lines[fm_end:]:
+                if line.startswith("## "):
+                    break
+                m = re.match(r"Status:\s*(\w+)", line)
+                if m:
+                    status = m.group(1)
+                    break
+        if status and status.strip().lower() in inactive:
+            continue
+        out.append((p, vault.role_of(abbr), fm, lines, fm_end, fence_blocks(lines)))
+    return out
+
+
+def repo_file(repo, path):
+    """path relative to repo, POSIX-spelled, when it is a file of repo itself.
+
+    None for a directory, a path outside the repository, and a file below a
+    nested repository - a clone under 20_software/ whose history is its
+    own, and which this check never walks.
+    """
+    try:
+        if not path.is_file():
+            return None
+        rel = path.resolve().relative_to(repo)
+    except (OSError, ValueError):
+        return None
+    d = repo
+    for part in rel.parts[:-1]:
+        d = d / part
+        if (d / ".git").exists():
+            return None
+    return rel.as_posix()
+
+
+def check_pointer_drift(vault, notes, spec, findings):
+    """pointer-drift: a file a note names changed after the note was last verified.
+
+    One walk of the vault's own repository, restricted to the cited files
+    and the notes themselves: first-parent, so a change counts on the day
+    it reached this line of history, not the day it was written on a
+    branch. A commit that changed the note together with the file is no
+    drift - the note was written against that change. TAE and DEC record a
+    point in time and are not asked (drift_exempt_roles). Nothing is said
+    without a repository, in a shallow one, or when git cannot answer.
+    """
+    repo = vault.git_root()
+    if repo is None:
+        return
+    repo = repo.resolve()
+    if not git_complete(repo):
+        return
+    cited = []
+    for p, role, fm, lines, fm_end, blocks in notes:
+        if role in spec["drift_exempt_roles"]:
+            continue
+        lv = fm.get("last-verified")
+        if not (isinstance(lv, str) and DATE_RE.match(lv)):
+            continue
+        hosted = set()
+        for open_line, info, _, close_line in blocks:
+            if fence_host(info):
+                hosted.update(range(open_line, (close_line or len(lines)) + 1))
+        refs = {}
+        for i, line in enumerate(lines, 1):
+            if i <= fm_end or i in hosted:
+                continue
+            for m in PATH_TOKEN_RE.finditer(line):
+                for reading in artifact_readings(vault, m.group(1)):
+                    rel = repo_file(repo, reading)
+                    if rel:
+                        refs.setdefault(rel, i)
+                        break
+        note = repo_file(repo, p)
+        if refs and note:
+            cited.append((p, lv, refs, note))
+    if not cited:
+        return
+    paths = sorted({r for _p, _lv, refs, _n in cited for r in refs}
+                   | {n for *_rest, n in cited})
+    args = ["--literal-pathspecs", "log", "--first-parent",
+            "--diff-merges=first-parent", "--no-renames", "--no-show-signature",
+            "-z", "--format=%x01%h %cs", "--name-only"]
+    dates = []
+    for _p, lv, _r, _n in cited:
+        try:
+            dates.append(date.fromisoformat(lv))
+        except ValueError:
+            pass
+    if dates:
+        # Two days of slack: --since compares timestamps, %cs is the
+        # committer's local date, and a stop at the bound only shortens
+        # the walk - the comparison below is on %cs alone.
+        args.append(f"--since={(min(dates) - timedelta(days=2)).isoformat()}")
+    out = git_read(repo, args + ["--", *paths])
+    if out is None:
+        return
+    last, commit = {}, None
+    for chunk in out.split(b"\0"):
+        chunk = chunk.strip(b"\n")
+        if not chunk:
+            continue
+        if chunk.startswith(b"\x01"):
+            head, _, chunk = chunk[1:].partition(b"\n")
+            parts = head.decode("ascii", "replace").split()
+            if len(parts) != 2:
+                return
+            commit = (parts[0], parts[1], set())
+        if commit is None or not chunk:
+            continue
+        name = os.fsdecode(chunk)
+        commit[2].add(name)
+        last.setdefault(name, commit)
+    for p, lv, refs, note in cited:
+        hits = []
+        for rel, line in refs.items():
+            got = last.get(rel)
+            if got and got[1] > lv and note not in got[2]:
+                hits.append((line, rel, got[0], got[1]))
+        if not hits:
+            continue
+        hits.sort()
+        line, rel, h, day = hits[0]
+        more = f" (+{len(hits) - 1} more)" if len(hits) > 1 else ""
+        findings.append(Finding(
+            "WARN", "pointer-drift", str(p), line,
+            f"{rel} changed in {h} on {day}, after this note's last-verified "
+            f"{lv}{more} - re-verify the note against it and bump "
+            "last-verified, or fix what it says"))
+
+
+def git_advisories(vault, corpus):
+    """The git-aware advisory WARNs (DEC-MTH-060), each check on its own.
+
+    One check that fails must not take the others with it - in the stop
+    hook a raise would drop every vault-wide finding at once - so each
+    writes into its own list, and a list is kept only when its check ran
+    to the end.
+    """
+    spec = advisory_spec(vault.schema())
+    if spec is None:
+        return []
+    notes = advisory_notes(vault, corpus, spec["inactive_statuses"])
+    found = []
+    for check in (check_pointer_drift,):
+        part = []
+        try:
+            check(vault, notes, spec, part)
+        except Exception:
+            continue
+        found.extend(part)
+    return found
+
+
 def validate_vault_wide(vault: Vault):
     # First, so it survives hook_stop's 15-line cut of the advisory block:
     # this finding is the explanation for the duplicate-basename and
@@ -2982,6 +3242,8 @@ def validate_vault_wide(vault: Vault):
             f"{label}: {', '.join(files)} - the link is ambiguous, and a "
             "path-qualified link does not resolve here either; rename one of "
             "the files"))
+
+    findings.extend(git_advisories(vault, corpus))
 
     # A file's own acceptance reaches its vault-wide WARNs too. Only files of
     # this vault's corpus are asked - a finding about the vault root or the
