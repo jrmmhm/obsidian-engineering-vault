@@ -7435,6 +7435,175 @@ for gd_abbr in REQ DEC ARC CMP IFC IMP TAE OAU REF; do
     fail "SKILL.md role row $gd_abbr differs from the conventions file: ${gd_line:-no row}"; fi
 done
 
+# ==========================================================================
+# BEGIN the git-aware advisories (DEC-MTH-060)
+# ==========================================================================
+# Every fixture repository below is built with fixed dates in UTC, so a
+# commit's %cs date is the date written here on every machine and in every
+# timezone. Cleaned up with an explicit rm, not a trap: traps in this file
+# overwrite.
+GA_TMP=$(mktemp -d)
+
+ga_git() { # ga_git <date YYYY-MM-DD> <git args...> - hermetic, dated git
+  local d="$1"; shift
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+      GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
+      GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+      GIT_AUTHOR_DATE="${d}T12:00:00 +0000" \
+      GIT_COMMITTER_DATE="${d}T12:00:00 +0000" git "$@"
+}
+
+ga_commit() { # ga_commit <repo> <date> <message> - stage everything, commit
+  ga_git "$2" -C "$1" add -A >/dev/null 2>&1
+  ga_git "$2" -C "$1" commit -q --no-verify --no-gpg-sign -m "$3" >/dev/null 2>&1
+}
+
+ga_vault() { # ga_vault <vault root> - the noise-cut vault plus IMP and DEC
+  nc_vault "$1"
+  mkdir -p "$1/06_implementation_(IMP)" "$1/02_decisions_(DEC)" \
+           "$1/98_administration_(ADM)"
+  printf '## Context\n' > "$1/06_implementation_(IMP)/00_IMP_file_template.md"
+  printf '## Context\n' > "$1/02_decisions_(DEC)/00_DEC_file_template.md"
+  printf '## Context\n' > "$1/98_administration_(ADM)/00_ADM_file_template.md"
+}
+
+ga_note() { # ga_note <path> <domain> <last-verified> <status> <body line>
+  mkdir -p "$(dirname "$1")"
+  {
+    printf -- '---\ndomain: %s\nstatus: %s\ncreated: 2026-01-01\nlast-verified: %s\n---\n' "$2" "$4" "$3"
+    printf '## Context\nA note of the git-advisory fixture. It is otherwise\n'
+    printf 'unremarkable, so that what is under test is the one line below.\n'
+    printf 'It says nothing else of interest and carries no value of its own.\n'
+    printf '%s\n' "$5"
+  } > "$1"
+}
+
+# --- Unit 1: pointer-drift ----------------------------------------------
+GD="$GA_TMP/Drift"
+GDV="$GD/00_documentation/01_projectvault"
+ga_vault "$GDV"
+mkdir -p "$GD/20_software/clone"
+printf 'one\n' > "$GD/20_software/tool.py"
+printf 'one\n' > "$GD/20_software/other.py"
+printf 'one\n' > "$GD/20_software/merged.py"
+printf 'one\n' > "$GD/20_software/clone/lib.py"
+IMPD="$GDV/06_implementation_(IMP)"
+ga_note "$IMPD/IMP_Tool.md" IMP 2026-01-05 active "The tool is \`20_software/tool.py\`."
+ga_note "$IMPD/IMP_Same_Day.md" IMP 2026-02-01 active "The tool is \`20_software/tool.py\`."
+ga_note "$IMPD/IMP_Together.md" IMP 2026-01-05 active "The other tool is \`20_software/other.py\`."
+ga_note "$IMPD/IMP_Retired.md" IMP 2026-01-05 superseded "The tool is \`20_software/tool.py\`."
+ga_note "$IMPD/IMP_Merge.md" IMP 2026-01-05 active "The merged tool is \`20_software/merged.py\`."
+ga_note "$IMPD/IMP_Clone.md" IMP 2026-01-05 active "The library is \`20_software/clone/lib.py\`."
+ga_note "$IMPD/IMP_Bad_Date.md" IMP 2026-02-30 active "The tool is \`20_software/tool.py\`."
+ga_note "$GDV/02_decisions_(DEC)/DEC_Tool.md" DEC 2026-01-05 active "Chose \`20_software/tool.py\`."
+ga_note "$GDV/07_testing_and_evidence_(TAE)/TAE_Tool.md" TAE 2026-01-05 active "Ran \`20_software/tool.py\`."
+cp -a "$GD" "$GA_TMP/DriftNoGit"
+ga_git 2026-01-01 init -q -b main "$GD"
+ga_commit "$GD" 2026-01-01 "baseline"
+# A change on a branch dated before last-verified that reaches main only
+# with the merge after it: first-parent dates it at the merge.
+ga_git 2026-01-03 -C "$GD" checkout -q -b side
+printf 'two\n' >> "$GD/20_software/merged.py"
+ga_commit "$GD" 2026-01-03 "side change"
+ga_git 2026-01-04 -C "$GD" checkout -q main
+ga_git 2026-01-10 -C "$GD" merge -q --no-ff --no-edit side >/dev/null 2>&1
+printf 'two\n' >> "$GD/20_software/tool.py"
+ga_commit "$GD" 2026-02-01 "tool changed"
+printf 'two\n' >> "$GD/20_software/other.py"
+printf 'Re-verified with the other tool.\n' >> "$IMPD/IMP_Together.md"
+ga_commit "$GD" 2026-02-10 "other tool and its note together"
+# A repository split: 20_software/clone/ was tracked here, leaves the
+# repository after last-verified and becomes a clone with a history of its
+# own. Its files are the clone's now - the removal is not a change of a
+# file this repository holds, and the clone's history is never walked.
+ga_git 2026-03-01 -C "$GD" rm -r -q --cached 20_software/clone
+printf '20_software/clone/\n' > "$GD/.gitignore"
+ga_commit "$GD" 2026-03-01 "split the clone out"
+ga_git 2026-03-01 init -q "$GD/20_software/clone"
+ga_commit "$GD/20_software/clone" 2026-03-01 "clone history"
+gd_out=$(python3 "$VALIDATOR" "$GDV" 2>&1); gd_rc=$?
+TESTS=$((TESTS + 1))
+if [ $gd_rc -ne 2 ] && contains "$gd_out" \
+  "^WARN .*IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, after this note's last-verified 2026-01-05 - re-verify the note against it and bump last-verified"; then ok x; else
+  fail "a file changed after its note's last-verified must be reported as pointer-drift:"
+  printf '%s\n' "$gd_out" | grep -E 'pointer-drift|crash' | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$gd_out" "IMP_Merge\.md:11 \[pointer-drift\] 20_software/merged\.py changed in [0-9a-f]* on 2026-01-10"; then ok x; else
+  fail "a change merged after last-verified must be dated at the merge (first parent):"
+  printf '%s\n' "$gd_out" | grep pointer-drift | sed 's/^/    /'; fi
+for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool; do
+  TESTS=$((TESTS + 1))
+  if ! contains "$gd_out" "$quiet\.md:[0-9]* \[pointer-drift\]"; then ok x; else
+    fail "$quiet must not be reported as pointer-drift:"
+    printf '%s\n' "$gd_out" | grep "$quiet" | sed 's/^/    /'; fi
+done
+# Bumping last-verified is the clear action.
+python3 - "$IMPD/IMP_Tool.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace("last-verified: 2026-01-05", "last-verified: 2026-02-01"))
+PY
+gd_out2=$(python3 "$VALIDATOR" "$GDV" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$gd_out2" "IMP_Tool\.md:[0-9]* \[pointer-drift\]" \
+   && contains "$gd_out2" "IMP_Merge\.md:[0-9]* \[pointer-drift\]"; then ok x; else
+  fail "bumping last-verified must clear that note's pointer-drift and no other:"
+  printf '%s\n' "$gd_out2" | grep pointer-drift | sed 's/^/    /'; fi
+gn_out=$(python3 "$VALIDATOR" "$GA_TMP/DriftNoGit/00_documentation/01_projectvault" 2>&1); gn_rc=$?
+TESTS=$((TESTS + 1))
+if [ $gn_rc -ne 2 ] && ! contains "$gn_out" "pointer-drift"; then ok x; else
+  fail "without a repository pointer-drift must say nothing, got rc=$gn_rc:"
+  printf '%s\n' "$gn_out" | grep -E 'pointer-drift|crash' | sed 's/^/    /'; fi
+# A shallow clone dates every file at its one commit; it must say nothing.
+# The note is new and untracked, so no commit carries it beside the file:
+# only the missing history could tell that tool.py last changed on
+# 2026-02-01, before this note's last-verified.
+ga_git 2026-03-02 clone -q --depth 1 "file://$GD" "$GA_TMP/DriftShallow" >/dev/null 2>&1
+ga_note "$GA_TMP/DriftShallow/00_documentation/01_projectvault/06_implementation_(IMP)/IMP_New.md" \
+  IMP 2026-02-05 active "The tool is \`20_software/tool.py\`."
+gs_out=$(python3 "$VALIDATOR" "$GA_TMP/DriftShallow/00_documentation/01_projectvault" 2>&1)
+TESTS=$((TESTS + 1))
+if [ "$(ga_git 2026-03-02 -C "$GA_TMP/DriftShallow" rev-parse --is-shallow-repository)" = true ] \
+   && ! contains "$gs_out" "pointer-drift"; then ok x; else
+  fail "a shallow clone must not report pointer-drift:"
+  printf '%s\n' "$gs_out" | grep pointer-drift | sed 's/^/    /'; fi
+# Advisory only: the stop report carries it, the gate does not block on it.
+SIDG="testsession-gitadv-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
+      "/tmp/claude-mechdocs/widehash-$SIDG"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDG" \
+  "$IMPD/IMP_Merge.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+gd_stop=$(printf '{"session_id":"%s"}' "$SIDG" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$(field systemMessage "$gd_stop")" "IMP_Merge\.md:11 \[pointer-drift\]" \
+   && ! has_key decision "$gd_stop"; then ok x; else
+  fail "pointer-drift must reach the stop report and never block:"
+  printf '%s\n' "$gd_stop" | sed 's/^/    /'; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
+      "/tmp/claude-mechdocs/widehash-$SIDG"
+
+# The fallback carries the same four lists the schema declares.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+real, err = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+assert err is None, err
+assert real["git_advisories"] is not vv.FALLBACK_SCHEMA["git_advisories"]
+for key in vv.ADVISORY_KEYS:
+    assert real["git_advisories"][key] == vv.FALLBACK_SCHEMA["git_advisories"][key], key
+assert vv.advisory_spec(real) == vv.advisory_spec({}), "fallback reads differently"
+PY
+then ok x; else fail "FALLBACK_SCHEMA git_advisories and vault_schema.json have drifted apart"; fi
+
+rm -rf "$GA_TMP"
+# ==========================================================================
+# END the git-aware advisories
+# ==========================================================================
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
