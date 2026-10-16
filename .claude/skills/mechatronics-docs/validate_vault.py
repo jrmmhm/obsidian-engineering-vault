@@ -165,6 +165,24 @@ ARTIFACT_SEG_RE = re.compile(r"^\d{2}_")
 # Explicit open-item markers suppress the body-wide dead-path WARN only -
 # never the References/Sources ERROR (silent-bypass prevention).
 PENDING_RE = re.compile(r"\b(pending|planned|tbd|not\s+yet)\b", re.I)
+# Commit ids ref-unresolved reads (DEC-MTH-060): a backtick span that is
+# nothing but lowercase hex - git never prints an id in capitals, Xcode's
+# object ids are nothing else - and a hex word right after 'commit(s)',
+# the measured way a prose citation writes one. 'repo@id' never matches:
+# it is how an id of a repository this project does not hold is written.
+HEX_SPAN_RE = re.compile(r"`([0-9a-f]{7,40})`")
+COMMIT_WORD_RE = re.compile(r"\b(?i:commits?)\s+`?([0-9a-f]{7,40})(?![\w@])")
+
+
+def commit_shaped(token):
+    """An abbreviated (7-16) or full (40) id carrying at least one letter.
+
+    All digits is a CI run or an issue number far more often than an id;
+    17-39 characters are a syzbot id or an md5, never an abbreviation git
+    writes. Precision over recall: an id of only digits goes unchecked.
+    """
+    return (any(c in "abcdef" for c in token)
+            and (7 <= len(token) <= 16 or len(token) == 40))
 
 # H2 headings that open the strict pointer zone in check_paths and end the
 # leak scan's reach in check_leaks, matched as substrings of the lowercased
@@ -3003,6 +3021,77 @@ def check_pointer_drift(vault, notes, spec, findings):
             "last-verified, or fix what it says"))
 
 
+def check_ref_unresolved(vault, notes, spec, findings):
+    """ref-unresolved: a commit id a note cites resolves in no local repository.
+
+    The repositories asked are the vault's own and every git clone directly
+    below a clone_parents folder, each once, with all ids still open on one
+    cat-file call. Any object counts - a tree id is a live pointer - and so
+    does an ambiguous abbreviation. A shallow repository, or one that
+    cannot answer, makes the check say nothing: 'missing' there proves
+    nothing about the id.
+    """
+    cited = []
+    for p, role, fm, lines, fm_end, blocks in notes:
+        if role not in spec["ref_roles"]:
+            continue
+        mask = fence_mask(lines, blocks)
+        ids = {}
+        for i, line in enumerate(lines, 1):
+            if i <= fm_end or mask[i]:
+                continue
+            for rx in (HEX_SPAN_RE, COMMIT_WORD_RE):
+                for m in rx.finditer(line):
+                    if commit_shaped(m.group(1)):
+                        ids.setdefault(m.group(1), i)
+        if ids:
+            cited.append((p, ids))
+    root = vault.git_root()
+    if not cited or root is None:
+        return
+    repos = [root.resolve()]
+    for parent in spec["clone_parents"]:
+        base = vault.project_root / parent
+        try:
+            kids = sorted(base.iterdir()) if base.is_dir() else []
+        except OSError:
+            kids = []
+        for d in kids:
+            if d.is_dir() and (d / ".git").exists() and d.resolve() not in repos:
+                repos.append(d.resolve())
+    open_ids = sorted({t for _p, ids in cited for t in ids})
+    for repo in repos:
+        if not open_ids:
+            break
+        if not git_complete(repo):
+            return
+        out = git_read(repo, ["cat-file", "--batch-check"],
+                       stdin="".join(t + "\n" for t in open_ids).encode())
+        if out is None:
+            return
+        answers = out.decode("ascii", "replace").splitlines()
+        if len(answers) != len(open_ids):
+            return
+        open_ids = [t for t, a in zip(open_ids, answers) if a.endswith(" missing")]
+    dead = set(open_ids)
+    where = "the vault's repository"
+    if len(repos) > 1:
+        where += (f" and {len(repos) - 1} clone(s) under "
+                  + ", ".join(spec["clone_parents"]))
+    for p, ids in cited:
+        gone = sorted((i, t) for t, i in ids.items() if t in dead)
+        if not gone:
+            continue
+        listed = ", ".join(f"`{t}`" for _i, t in gone)
+        findings.append(Finding(
+            "WARN", "ref-unresolved", str(p), gone[0][0],
+            f"commit id(s) {listed} resolve to no object in {where} - a "
+            "rewritten history or a deleted branch leaves an id dead once its "
+            "objects are pruned; replace it with the id that carries the "
+            "change now, or write an id of a repository this project does "
+            "not hold as repo@id"))
+
+
 def git_advisories(vault, corpus):
     """The git-aware advisory WARNs (DEC-MTH-060), each check on its own.
 
@@ -3016,7 +3105,7 @@ def git_advisories(vault, corpus):
         return []
     notes = advisory_notes(vault, corpus, spec["inactive_statuses"])
     found = []
-    for check in (check_pointer_drift,):
+    for check in (check_pointer_drift, check_ref_unresolved):
         part = []
         try:
             check(vault, notes, spec, part)
