@@ -278,6 +278,9 @@ FALLBACK_SCHEMA = {
                          "reason_field": "validator-accept-reason",
                          "acceptable_codes": ["length", "structure", "stub",
                                               "link-budget"]},
+    # In the essentials so the two size measures keep their limits when the
+    # schema cannot be read (01_methodvault, DEC-MTH-058).
+    "size_limits": {"length_warn_words": 2500, "adm_cell_max_chars": 600},
     "consistency_rules": [{"id": "requirement-coverage",
                            "deferral_status_values": ["Blocked", "Deferred", "TBD"]}],
     # In the essentials for the alias map's reason (issue #66): without it
@@ -397,6 +400,21 @@ def accept_spec(schema):
         if (isinstance(field, str) and field and isinstance(reason, str)
                 and reason and codes):
             return field, reason, set(codes)
+    return None
+
+
+def size_limit(schema, key):
+    """A positive integer of the schema's size_limits (DEC-MTH-058).
+
+    Read like overview_marker: from the schema and, failing that, from
+    FALLBACK_SCHEMA - so a value that is not a positive integer falls back
+    rather than switching the check off. A bool is no integer here, though
+    Python counts it as one. None only when neither declares the key.
+    """
+    for src in (schema, FALLBACK_SCHEMA):
+        value = _dict(src, "size_limits").get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
     return None
 
 
@@ -1595,16 +1613,16 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         check_frontmatter(vault, fm, abbr, path, findings)
 
     check_sections(vault, abbr, path, lines, findings)
-    check_length(path, lines, findings)
+    check_length(path, lines, findings, size_limit(vault.schema(), "length_warn_words"))
     check_links(vault, path, lines, findings, strict_links)
     check_leaks(abbr, path, lines, fm_end, findings)
     check_paths(vault, path, lines, fm_end, findings)
-    # The three domain-specific checks decide by canonical ROLE, the rest
+    # The domain-specific checks decide by canonical ROLE, the rest
     # of this chain by the folder ABBREVIATION - and the two names stand
     # side by side here so the difference is a choice rather than an
     # oversight (issue #115). filename-prefix and the folder-abbreviation
     # type behind frontmatter-domain need the folder and nothing else;
-    # these three ask what the folder means. role_of does not arbitrate a
+    # these ask what the folder means. role_of does not arbitrate a
     # contested role, so a vault carrying both spellings keeps both halves
     # checked.
     if role == "REQ":
@@ -1613,6 +1631,9 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         check_tae_verifies(vault, fm, path, findings)
     if role == "DEC":
         check_dec_status(vault, path, lines, findings, abbr)
+    if role == "ADM":
+        check_adm_cells(path, lines, findings,
+                        size_limit(vault.schema(), "adm_cell_max_chars"))
 
     body = [l for l in lines[fm_end:] if l.strip()]
     if len(body) < STUB_MIN_LINES:
@@ -1947,7 +1968,7 @@ def check_sections(vault, abbr, path, lines, findings):
                                   "is what a reader and a search look for"))
 
 
-def check_length(path, lines, findings):
+def check_length(path, lines, findings, max_words=None):
     n = len(lines)
     if n > LENGTH_ERROR:
         findings.append(Finding("ERROR", "length", str(path), None,
@@ -1956,9 +1977,41 @@ def check_length(path, lines, findings):
         findings.append(Finding("WARN", "length", str(path), None,
                                 f"{n} lines > {LENGTH_WARN}. Apply the 4-question rule: "
                                 "does the filename still fully describe the content? Consider splitting."))
+    elif max_words:
+        # A note can grow in its lines rather than in their number - a
+        # table cell turning into a dated log passes the count above
+        # (DEC-MTH-058). Same code, so an acceptance of length covers both.
+        words = sum(len(l.split()) for l in lines)
+        if words > max_words:
+            findings.append(Finding("WARN", "length", str(path), None,
+                                    f"{words} words > {max_words} in {n} lines. Apply the "
+                                    "4-question rule; move narrative and evidence to the "
+                                    "note that owns them, or split."))
     if n > STRUCTURE_WARN and not any(l.startswith(("## ", "### ")) for l in lines):
         findings.append(Finding("WARN", "structure", str(path), None,
                                 f"{n} lines without any subheading - add structure."))
+
+
+def check_adm_cells(path, lines, findings, max_chars):
+    """ADM table cells longer than max_chars, one finding per file.
+
+    A tracker row holds the current state, a one-sentence next step and a
+    link (DEC-MTH-058); a cell past the limit has become a log. Rows come
+    from req_rows, the one reader of a table body - escaped pipes, fences
+    and an unclosed fence handled the way every other table check sees them.
+    """
+    if not max_chars:
+        return
+    long_cells = [i for i, cells in req_rows(lines)
+                  for c in cells if len(c.strip()) > max_chars]
+    if long_cells:
+        findings.append(Finding("WARN", "adm-cell-long", str(path), long_cells[0],
+                                f"{len(long_cells)} table cell(s) longer than {max_chars} "
+                                "characters, the first on this line - a tracker cell holds "
+                                "the current state in one sentence and a link; the history "
+                                "belongs to the git log, the evidence to the owning TAE or "
+                                "DEC, and a finished row moves to the tracker's _Closed "
+                                "sibling (00_ADM_README)."))
 
 
 def anchor_index(lines, mask):
