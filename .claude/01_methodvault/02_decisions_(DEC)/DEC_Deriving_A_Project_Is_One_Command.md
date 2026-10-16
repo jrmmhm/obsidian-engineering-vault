@@ -6,6 +6,7 @@ last-verified: 2026-08-08
 ---
 Date: 2026-08-08
 Status: Accepted
+Corrected by: [[DEC_The_Validator_Reports_What_Can_Be_Acted_On]] – the README collision is no longer a standing WARN: duplicate-basename fires only once a wikilink names the shared stem, so a default derivation reports no warning and the rename flag stays the way to make a `[[README]]` link unambiguous.
 
 ## Context
 

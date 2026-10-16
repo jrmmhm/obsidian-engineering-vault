@@ -8,6 +8,7 @@ validator-accept-reason: the measured cost of a real decision recorded whole, ac
 ---
 Date: 2026-08-21
 Status: Accepted
+Corrected by: [[DEC_The_Validator_Reports_What_Can_Be_Acted_On]] – the hub link budget no longer exists: the budget counts prose links only, so the overview needs no larger one, and the marker now decides the reachability scan alone.
 
 ## Context
 

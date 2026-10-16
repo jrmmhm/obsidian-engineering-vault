@@ -6,6 +6,7 @@ last-verified: 2026-08-10
 ---
 Date: 2026-08-10
 Status: Accepted
+Corrected by: [[DEC_Enforcement_State_Is_Derived_Not_Kept]] – the `SKILL_REVISION` constant is gone; `--check-install` prints a revision derived from the bytes of the validator, the schema and the exporter.
 
 ## Context
 
