@@ -1054,6 +1054,9 @@ Duplicate basename fixture, first instance.
 Seeded conclusion.
 EOF
 cp "$W/07_testing_and_evidence_(TAE)/TAE_Dup.md" "$W/02_decisions_(DEC)/TAE_Dup.md"
+# A shared stem is only a defect where a link names it (DEC-MTH-053), so the
+# pair gets the one link that makes it ambiguous.
+printf 'Which evidence note is meant here: [[TAE_Dup]]?\n' > "$W/dup_link.md"
 
 # Fenced blocks past the record threshold. IMP_Host_Copy carries a bare one
 # (a copy - ERROR) and a declaration that names nothing (not a declaration -
@@ -5166,21 +5169,22 @@ if [ -f "$NP" ]; then
     fail "derivation-script reference survives in STRUCTURE.md/README.md"; else ok x; fi
 
   # The generated README carries the target's name and, on the default
-  # path, the explanation of the one WARN the validator will keep showing.
+  # path, the explanation of when the two README files become a finding.
   TESTS=$((TESTS + 1))
   if [ "$(head -n 1 "$ND/README.md")" = "# myproj" ]; then ok x; else
     fail "generated README must open with '# myproj'"; fi
   TESTS=$((TESTS + 1))
   if grep -q "duplicate-basename" "$ND/README.md"; then ok x; else
-    fail "default derivation must explain the duplicate-basename WARN in README.md"; fi
+    fail "default derivation must explain the duplicate-basename rule in README.md"; fi
 
-  # The state the script predicts is the state the validator reports.
+  # The state the script predicts is the state the validator reports. The
+  # two README files are unlinked, so they are no finding (DEC-MTH-053).
   npval=$(python3 "$ND/.claude/skills/mechatronics-docs/validate_vault.py" \
     "$ND/00_documentation/01_projectvault" 2>&1); npvrc=$?
   TESTS=$((TESTS + 1))
-  if [ $npvrc -eq 0 ] && contains "$npval" "0 error(s), 1 warning(s)" \
-      && contains "$npval" "duplicate-basename"; then ok x; else
-    fail "derived vault must report exactly the known WARN:"
+  if [ $npvrc -eq 0 ] && contains "$npval" "0 error(s), 0 warning(s)" \
+      && ! contains "$npval" "duplicate-basename"; then ok x; else
+    fail "derived vault must report no warning:"
     printf '%s\n' "$npval" | sed 's/^/    /'
   fi
 
@@ -6408,9 +6412,9 @@ if [ -f "$NP" ]; then
   minval=$(python3 "$MD/.claude/skills/mechatronics-docs/validate_vault.py" \
     "$minvault" 2>&1); minvrc=$?
   TESTS=$((TESTS + 1))
-  if [ $minvrc -eq 0 ] && contains "$minval" "0 error(s), 1 warning(s)" \
-      && contains "$minval" "duplicate-basename"; then ok x; else
-    fail "minimal vault must report exactly the known WARN:"
+  if [ $minvrc -eq 0 ] && contains "$minval" "0 error(s), 0 warning(s)" \
+      && ! contains "$minval" "duplicate-basename"; then ok x; else
+    fail "minimal vault must report no warning:"
     printf '%s\n' "$minval" | sed 's/^/    /'
   fi
   minexp=$(python3 "$MD/.claude/skills/mechatronics-docs/export_traceability.py" \
@@ -6439,7 +6443,7 @@ if [ -f "$NP" ]; then
     "$minvault" 2>&1)
   TESTS=$((TESTS + 1))
   if [ -d "$minvault/02_decisions_(DEC)" ] && [ ! -e "$MD/$MIN_PARK/02_decisions_(DEC)" ] \
-      && contains "$grownval" "0 error(s), 1 warning(s)"; then ok x; else
+      && contains "$grownval" "0 error(s), 0 warning(s)"; then ok x; else
     fail "a domain moved back into the vault must need no migration:"
     printf '%s\n' "$grownval" | sed 's/^/    /'
   fi
@@ -6578,6 +6582,9 @@ Sensor module of the boundary fixture. It links a note that exists only in
 the directory beside this vault, and its own basename exists there a second
 time: [[REF_Outside_Datasheet]].
 EOF
+  # The link that makes a shared ARC_Sensor stem a collision at all: a
+  # name nobody links is no finding (DEC-MTH-053).
+  printf 'The sensor module is [[ARC_Sensor]].\n' > "$1/links.md"
 }
 
 # --- the root vault: repository root == vault root -------------------------
@@ -6600,7 +6607,7 @@ TESTS=$((TESTS + 1))
 if [ $rvrc -eq 1 ]; then ok x; else
   fail "the unresolved link is an ERROR in a full run, so the exit code must be 1 (was $rvrc)"; fi
 TESTS=$((TESTS + 1))
-if ! contains "$rvout" "'ARC_Sensor' exists"; then ok x; else
+if ! contains "$rvout" "\[duplicate-basename\] \[\[ARC_Sensor\]\]"; then ok x; else
   fail "a basename collision outside the repository is not this vault's collision:"
   printf '%s\n' "$rvout" | grep duplicate-basename | sed 's/^/    /'
 fi
@@ -6618,15 +6625,15 @@ cp -a "$RV" "$RT_TMP/elsewhere_Rootproj"
 rvout2=$(python3 "$VALIDATOR" "$RT_TMP/elsewhere_Rootproj" 2>&1)
 TESTS=$((TESTS + 1))
 if contains "$rvout2" "REF_Outside_Datasheet" \
-    && ! contains "$rvout2" "'ARC_Sensor' exists"; then ok x; else
+    && ! contains "$rvout2" "\[duplicate-basename\] \[\[ARC_Sensor\]\]"; then ok x; else
   fail "one repository copied beside its own neighbour must report the same:"
   printf '%s\n' "$rvout2" | sed 's/^/    /'
 fi
 
 # --- the canonical vault: the boundary must NOT move -----------------------
-# 02_documents lies outside the vault and inside the repository, and its
-# collision is the one the shipped template carries and CONTRIBUTING.md
-# quotes. Narrowing the boundary to the vault root would silence it.
+# 02_documents lies outside the vault and inside the repository, and a
+# linked name colliding with a file there is the case duplicate-basename
+# exists for. Narrowing the boundary to the vault root would silence it.
 CV="$RT_TMP/Canonproj/00_documentation/01_projectvault"
 rt_domains "$CV"
 mkdir -p "$RT_TMP/Canonproj/00_documentation/02_documents"
@@ -6639,7 +6646,7 @@ rgit init -q "$RT_TMP/Canonproj"
 cvout=$(python3 "$VALIDATOR" "$CV" 2>&1)
 
 TESTS=$((TESTS + 1))
-if contains "$cvout" "'ARC_Sensor' exists 2x under 00_documentation"; then ok x; else
+if contains "$cvout" "\[duplicate-basename\] \[\[ARC_Sensor\]\] (linked from links.md:1) matches 2 files under 00_documentation: .*02_documents/ARC_Sensor\.md"; then ok x; else
   fail "the canonical layout must keep reporting the 02_documents collision:"
   printf '%s\n' "$cvout" | sed 's/^/    /'
 fi
@@ -6885,6 +6892,41 @@ if contains "$ng_out" "duplicate-basename.*ARC_Sensor"; then ok x; else
   fail "outside version control the whole documentation root stays indexed:"
   printf '%s\n' "$ng_out" | sed 's/^/    /'
 fi
+
+# --- Unit 2: a shared stem is a finding only where a link names it --------
+# The template's two README.md are linked by nobody and were reported on
+# every derived vault. A linked one is a real ambiguity and must stay one,
+# named with where it is linked from and every file it could mean. A link
+# matched by substring would also fire on [[README_x]]; one inside a code
+# span or a fence is no link in Obsidian.
+DB="$NC_TMP/Dup/00_documentation/01_projectvault"
+nc_vault "$DB"
+mkdir -p "$NC_TMP/Dup/00_documentation/02_documents"
+printf '# the vault readme\n' > "$DB/README.md"
+printf '# the documents readme\n' > "$NC_TMP/Dup/00_documentation/02_documents/README.md"
+nc_note "$DB/03_architecture_(ARC)/ARC_Twin.md" ARC "Unlinked twin, first copy."
+mkdir -p "$NC_TMP/Dup/00_documentation/02_documents/arc"
+printf '# unlinked twin, second copy\n' > "$NC_TMP/Dup/00_documentation/02_documents/arc/ARC_Twin.md"
+nc_note "$DB/03_architecture_(ARC)/ARC_Linker.md" ARC \
+  "It names [[README_x]], \`[[ARC_Twin]]\` and, in prose, nothing else."
+printf '# a note whose stem merely extends README\n' > "$DB/README_x.md"
+db_out=$(python3 "$VALIDATOR" "$DB" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$db_out" "duplicate-basename"; then ok x; else
+  fail "an unlinked shared stem, a substring and a code-span link are no ambiguity:"
+  printf '%s\n' "$db_out" | grep duplicate-basename | sed 's/^/    /'
+fi
+printf '```\n[[ARC_Twin]]\n```\nSee [[README.md|the readme]] and [[README]].\n' >> "$DB/README_x.md"
+db_out=$(python3 "$VALIDATOR" "$DB" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$db_out" "\[duplicate-basename\] \[\[README\]\] (linked from README_x.md:5, README_x.md:5) matches 2 files under 00_documentation: 01_projectvault/README.md, 02_documents/README.md - .*rename one of the files"; then
+  ok x; else
+  fail "a linked shared stem must name its link sources, every file and the remedy:"
+  printf '%s\n' "$db_out" | grep duplicate-basename | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$db_out" "duplicate-basename.*ARC_Twin"; then ok x; else
+  fail "a link inside a fenced block must not make a stem ambiguous"; fi
 
 rm -rf "$NC_TMP"
 # ==========================================================================
