@@ -298,7 +298,12 @@ yours. In ARC no block is permitted at all, declared or not.
 A file answers ONE question. Above ~150 lines, re-apply the 4-question
 rule: can the filename still fully describe the content? If not, split.
 Above 400 lines the validator blocks — that size is a structural SSOT
-violation, not a formatting issue. Length is not the only shape the
+violation, not a formatting issue. Lines are not the only measure: a
+file under the line limit whose lines have grown long — a table cell that
+became a log — is reported as `length` too once its words pass the limit
+the validator's schema sets. In ADM a single table cell past its own limit
+is reported as `adm-cell-long`, because a tracker cell holds a state and a
+sentence, not a history ([[00_ADM_README]]). Length is not the only shape the
 validator reads: a long file without a single subheading is reported as
 `structure`, a very short one as `stub` — both in the quick reference at
 the end of this file. A file that is long on purpose may accept the
