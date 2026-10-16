@@ -54,8 +54,11 @@ decision.
   `--check-install` prints a revision derived from the content of the
   validator, the schema and the exporter. **MINOR** by the table in
   [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
-  — new WARNs and an optional frontmatter field; existing vaults only lose
-  findings. `schema_version` moves to `0.6`. The reasoning is
+  — new WARNs and an optional frontmatter field. An existing vault can gain
+  one finding: an ARC note or an overview with more than 20 prose links,
+  which the removed hub budget of 50 left silent, now reports
+  `link-budget` (none of the six measured vaults has one).
+  `schema_version` moves to `0.6`. The reasoning is
   [`DEC_The_Validator_Reports_What_Can_Be_Acted_On`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Validator_Reports_What_Can_Be_Acted_On.md),
   [`DEC_A_Known_Finding_Is_Counted_Not_Repeated`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Known_Finding_Is_Counted_Not_Repeated.md)
   and

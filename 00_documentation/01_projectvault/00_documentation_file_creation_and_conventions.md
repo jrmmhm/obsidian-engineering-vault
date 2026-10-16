@@ -339,7 +339,7 @@ lists those as advisory; the full audit is the pass that counts.
 | `encoding-not-utf8` | ERROR | every file the validator reads, templates included | The bytes are not UTF-8. Every other finding on that file is a consequence of the encoding — re-save as UTF-8 and read them again. |
 | `id-scope-mismatch` | WARN, vault-wide | REQ files carrying both an `id` and a `(SCOPE)` token | The scope in the frontmatter `id` differs from the token in the filename. The id wins, so every row of the file is addressed under the id's scope. |
 | `orphan` | WARN, vault-wide | domain files | No other file in the vault links to it — reachable by search alone. |
-| `accept-invalid` | WARN | every file the validator reads | `validator-accept` names a code that cannot be accepted — an ERROR, or a WARN outside the schema's list — or sits in a template, whose frontmatter every copy would inherit. The finding it names is still reported. |
+| `accept-invalid` | WARN | every file the validator reads | `validator-accept` names a code that cannot be accepted — an ERROR, or a WARN outside the schema's list — or sits in a `00_` file — a template, whose frontmatter every copy would inherit, or the README beside it. The finding it names is still reported. |
 | `accept-reason-missing` | WARN | every file the validator reads | `validator-accept` without a `validator-accept-reason`. Nothing is accepted until the file says why. |
 
 `duplicate-basename` has one remedy here, and it is not the one Obsidian

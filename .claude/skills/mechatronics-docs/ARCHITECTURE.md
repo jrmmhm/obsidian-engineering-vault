@@ -299,7 +299,7 @@ Python, which is why a grep of the source alone does not find them.
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
 | `overview-unidentified` | `validate_vault_wide` | vault-wide | WARN |
-| `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere |
+| `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere, and WARN anywhere for a gitignored path whose folder is absent |
 | `req-class` | `check_req_table` | domain, requirements role | ERROR |
 | `req-criterion` | `check_req_table` | domain, requirements role | ERROR |
 | `req-duplicate` | `check_req_table` | domain, requirements role | ERROR |
