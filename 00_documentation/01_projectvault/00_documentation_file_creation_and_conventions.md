@@ -263,7 +263,8 @@ defines `file://host/path` as the formal spelling of the same thing. Name
 the host in one of these ways: the path alone does not say which machine
 it is true on, and a reader on a different machine cannot recover it.
 A commit id follows the same rule: an id of this repository, or of a
-clone under `20_software/`, is written bare (`` `92b06cd` ``, or "commit
+clone the validator asks (`20_software/` as shipped, `git_advisories` in
+its schema), is written bare (`` `92b06cd` ``, or "commit
 92b06cd"), and an id of a repository this project does not hold names
 it — `` `strictdoc@5a9b679` `` — because only the bare form is looked up.
 
@@ -333,9 +334,11 @@ inbox and the domain files together — but nothing below a folder that is
 not a domain folder, because the validator never descends there.
 
 Six of the eleven are vault-wide rather than per-file. The stop gate
-lists those as advisory; the full audit is the pass that counts. Three of
+lists those as advisory; the full audit is the pass that counts. Two of
 them read git, and say nothing where git cannot answer — no repository,
-or a shallow clone.
+or a shallow clone. Which roles and folders they ask is the
+`git_advisories` block of the validator's schema; the table states what
+ships.
 
 | Code | Severity | Fires on | Rule |
 | --- | --- | --- | --- |
