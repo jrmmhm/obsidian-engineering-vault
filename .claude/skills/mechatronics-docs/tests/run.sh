@@ -6964,6 +6964,140 @@ if ! contains "$lb_out" "ARC_Rows\.md.*\[link-budget\]" \
   printf '%s\n' "$lb_out" | grep -E "link-budget|link-repeat" | sed 's/^/    /'
 fi
 
+# --- Unit 4a: a file accepts WARNs in its own frontmatter ------------------
+# Accepted means counted, not printed; an ERROR is never accepted, and
+# neither is a code outside the schema's closed list; without a reason
+# nothing is in force; a template accepts nothing.
+AC="$NC_TMP/Accept/00_documentation/01_projectvault"
+nc_vault "$AC"
+nc_long() { # nc_long <path> <frontmatter lines> <n body lines>
+  { printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-10-16\n'
+    printf '%b' "$2"
+    printf -- '---\n## Context\n'
+    i=1; while [ $i -le "$3" ]; do printf 'Line %s of a long but otherwise correct note.\n' "$i"; i=$((i + 1)); done
+  } > "$1"
+}
+LV='last-verified: 2026-10-16\n'
+nc_long "$AC/03_architecture_(ARC)/ARC_Accepted.md" \
+  "${LV}validator-accept: [length]\nvalidator-accept-reason: a long record kept whole\n" 160
+nc_long "$AC/03_architecture_(ARC)/ARC_No_Reason.md" "${LV}validator-accept: [length]\n" 160
+nc_long "$AC/03_architecture_(ARC)/ARC_Error_Entry.md" \
+  "validator-accept: [frontmatter-key, length]\nvalidator-accept-reason: tries to hide an ERROR\n" 160
+nc_long "$AC/03_architecture_(ARC)/ARC_Too_Long.md" \
+  "${LV}validator-accept: [length]\nvalidator-accept-reason: a record kept whole\n" 420
+printf -- '---\nvalidator-accept: [length]\nvalidator-accept-reason: copied everywhere\n---\n## Context\n' \
+  > "$AC/03_architecture_(ARC)/00_ARC_file_template.md"
+printf 'An index naming [[ARC_Accepted]], [[ARC_No_Reason]], [[ARC_Error_Entry]], [[ARC_Too_Long]].\n' \
+  > "$AC/index.md"
+ac_out=$(python3 "$VALIDATOR" "$AC" 2>&1)
+ac_has() { contains "$ac_out" "$1"; }
+TESTS=$((TESTS + 1))
+if ! ac_has "ARC_Accepted\.md.*\[length\]" && ! ac_has "ARC_Accepted\.md.*accept-"; then ok x; else
+  fail "an accepted WARN with a reason must not be printed:"
+  printf '%s\n' "$ac_out" | grep ARC_Accepted | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "ARC_No_Reason\.md \[length\]" && ac_has "ARC_No_Reason\.md:1 \[accept-reason-missing\]"; then ok x; else
+  fail "an acceptance without a reason must not be in force, and must say so:"
+  printf '%s\n' "$ac_out" | grep ARC_No_Reason | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "^ERROR .*ARC_Error_Entry\.md:1 \[frontmatter-key\]" \
+   && ac_has "ARC_Error_Entry\.md:1 \[accept-invalid\] validator-accept names \['frontmatter-key'\]" \
+   && ! ac_has "ARC_Error_Entry\.md \[length\]"; then ok x; else
+  fail "an ERROR code in the list must stay reported, its entry named, the valid entry kept:"
+  printf '%s\n' "$ac_out" | grep ARC_Error_Entry | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "^ERROR .*ARC_Too_Long\.md \[length\]"; then ok x; else
+  fail "an accepted code must never hide its ERROR severity:"
+  printf '%s\n' "$ac_out" | grep ARC_Too_Long | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "00_ARC_file_template\.md:1 \[accept-invalid\]"; then ok x; else
+  fail "a template's acceptance must be refused:"
+  printf '%s\n' "$ac_out" | grep 00_ARC | sed 's/^/    /'; fi
+# The count line: what was accepted, once, and never after the summary.
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$ac_out" | tail -n 2 | head -n 1)" = \
+     "accepted: 2 finding(s) in 2 file(s) - 2 by validator-accept" ] \
+   && contains "$(printf '%s\n' "$ac_out" | tail -n 1)" "^-- .* error(s)"; then ok x; else
+  fail "accepted findings must be counted in one line just above the summary:"
+  printf '%s\n' "$ac_out" | tail -n 3 | sed 's/^/    /'; fi
+# The vault-wide path: no packaged acceptable code is vault-wide, so a
+# schema that lists one proves the vault-wide filter on its own.
+mkdir -p "$NC_TMP/orphanok"
+cp "$VALIDATOR" "$SKILL_DIR/export_traceability.py" "$NC_TMP/orphanok/"
+python3 - "$SKILL_DIR/vault_schema.json" "$NC_TMP/orphanok/vault_schema.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+s["validator_accept"]["acceptable_codes"].append("orphan")
+json.dump(s, open(sys.argv[2], "w"))
+PY
+nc_note "$AC/07_testing_and_evidence_(TAE)/TAE_Alone.md" TAE "Nobody links it."
+python3 - "$AC/07_testing_and_evidence_(TAE)/TAE_Alone.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace(
+    "last-verified: 2026-10-16\n",
+    "last-verified: 2026-10-16\nvalidator-accept: [orphan]\nvalidator-accept-reason: kept for later\n", 1))
+PY
+ao_out=$(python3 "$NC_TMP/orphanok/validate_vault.py" "$AC" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$ao_out" "TAE_Alone\.md \[orphan\]" \
+   && contains "$ao_out" "accepted: 3 finding(s) in 3 file(s)" \
+   && contains "$(python3 "$VALIDATOR" "$AC" 2>&1)" "TAE_Alone\.md:1 \[accept-invalid\] validator-accept names \['orphan'\]"; then
+  ok x; else fail "a vault-wide WARN must follow its file's acceptance, and only where the schema lists it:"
+  printf '%s\n' "$ao_out" | grep -E "TAE_Alone|accepted" | sed 's/^/    /'; fi
+
+# The fallback carries the acceptance and the deferral vocabulary, pinned
+# against the packaged schema like the field profiles above.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+real, err = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+assert err is None, err
+assert vv.accept_spec(real) == vv.accept_spec({}), "validator_accept drift"
+assert vv.deferral_values(real) == vv.deferral_values({}), "deferral_status_values drift"
+assert vv.deferral_values(real), "no deferral value declared"
+PY
+then ok x; else fail "FALLBACK_SCHEMA and vault_schema.json disagree about acceptance or deferral"; fi
+
+# --- Unit 4b: a requirement deferred in its allocation row ---------------
+# Each deferral value on its own, and a qualified one, must turn the
+# requirement's req-uncovered into the count line; Draft must not, and one
+# deferred row beside an Approved one must not either.
+for status in "Blocked" "Deferred" "TBD" "Blocked (waiting for the maintainer)" "Draft" "MIXED"; do
+  DF="$NC_TMP/Defer-$(printf '%s' "$status" | tr -c 'A-Za-z' '_')/00_documentation/01_projectvault"
+  build_coverage_vault "$DF"
+  python3 - "$DF/03_architecture_(ARC)/ARC_Coverage.md" "$status" <<'PY'
+import sys, pathlib
+p, status = pathlib.Path(sys.argv[1]), sys.argv[2]
+row = "| supply path | REQ-COV-005 | measured during bring-up | Draft |"
+t = p.read_text()
+assert t.count(row) == 1
+if status == "MIXED":
+    new = row.replace("Draft", "Blocked") + "\n| backup path | REQ-COV-005 | measured | Approved |"
+else:
+    new = row.replace("Draft", status)
+p.write_text(t.replace(row, new))
+PY
+  df_out=$(python3 "$VALIDATOR" "$DF" 2>&1)
+  TESTS=$((TESTS + 1))
+  case "$status" in
+    Draft|MIXED)
+      if contains "$df_out" "\[req-uncovered\].*REQ-COV-005" \
+         && ! contains "$df_out" "deferred in an allocation row"; then ok x; else
+        fail "status '$status' must leave REQ-COV-005 reported:"
+        printf '%s\n' "$df_out" | grep -E "REQ-COV-005|accepted" | sed 's/^/    /'; fi ;;
+    *)
+      if ! contains "$df_out" "\[req-uncovered\].*REQ-COV-005" \
+         && contains "$df_out" "accepted: 1 finding(s) in 1 file(s) - 1 requirement(s) deferred in an allocation row"; then
+        ok x; else
+        fail "status '$status' must defer REQ-COV-005 into the count line:"
+        printf '%s\n' "$df_out" | grep -E "REQ-COV-005|accepted" | sed 's/^/    /'; fi ;;
+  esac
+done
+
 rm -rf "$NC_TMP"
 # ==========================================================================
 # END the validator noise cut
