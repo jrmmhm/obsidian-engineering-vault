@@ -8,7 +8,7 @@ validator-accept-reason: the measured cost of a real decision recorded whole, ac
 ---
 Date: 2026-08-05
 Status: Accepted
-Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-05j — The correspondence to a safety standard is structural, not a claim (Accepted)".
+Migrated 2026-08-05 from the appended decision log, "Amendment 2026-08-05j — The correspondence to a safety standard is structural, not a claim (Accepted)". Changed 2026-10-16: StrictDoc's commit is written `strictdoc@5a9b679`, the form an id of a repository this project does not hold takes ([[DEC_Git_History_Says_Which_Notes_To_Reverify]]); no statement changed.
 
 ## Context
 
@@ -26,7 +26,7 @@ map. The candidate standards are paywalled, so a mapping written from
 memory would be a fabrication with clause numbers on it. And the model
 the issue names — StrictDoc's DO-178C document — turns out on reading to
 be something else: `docs/strictdoc_40_DO178_requirements.sdoc` at commit
-`5a9b679` is titled "Technical Note: DO-178C requirements tool
+`strictdoc@5a9b679` is titled "Technical Note: DO-178C requirements tool
 requirements", carries `CLASSIFICATION: Draft`, and holds requirements on
 the tool, each with a `COMPLIANCE` field taking `C`, `PC` or `NC`, split
 into "Already implemented features" and "Needs discussion". It is not a
