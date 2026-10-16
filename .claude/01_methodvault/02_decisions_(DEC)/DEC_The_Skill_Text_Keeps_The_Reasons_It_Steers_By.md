@@ -10,12 +10,14 @@ Status: Accepted
 ## Context
 
 `SKILL.md` of the mechatronics-docs skill is the prompt every session reads
-in full when it invokes the skill, and it had grown to 514 lines, about a
-third of them reference for the tools around the vault — the traceability
-exporter, `--check-install`, the pre-commit and CI tiers — under its own
-sentence "None of that is needed to write vault notes". Other passages
-restated what the conventions file of a vault owns, and one of those copies
-had drifted from its owner. Claude Code's skill guidance asks for a
+in full when it invokes the skill, and it had grown to 514 lines. About a
+fifth of them were reference for the tools around the vault — the
+traceability exporter, `--check-install`, the pre-commit and CI tiers — and
+explanations of findings whose validator message already carries the
+remedy, under the file's own sentence "None of that is needed to write
+vault notes". Other passages restated what the conventions file of a vault
+owns, and the copies had drifted from their owner: the four questions the
+skill asked before creating a file were not the conventions file's four. Claude Code's skill guidance asks for a
 `SKILL.md` under 500 lines with detailed reference in separate files one
 level deep, which a session reads only when it needs them
 (code.claude.com/docs/en/skills; platform.claude.com, Agent Skills best
@@ -74,8 +76,10 @@ Option C, as the rule for every edit of the skill text:
 
 ## Consequences
 
-- `SKILL.md` went from 514 to 321 lines and from 29,570 to 18,721 bytes;
-  the Detail Ownership section is unchanged. `REFERENCE.md` holds the
+- `SKILL.md` went from 514 to 320 lines and from 29,570 to 18,721 bytes,
+  not to half: the parts kept word for word — frontmatter, activation
+  guard, role and boundary tables, Detail Ownership, coverage, checklist,
+  file placement — are about a third of the old size on their own. `REFERENCE.md` holds the
   export, which copy enforces, and the tiers outside a session.
 - Pending: the rule rests on one comparison and a stated hypothesis. The
   A/B comparison of this change against the full-length text decides
