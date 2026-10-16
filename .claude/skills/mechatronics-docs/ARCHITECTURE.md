@@ -271,7 +271,6 @@ Python, which is why a grep of the source alone does not find them.
 | `inb-age` | `check_inb_age` | inbox, disk pass only | WARN |
 | `length` | `check_length` | domain | ERROR above the hard limit, WARN above the soft one |
 | `link-budget` | `check_links` | every file read | WARN |
-| `link-repeat` | `check_links` | every file read | WARN |
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
 | `overview-unidentified` | `validate_vault_wide` | vault-wide | WARN |
