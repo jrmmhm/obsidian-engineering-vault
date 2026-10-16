@@ -115,6 +115,23 @@ decision.
 
 ### Changed
 
+- **`SKILL.md` no longer states what is not true** — the activation guard
+  demanded folders numbered `01_`–`09_` and so refused vaults the validator
+  accepts, the method vault's 02/09/98 among them; it now asks the
+  validator, and a vault whose templates carry no frontmatter is updated
+  first. The hook text described the stop gate as blocking twice per
+  session, the hooks as running "while this skill is active", and asked the
+  agent to answer a list only the user sees; it now matches the validator
+  after the noise cut, says that sessions which never invoke the skill and
+  subagent writes are not validated in-session, and never lets the agent
+  add a `validator-accept` on its own. The role table quotes the
+  conventions file again (CMP had drifted), the inert `invocation: auto`
+  key is gone, and the post-write hook reports a validator crash to the
+  user and the session instead of to stderr. No rule moved and no finding
+  code changed: corrected documentation plus a hook fix, **MINOR** by the
+  table. Why the hooks stay skill-scoped:
+  [DEC-MTH-056](.claude/01_methodvault/02_decisions_(DEC)/DEC_Vault_Hooks_Stay_Registered_By_The_Skill.md).
+
 - **A module its parent contains is no longer a documentation island** —
   `arc-not-in-overview` demanded that every ARC file appear in the overview,
   while `vault_schema.json` declares that ARC-to-ARC containment is authored
