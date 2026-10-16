@@ -2791,8 +2791,12 @@ def validate_vault_wide(vault: Vault):
         evidence = evidence_index(vault, corpus)
         allocated = allocation_index(vault)
         deferred = deferred_requirements(vault) if allocated is not None else set()
-        tail = ("coverage is decided on the allocation table and on "
-                "'verifies', never on a mention in prose")
+        # One finding per requirement file and kind of gap, not one per
+        # requirement: the rationale repeated per identifier made six
+        # near-identical lines out of one fact on a real vault, and the
+        # rationale lives in SKILL.md (01_methodvault, DEC-MTH-053). The
+        # three kinds stay apart because their repairs differ.
+        groups = {}
         for rid, (f, i) in idx.items():
             notes = evidence.get(rid)
             alloc = allocated.get(rid) if allocated is not None else None
@@ -2801,20 +2805,28 @@ def validate_vault_wide(vault: Vault):
             if not notes and rid in deferred:
                 vault.deferred.append((rid, str(f)))
                 continue
-            if notes:
-                by = ", ".join(sorted(p.stem for p in notes))
-                msg = (f"{rid} is verified by {by} but no allocation row "
-                       "allocates it - nothing states which part of the "
-                       f"system owes it; {tail}")
-            elif alloc is False:
-                msg = (f"{rid} has no allocation row naming it and no TAE "
-                       "naming it in 'verifies' - an unverified REQ is "
-                       f"indistinguishable from an unmet one; {tail}")
+            kind = "verified" if notes else "neither" if alloc is False else "unverified"
+            g = groups.setdefault((f, kind), {"line": i, "ids": [], "by": set()})
+            g["ids"].append(rid)
+            g["by"].update(p.stem for p in notes or ())
+        values = deferral_values(vault.schema()) or ["Blocked"]
+        defer = ("or allocate them in a row whose status is "
+                 + (", ".join(values[:-1]) + " or " if len(values) > 1 else "")
+                 + values[-1] + " with the reason in a DEC")
+        for (f, kind), g in groups.items():
+            ids = ", ".join(g["ids"])
+            if kind == "verified":
+                msg = (f"{ids}: verified by {', '.join(sorted(g['by']))} but no "
+                       "allocation row allocates them - add the row naming the "
+                       "part of the system that owes each")
+            elif kind == "neither":
+                msg = (f"{ids}: no allocation row names them and no TAE names "
+                       "them in 'verifies' - allocate each in a row and add it "
+                       f"to a TAE's verifies:, {defer}")
             else:
-                msg = (f"{rid} is named by no TAE in 'verifies' - an "
-                       "unverified REQ is indistinguishable from an unmet "
-                       f"one; {tail}")
-            findings.append(Finding("WARN", "req-uncovered", str(f), i, msg))
+                msg = (f"{ids}: named by no TAE in 'verifies' - add each to a "
+                       f"TAE's verifies:, {defer}")
+            findings.append(Finding("WARN", "req-uncovered", str(f), g["line"], msg))
 
     # Every ARC module is reachable from the overview. The overview names
     # the top-level modules and a main module names its submodules, so an
