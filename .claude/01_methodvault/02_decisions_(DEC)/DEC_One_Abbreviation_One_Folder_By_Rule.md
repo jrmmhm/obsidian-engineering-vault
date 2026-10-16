@@ -3,6 +3,8 @@ domain: DEC
 id: DEC-MTH-021
 created: 2026-08-04
 last-verified: 2026-08-05
+validator-accept: [length]
+validator-accept-reason: the measured cost of a real decision recorded whole, accepted in the method vault's CI audit rather than split
 ---
 Date: 2026-08-04
 Status: Accepted
