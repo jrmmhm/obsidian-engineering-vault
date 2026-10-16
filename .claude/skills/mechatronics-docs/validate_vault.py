@@ -44,8 +44,6 @@ LENGTH_WARN = 150
 LENGTH_ERROR = 400
 STRUCTURE_WARN = 100
 LINK_BUDGET = 20
-LINK_BUDGET_HUB = 50
-LINK_REPEAT_WARN = 3
 STUB_MIN_LINES = 5
 INB_MAX_AGE_DAYS = 7
 
@@ -748,25 +746,6 @@ class Vault:
                     near.append((p, f"{marker[0]}: {value}"))
             self._overviews = (found, near)
         return self._overviews
-
-    def overview(self):
-        """The one file that is this vault's entry point, or None.
-
-        None for zero claimants and for several: a vault has one entry
-        point, and picking one of two would grant the looser half of this
-        rule - the hub link budget - while the stricter half cannot run.
-        """
-        found, _near = self.overview_scan()
-        return found[0] if len(found) == 1 else None
-
-    def is_overview(self, path: Path):
-        ov = self.overview()
-        if ov is None:
-            return False
-        try:
-            return Path(path).resolve() == ov.resolve()
-        except OSError:
-            return False
 
     def templates_for(self, abbr):
         """H2 heading sets of each template of a domain (empty sets excluded).
@@ -1485,7 +1464,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                                 "UTF-8 and read them again."))
 
     if kind == "inbox":
-        check_links(vault, path, lines, findings, strict_links, hub=False)
+        check_links(vault, path, lines, findings, strict_links)
         if content is None:
             check_inb_age(path, findings)
         return findings
@@ -1503,11 +1482,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                 # place where catching it is worth the most.
                 check_undeclared(vault, fm, abbr, path, findings)
         # infra/root files carry placeholder example links - never strict.
-        # The hub budget goes to the file that DECLARES itself the overview,
-        # never to a file name: a hub is a hub in every language, and the
-        # literal here was dark in every vault that renamed it (issue #116).
-        check_links(vault, path, lines, findings, strict=False,
-                    hub=vault.is_overview(path))
+        check_links(vault, path, lines, findings, strict=False)
         return findings
 
     # ---- full domain-file checks ----
@@ -1529,7 +1504,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
 
     check_sections(vault, abbr, path, lines, findings)
     check_length(path, lines, findings)
-    check_links(vault, path, lines, findings, strict_links, hub=abbr == "ARC")
+    check_links(vault, path, lines, findings, strict_links)
     check_leaks(abbr, path, lines, fm_end, findings)
     check_paths(vault, path, lines, fm_end, findings)
     # The three domain-specific checks decide by canonical ROLE, the rest
@@ -1904,9 +1879,8 @@ def iter_wikilinks(lines, mask=None):
             yield i, line, m
 
 
-def check_links(vault, path, lines, findings, strict, hub=False):
+def check_links(vault, path, lines, findings, strict):
     md_names, all_names = vault.md_names(), vault.all_names()
-    targets = Counter()
     total = 0
     mask = fence_mask(lines)
     anchors = None      # built on the first same-file link, never for a file without one
@@ -1916,10 +1890,9 @@ def check_links(vault, path, lines, findings, strict, hub=False):
         if not target:
             # A link into this file. It names no other file, so it is
             # resolved against this one - and it is deliberately kept
-            # out of the budget and the repeat counter below, both of
-            # which are about OUTGOING links: "link the responsible
-            # file once" has no addressee when the target is the file
-            # the reader is already in.
+            # out of the budget below, which is about OUTGOING links:
+            # "link the responsible file once" has no addressee when the
+            # target is the file the reader is already in.
             if not anchor.strip("#^"):
                 # '[[]]', '[[#]]', '[[|alias]]' - a link naming nothing
                 # at all. Skipped rather than reported, which is what
@@ -1934,8 +1907,14 @@ def check_links(vault, path, lines, findings, strict, hub=False):
                                         f"[[{anchor}]] names no heading and no "
                                         "block identifier in this file"))
             continue
-        total += 1
-        targets[target] += 1
+        # The budget counts prose links only. A table row is a relation slot
+        # the templates mandate - one allocation row per requirement, one
+        # source cell per row - and a link of a note to itself is the same
+        # self-reference as a same-file anchor. Measured on six vaults, 11
+        # of 14 budget findings came from exactly those two shapes
+        # (01_methodvault, DEC-MTH-053).
+        if target != path.stem and not line.lstrip().startswith("|"):
+            total += 1
         resolved = (target in md_names or target in all_names
                     or f"{target}.md" in all_names)
         if not resolved:
@@ -1943,15 +1922,10 @@ def check_links(vault, path, lines, findings, strict, hub=False):
             findings.append(Finding(sev, "link-unresolved", str(path), i,
                                     f"[[{target}]] does not resolve to any file "
                                     f"under {vault.index_root_label()}"))
-    budget = LINK_BUDGET_HUB if hub else LINK_BUDGET
-    if total > budget:
+    if total > LINK_BUDGET:
         findings.append(Finding("WARN", "link-budget", str(path), None,
-                                f"{total} outgoing links > {budget}. Link the responsible "
-                                "file once - do not link every mention."))
-    for t, c in targets.items():
-        if c > LINK_REPEAT_WARN:
-            findings.append(Finding("WARN", "link-repeat", str(path), None,
-                                    f"[[{t}]] linked {c}x in one file."))
+                                f"{total} outgoing prose links > {LINK_BUDGET}. Link the "
+                                "responsible file once - do not link every mention."))
 
 
 def check_fence(abbr, path, line, info, body_lines, findings):
@@ -2722,12 +2696,11 @@ def validate_vault_wide(vault: Vault):
                  if not f.name.startswith("00_")] if arcdir else []
     marked, near = vault.overview_scan()
     if len(marked) != 1:
-        # Reported for EVERY vault, not only one with ARC notes in it. The
-        # entry point decides the hub link budget as well as the
-        # reachability scan, so a vault whose ARC folder is still empty -
-        # which every project derived with the three-domain profile is on
-        # day one - would otherwise have its overview drop to the ordinary
-        # budget with nothing said. That is the silence this rule exists
+        # Reported for EVERY vault, not only one with ARC notes in it. A
+        # vault whose ARC folder is still empty - which every project
+        # derived with the three-domain profile is on day one - would
+        # otherwise start skipping the reachability scan with its first ARC
+        # note and nothing said. That is the silence this rule exists
         # against, and gating the finding on ARC content would have kept a
         # smaller copy of it.
         marker = overview_marker(vault.schema())
@@ -2745,8 +2718,7 @@ def validate_vault_wide(vault: Vault):
                 f"{p.name} carries {d}" for p, d in near)
         findings.append(Finding(
             "WARN", "overview-unidentified", str(vault.root), None,
-            msg + " - the hub link budget is granted to no file and the ARC "
-            "reachability check did not run"))
+            msg + " - the ARC reachability check did not run"))
     if arc_files and len(marked) == 1:
         contained = arc_containment(vault)
         if contained is None:
