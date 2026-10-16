@@ -69,6 +69,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-049 | 2026-08-20 | [[DEC_A_Declared_Relation_Without_A_Check_Of_Its_Own]] — corrected-by is declared and deliberately unenforced, with the gap written down |
 | DEC-MTH-050 | 2026-08-21 | [[DEC_Per_File_Checks_Follow_The_Role_Map]] — the per-file domain checks decide by canonical role |
 | DEC-MTH-051 | 2026-08-21 | [[DEC_Reachability_Is_Decided_From_A_Self_Declared_Overview]] — the vault's entry point declares itself, and a module its parent contains is reachable |
+| DEC-MTH-052 | 2026-10-16 | [[DEC_A_Citation_States_What_Its_Source_Reports]] — the enforcement layer's research citations are corrected to what their sources report |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather
