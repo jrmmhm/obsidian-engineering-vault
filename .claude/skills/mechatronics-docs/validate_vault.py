@@ -642,6 +642,7 @@ class Vault:
         # row as (requirement, REQ file) (DEC-MTH-054).
         self.accepted = Counter()
         self.deferred = []
+        self._ignored = {}
 
     def schema(self):
         if self._schema is None:
@@ -754,6 +755,28 @@ class Vault:
                                            or repo in self.doc_root.parents)
             self._index_root = self.doc_root if repo is None or inside else self.root
         return self._index_root
+
+    def is_gitignored(self, path: Path):
+        """Does the vault's repository ignore this path? False when unsure.
+
+        Asked about paths that do not exist, which git answers from its
+        ignore rules alone. A path outside the repository, no repository,
+        or a git that cannot answer is 'not ignored' - the answer that keeps
+        a missing path an ERROR.
+        """
+        repo = self.git_root()
+        if repo is None:
+            return False
+        key = str(path)
+        if key not in self._ignored:
+            try:
+                r = subprocess.run(["git", "-C", str(repo), "check-ignore", "-q",
+                                    "--", key],
+                                   capture_output=True, timeout=10, env=git_env())
+                self._ignored[key] = r.returncode == 0
+            except (OSError, subprocess.TimeoutExpired):
+                self._ignored[key] = False
+        return self._ignored[key]
 
     def index_root_label(self):
         """The boundary as the two findings name it, relative to project_root.
@@ -2206,6 +2229,23 @@ def check_paths(vault, path, lines, fm_end, findings):
             if len(segs) > 1:
                 candidates.append(vault.project_root / "/".join(segs[1:]))
             if not any(c.exists() for c in candidates):
+                # A gitignored path whose folder is absent too cannot exist
+                # on a fresh checkout - a clone directory CI never has. As an
+                # ERROR it made one project rewrite its paths until the
+                # check no longer saw them (01_methodvault, DEC-MTH-053).
+                # The folder test keeps a typo an ERROR: where the folder is
+                # there, the author's checkout can tell a wrong name from a
+                # missing file. Asked of the project-relative reading only:
+                # the fallback readings point at folders that never exist,
+                # and an ignore pattern like '*.log' matches them anywhere.
+                primary = candidates[0]
+                if not primary.parent.exists() and vault.is_gitignored(primary):
+                    findings.append(Finding(
+                        "WARN", "path-missing", str(path), i,
+                        f"referenced artifact '{token}' is unverifiable on this "
+                        "checkout (gitignored, and its folder is absent) - "
+                        "check it where the ignored files live"))
+                    continue
                 sev = "ERROR" if in_ref else "WARN"
                 msg = (f"referenced artifact '{token}' does not exist - "
                        "stale pointer (docs say A, disk says B)")
