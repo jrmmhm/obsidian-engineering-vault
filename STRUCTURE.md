@@ -189,9 +189,8 @@ either is `README.md`, under four conditions that include a CI step
 regenerating and diffing it — the exception is argued in the method vault, not
 assumed here.
 
-`REFERENCE.md` beside `SKILL.md` holds what an agent needs only on demand —
-the traceability export, which copy of the skill enforces and the tiers
-outside a session — so the skill text itself stays short.
+`REFERENCE.md` beside `SKILL.md` holds what an agent needs only on demand,
+so the skill text itself stays short; `SKILL.md` says when to open it.
 
 `ARCHITECTURE.md` in the same directory is the maintainer's view of the
 validator: its three stages and five entry points mapped onto the functions
