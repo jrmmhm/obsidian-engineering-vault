@@ -176,12 +176,11 @@ Its last line:
 
 <!-- tutorial-output: validator-draft -->
 ```text
--- 0 error(s), 2 warning(s), 0 near miss(es)
+-- 0 error(s), 1 warning(s), 0 near miss(es)
 ```
 
-Zero ERRORs — the gate. Above that line stand the two warnings, each naming
-its file with a path on your machine. One is the known `duplicate-basename`
-your generated README explains. The other is the one that matters now:
+Zero ERRORs — the gate. Above that line stands the one warning, naming its
+file with a path on your machine, and it is the one that matters now:
 
 ```
 [req-uncovered] REQ-DOC-001 is named by no TAE in 'verifies' - an unverified
@@ -267,13 +266,13 @@ Command, and the summary line it printed:
 
 ```
 $ python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault
--- 0 error(s), 2 warning(s), 0 near miss(es)
+-- 0 error(s), 1 warning(s), 0 near miss(es)
 ```
 
 ## Conclusion
 
-Zero ERRORs, so REQ-DOC-001 is met by this run. Both warnings are
-advisory and neither is an ERROR.
+Zero ERRORs, so REQ-DOC-001 is met by this run. The warning is
+advisory and not an ERROR.
 ````
 
 `verifies: [REQ-DOC-001]` is the half of the loop that lives here. It is a
@@ -305,7 +304,7 @@ Run the same two commands again.
 
 <!-- tutorial-output: validator-final -->
 ```text
--- 0 error(s), 1 warning(s), 0 near miss(es)
+-- 0 error(s), 0 warning(s), 0 near miss(es)
 ```
 
 The `req-uncovered` warning is gone — you closed what it was pointing at.
