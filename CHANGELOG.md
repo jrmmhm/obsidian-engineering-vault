@@ -39,8 +39,11 @@ decision.
   written in one row of an ADM tracker, and every other note links the
   tracker instead of restating it. Measured in two working vaults, 17 of 30
   false load-bearing claims were such a status, restated in several notes
-  and updated in one. The tracker row holds the current state, its date, a
-  one-sentence next step and a link; a finished row moves to a sibling
+  and updated in one. The tracker row holds the current state, its date,
+  the facts the next step needs (who acked, who is addressed next, the
+  current version), a one-sentence next step and a link; history that
+  outgrows a cell moves to its owning TAE, DEC or IMP or into a commit
+  message and is never dropped; a finished row moves to a sibling
   `<Tracker>_Closed` note; the ADM README teaches the shape, and ADM still
   has no file template. Two WARNs back it: `length` also fires on a file
   under the line limit whose words pass `size_limits.length_warn_words`
