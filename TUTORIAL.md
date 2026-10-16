@@ -183,8 +183,9 @@ Zero ERRORs — the gate. Above that line stands the one warning, naming its
 file with a path on your machine, and it is the one that matters now:
 
 ```
-[req-uncovered] REQ-DOC-001 is named by no TAE in 'verifies' - an unverified
-REQ is indistinguishable from an unmet one
+[req-uncovered] REQ-DOC-001: named by no TAE in 'verifies' - add each to a
+TAE's verifies:, or allocate them in a row whose status is Blocked, Deferred
+or TBD with the reason in a DEC
 ```
 
 Now the exporter:
