@@ -356,9 +356,9 @@ unit or service name, a function or file name, a port, a hostname — and
 lifecycle state, the status an item takes after the work is done, as the
 conventions file defines it under *Lifecycle state*. Lifecycle state goes
 stale fastest of all, because the event that changes it touches no file
-but the one somebody remembers. A TAE's Test Conditions are exempt: a
-version or setting recorded there is an observation of that run, not an
-owned fact.
+but the one somebody remembers. A TAE's Test Conditions — whatever title
+the vault's TAE template gives that section — are exempt: a version or
+setting recorded there is an observation of that run, not an owned fact.
 
 Why this is a rule and not a preference. Documentation goes stale
 silently — no build breaks, no test fails — and the content that goes
@@ -499,7 +499,8 @@ defect in the documentation, not a property of the system.
 3. Every behavioral claim evidenced or marked `(unverified)`?
 4. No concrete implementation values outside IMP/CMP/IFC/TAE/REQ tables,
    and every volatile fact you wrote owned by exactly one file — no path,
-   version, flag, value or unit name restated in a second note?
+   version, flag, value, unit name or lifecycle state restated in a second
+   note?
 5. All wikilinks resolve; all referenced artifact paths exist?
 6. Invalidation sweep done — no existing note contradicts the new state?
 7. Every touched REQ has a verifying TAE (or a recorded deferred one)?
