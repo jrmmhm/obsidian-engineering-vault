@@ -125,7 +125,8 @@ decision.
   after the noise cut, says that sessions which never invoke the skill and
   subagent writes are not validated in-session, and never lets the agent
   add a `validator-accept` on its own. The role table quotes the
-  conventions file again (CMP had drifted), the inert `invocation: auto`
+  conventions file again (six of its nine questions had drifted, CMP's
+  among them), the inert `invocation: auto`
   key is gone, and the post-write hook reports a validator crash to the
   user and the session instead of to stderr. No rule moved and no finding
   code changed: corrected documentation plus a hook fix, **MINOR** by the
