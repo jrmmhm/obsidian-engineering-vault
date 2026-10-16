@@ -68,26 +68,38 @@ contract applies to it either.
 
 K5, chosen by the operator on 2026-10-16.
 
-1. A tracker row carries the current state, the date it was reached, a
-   next step of one sentence and a link to the note that holds the detail.
-   A new state replaces the old one in the same cell; it is not appended.
-2. No dated follow-up section and no session log in an ADM note. The
+1. A tracker row carries the current state, the date it was reached, its
+   next-step facts, a next step of one sentence and a link to the note
+   that holds the detail. A new state replaces the old one in the same
+   cell; it is not appended. The next-step facts are what the next step
+   needs to be taken correctly — who reviewed or acked, who is addressed
+   next (recipients, Cc), the identifier of the current version — and stay
+   in the row or one named link away.
+2. A row's history moves; it is never dropped. When a cell grows past the
+   limit, its dated events and review narrative move to the note that owns
+   them — the TAE of the test, the DEC of the decision, the IMP of the
+   change — or into the commit message of the change that records them,
+   and the row links that note. Nothing leaves the vault without a place
+   it moved to.
+3. No dated follow-up section and no session log in an ADM note. The
    history of a row is the git log of the commits that changed it; the
    evidence is the TAE, the reasoning the DEC.
-3. A finished row leaves the tracker in the session that finishes it and
+4. A finished row leaves the tracker in the session that finishes it and
    moves, reduced to its final state, date and link, to a sibling note
-   named `<Tracker>_Closed` in the same folder. The tracker's Context links
-   that sibling. When the sibling reaches the length warning it is split
-   by year.
-4. No ADM template file. A template would make every existing ADM note owe
+   named `<Tracker>_Closed` in the same folder, after anything else it held
+   has moved under rule 2. The tracker's Context links that sibling. When
+   the sibling reaches the length warning it is split by year.
+5. No ADM template file. A template would make every existing ADM note owe
    its sections as a `template-sections` ERROR; the shape is taught by the
    ADM README instead.
-5. Two advisory measures back the rule: `length` also counts words in a
+6. Two advisory measures back the rule: `length` also counts words in a
    file the line count passes, and `adm-cell-long` names an ADM table cell
    longer than a set number of characters. Both limits live in
    `vault_schema.json` under `size_limits`; `adm-cell-long` cannot be
    accepted in a file's frontmatter, because a tracker that keeps its log
-   in a cell is exactly what the rule is for.
+   in a cell is exactly what the rule is for. Its message names the repair
+   as moving the history and keeping the next-step facts, never as
+   shortening the cell.
 
 ## Justification
 
@@ -116,6 +128,12 @@ K5, chosen by the operator on 2026-10-16.
   and that an item has one live row. A WARN on dated headings was measured
   and refused — publication drafts legitimately carry a posting date in
   their heading.
+- Rules 1 and 2 on next-step facts and moved history were added after an
+  A/B replay of the kernel send event. Agents given the first version of
+  this rule shortened an open tracker row and dropped the name of the
+  maintainer who had acked it and the Cc list of the next reply — facts
+  the next step needed and no other note held. Shortening is the wrong
+  repair; moving is the right one.
 - The existing trackers of the two measured vaults are not migrated here;
   that is a later batch per repository.
 - The two measures are a rule the vault did not have before and two new
