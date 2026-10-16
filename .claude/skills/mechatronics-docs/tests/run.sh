@@ -7604,6 +7604,101 @@ assert vv.advisory_spec(real) == vv.advisory_spec({}), "fallback reads different
 PY
 then ok x; else fail "FALLBACK_SCHEMA git_advisories and vault_schema.json have drifted apart"; fi
 
+# --- Unit 2: ref-unresolved ---------------------------------------------
+GR="$GA_TMP/Refs"
+GRV="$GR/00_documentation/01_projectvault"
+ga_vault "$GRV"
+mkdir -p "$GR/20_software"
+printf 'one\n' > "$GR/20_software/tool.py"
+printf '20_software/lib/\n20_software/shallow/\n20_software/part/\n' > "$GR/.gitignore"
+ga_git 2026-01-01 init -q -b main "$GR"
+ga_commit "$GR" 2026-01-01 "baseline"
+gr_head=$(ga_git 2026-01-01 -C "$GR" rev-parse --short=8 HEAD)
+gr_tree=$(ga_git 2026-01-01 -C "$GR" rev-parse --short=8 'HEAD^{tree}')
+# A commit that a rewrite leaves behind: amended away, then pruned.
+printf 'two\n' >> "$GR/20_software/tool.py"
+ga_commit "$GR" 2026-01-02 "to be rewritten"
+gr_old=$(ga_git 2026-01-02 -C "$GR" rev-parse --short=10 HEAD)
+ga_git 2026-01-03 -C "$GR" commit -q --amend --no-verify --no-gpg-sign -m "rewritten" >/dev/null 2>&1
+mkdir -p "$GR/20_software/lib"
+printf 'lib\n' > "$GR/20_software/lib/lib.c"
+ga_git 2026-01-04 init -q "$GR/20_software/lib"
+ga_commit "$GR/20_software/lib" 2026-01-04 "library"
+gr_lib=$(ga_git 2026-01-04 -C "$GR/20_software/lib" rev-parse --short=12 HEAD)
+IMPR="$GRV/06_implementation_(IMP)"
+ga_note "$IMPR/IMP_Dead.md" IMP 2026-01-05 active "Built at \`deadbee1\`."
+ga_note "$GRV/02_decisions_(DEC)/DEC_Prose.md" DEC 2026-01-05 active \
+  "The fragment was fixed in commit abcdef9, for gcc."
+ga_note "$IMPR/IMP_Live.md" IMP 2026-01-05 active \
+  "At \`$gr_head\`, tree \`$gr_tree\`, library \`$gr_lib\`."
+ga_note "$IMPR/IMP_Rewrite.md" IMP 2026-01-05 active "Measured at commit \`$gr_old\`."
+ga_note "$IMPR/IMP_Shapes.md" IMP 2026-01-05 active \
+  "Ids it must not read: \`DEADBEEF12\`, \`12345678901\`, \`9d55b199192a4be7d02c\`, \`0xdeadbeef\`, \`strictdoc@deadbee4\`."
+printf '```text\ndeadbee2\n`deadbee2`\n```\n' >> "$IMPR/IMP_Shapes.md"
+ga_note "$GRV/98_administration_(ADM)/ADM_Tracker.md" ADM 2026-01-05 active "Sent at \`deadbee3\`."
+cp -a "$GR" "$GA_TMP/RefsNoGit"
+rm -rf "$GA_TMP/RefsNoGit/.git" "$GA_TMP/RefsNoGit/20_software/lib/.git"
+gr_out=$(python3 "$VALIDATOR" "$GRV" 2>&1); gr_rc=$?
+TESTS=$((TESTS + 1))
+if [ $gr_rc -ne 2 ] && contains "$gr_out" \
+  "^WARN .*IMP_Dead\.md:11 \[ref-unresolved\] commit id(s) \`deadbee1\` resolve to no object in the vault's repository and 1 clone(s) under 20_software - .*repo@id"; then ok x; else
+  fail "a backticked commit id no repository holds must be reported as ref-unresolved:"
+  printf '%s\n' "$gr_out" | grep -E 'ref-unresolved|crash' | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$gr_out" "DEC_Prose\.md:11 \[ref-unresolved\] commit id(s) \`abcdef9\`"; then ok x; else
+  fail "a dead id written as 'commit <hex>' in prose must be reported:"
+  printf '%s\n' "$gr_out" | grep ref-unresolved | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! contains "$gr_out" "IMP_Rewrite\.md:[0-9]* \[ref-unresolved\]"; then ok x; else
+  fail "an amended-away commit resolves until its objects are pruned:"
+  printf '%s\n' "$gr_out" | grep IMP_Rewrite | sed 's/^/    /'; fi
+for quiet in IMP_Live IMP_Shapes ADM_Tracker; do
+  TESTS=$((TESTS + 1))
+  if ! contains "$gr_out" "$quiet\.md:[0-9]* \[ref-unresolved\]"; then ok x; else
+    fail "$quiet must not be reported as ref-unresolved:"
+    printf '%s\n' "$gr_out" | grep "$quiet" | sed 's/^/    /'; fi
+done
+ga_git 2026-01-06 -C "$GR" reflog expire --expire=now --all
+ga_git 2026-01-06 -C "$GR" gc -q --prune=now
+gr_out2=$(python3 "$VALIDATOR" "$GRV" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gr_out2" "IMP_Rewrite\.md:11 \[ref-unresolved\] commit id(s) \`$gr_old\`"; then ok x; else
+  fail "a rewritten-away commit must be reported once its objects are pruned:"
+  printf '%s\n' "$gr_out2" | grep ref-unresolved | sed 's/^/    /'; fi
+grn_out=$(python3 "$VALIDATOR" "$GA_TMP/RefsNoGit/00_documentation/01_projectvault" 2>&1); grn_rc=$?
+TESTS=$((TESTS + 1))
+if [ $grn_rc -ne 2 ] && ! contains "$grn_out" "ref-unresolved"; then ok x; else
+  fail "without a repository ref-unresolved must say nothing, got rc=$grn_rc:"
+  printf '%s\n' "$grn_out" | grep -E 'ref-unresolved|crash' | sed 's/^/    /'; fi
+# One shallow repository among those asked: 'missing' there proves nothing.
+ga_git 2026-01-07 clone -q --depth 1 "file://$GR/20_software/lib" "$GR/20_software/shallow" >/dev/null 2>&1
+grs_out=$(python3 "$VALIDATOR" "$GRV" 2>&1)
+TESTS=$((TESTS + 1))
+if [ -e "$GR/20_software/shallow/.git/shallow" ] && ! contains "$grs_out" "ref-unresolved"; then ok x; else
+  fail "a shallow repository among those asked must silence ref-unresolved:"
+  printf '%s\n' "$grs_out" | grep ref-unresolved | sed 's/^/    /'; fi
+rm -rf "$GR/20_software/shallow"
+# A partial clone is never asked to fetch. Its promisor holds a commit the
+# clone does not: a lazy fetch would make the id resolve and leave the
+# object behind; the network block keeps it missing.
+GPS="$GA_TMP/promisor"
+mkdir -p "$GPS"
+printf 'p\n' > "$GPS/p.txt"
+ga_git 2026-01-08 init -q -b main "$GPS"
+ga_commit "$GPS" 2026-01-08 "promisor baseline"
+ga_git 2026-01-08 -C "$GPS" config uploadpack.allowFilter true
+ga_git 2026-01-08 -C "$GPS" config uploadpack.allowAnySHA1InWant true
+ga_git 2026-01-08 clone -q --filter=blob:none "file://$GPS" "$GR/20_software/part" >/dev/null 2>&1
+printf 'q\n' >> "$GPS/p.txt"
+ga_commit "$GPS" 2026-01-09 "only on the promisor"
+gp_new=$(ga_git 2026-01-09 -C "$GPS" rev-parse HEAD)
+ga_note "$IMPR/IMP_Promisor.md" IMP 2026-01-09 active "Fixed in commit $gp_new upstream."
+python3 "$VALIDATOR" "$GRV" >/dev/null 2>&1
+TESTS=$((TESTS + 1))
+if [ "$(ga_git 2026-01-09 -C "$GR/20_software/part" config remote.origin.promisor)" = true ] \
+   && ! GIT_NO_LAZY_FETCH=1 ga_git 2026-01-09 -C "$GR/20_software/part" cat-file -e "$gp_new" 2>/dev/null; then ok x; else
+  fail "ref-unresolved must never make a partial clone fetch a missing object"; fi
+
 rm -rf "$GA_TMP"
 # ==========================================================================
 # END the git-aware advisories
