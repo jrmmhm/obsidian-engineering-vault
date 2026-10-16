@@ -7,8 +7,9 @@ nothing is repeated below, so there is nothing here that can drift out of date.
 - Project rules and the documentation method → `CLAUDE.md`
 - Which folder holds which kind of artifact → `STRUCTURE.md`
 - The documentation skill, its validator and its traceability exporter →
-  `.claude/skills/mechatronics-docs/` (`SKILL.md` describes the method and the
-  tools; the tools are plain Python and need no particular agent to run)
+  `.claude/skills/mechatronics-docs/` (`SKILL.md` describes the method,
+  `REFERENCE.md` the tools; the tools are plain Python and need no particular
+  agent to run)
 
 The rules keep the name `CLAUDE.md` for a mechanical reason: Claude Code reads
 `CLAUDE.md` and not `AGENTS.md`. One set of rules, one file, and this pointer
