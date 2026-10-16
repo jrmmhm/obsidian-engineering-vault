@@ -144,6 +144,19 @@ decision.
 
 ### Fixed
 
+- **The enforcement layer's research citations say what their sources
+  say** — `DEC_Enforcement_Layer_For_The_Vault_Conventions`, the record
+  every validator change refines, quoted the DocPrism ablation as "98%
+  flag rate at 14% accuracy vs 94%" where the paper reports flag rates of
+  98% and 14% and F1 0.22 and 0.77, called a steady degradation under
+  instruction count a "collapse", called one mitigation of compaction loss
+  the "only" one, and dropped the caveats two other papers attach to their
+  findings. Six citation sites now state what each source reports, checked
+  against the papers on 2026-10-16. The decision stands on the corrected
+  evidence. The record declares the correction and points at
+  [`DEC_A_Citation_States_What_Its_Source_Reports`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Citation_States_What_Its_Source_Reports.md)
+  with a `Corrected by:` line. No rule moves and no vault gains a finding;
+  corrected documentation: MINOR.
 - **A file carrying two template contracts is held to both** —
   `check_sections` scored a file against every template of its domain and
   kept the best, so an ARC file carrying the main-module template's two
