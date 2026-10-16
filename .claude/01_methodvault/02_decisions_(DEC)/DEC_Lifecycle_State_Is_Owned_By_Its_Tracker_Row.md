@@ -5,7 +5,7 @@ created: 2026-10-16
 last-verified: 2026-10-16
 ---
 Date: 2026-10-16
-Status: Draft
+Status: Accepted
 
 ## Context
 

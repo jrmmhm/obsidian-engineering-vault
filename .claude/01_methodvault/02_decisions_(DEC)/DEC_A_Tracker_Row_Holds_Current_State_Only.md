@@ -5,7 +5,7 @@ created: 2026-10-16
 last-verified: 2026-10-16
 ---
 Date: 2026-10-16
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -82,10 +82,12 @@ K5, chosen by the operator on 2026-10-16.
 4. No ADM template file. A template would make every existing ADM note owe
    its sections as a `template-sections` ERROR; the shape is taught by the
    ADM README instead.
-5. Two advisory measures back the rule (Stage B, after the rebase onto the
-   validator changes in flight): `length` also counts words, and a new
-   `adm-cell-long` WARN names an ADM table cell longer than a set number of
-   characters. Both thresholds live in `vault_schema.json`.
+5. Two advisory measures back the rule: `length` also counts words in a
+   file the line count passes, and `adm-cell-long` names an ADM table cell
+   longer than a set number of characters. Both limits live in
+   `vault_schema.json` under `size_limits`; `adm-cell-long` cannot be
+   accepted in a file's frontmatter, because a tracker that keeps its log
+   in a cell is exactly what the rule is for.
 
 ## Justification
 
