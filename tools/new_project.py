@@ -10,8 +10,8 @@ worked example along the README's documented deletion path, rewrites the CI
 workflow to the two steps that hold in a derived project (issue #85), and
 generates a project README carrying the project name. It finishes by running
 the derived copy's own vault validator and refuses to report success unless
-the output matches the predicted state: zero ERRORs and either the one known
-`duplicate-basename` warning or, with --rename-docs-readme, none at all.
+the output matches the predicted state: zero ERRORs and zero warnings, with
+or without --rename-docs-readme.
 
 The strip list is assembled from what the repository says about itself
 (CONTRIBUTING.md and CHANGELOG.md blockquotes, STRUCTURE.md's per-directory
@@ -100,8 +100,8 @@ MINIMAL_PARKED_DOMAINS = [
 # resolves: the name index is built over the whole documentation root.
 PARK_REL = "00_documentation/03_vault_domains_not_in_use"
 # Not 'README.md'. That name exists twice under 00_documentation already, and a
-# third one would make the warning-free state of --rename-docs-readme
-# unreachable - measured as the difference between one warning and none.
+# third one would be one more file a [[README]] link could mean - the very
+# ambiguity --rename-docs-readme exists to remove.
 PARK_README_NAME = "00_domains_not_in_use_README.md"
 
 PARK_README = """\
@@ -317,14 +317,15 @@ RENAME_REFERENCE = (
     "See `00_documentation/02_documents/00_documents_README.md` for the full type table.")
 
 WARN_PARAGRAPH = """\
-## Known validator warning
+## Two files called README
 
 `01_projectvault/README.md` and `02_documents/README.md` share the basename
-`README`, and the validator resolves a wikilink by its basename alone, so it
-reports one `duplicate-basename` WARN for this layout. It is advisory: keeping
+`README`, and the validator resolves a wikilink by its basename alone. Keeping
 both names is fine as long as no wikilink addresses either file as
-`[[README]]`. Renaming `00_documentation/02_documents/README.md` (for example
-to `00_documents_README.md`) is the only remedy.
+`[[README]]`: the moment one does, the link is ambiguous and the validator
+reports it as `duplicate-basename`. A path-qualified link does not resolve
+here, so renaming `00_documentation/02_documents/README.md` (for example to
+`00_documents_README.md`) is the only remedy.
 
 """
 
@@ -544,8 +545,8 @@ def main():
                         "into them")
     parser.add_argument("--rename-docs-readme", action="store_true",
                         help="rename 00_documentation/02_documents/README.md "
-                        f"to {RENAMED_NAME}, resolving the known "
-                        "duplicate-basename validator warning")
+                        f"to {RENAMED_NAME}, so that a [[README]] wikilink "
+                        "is never ambiguous (duplicate-basename)")
     args = parser.parse_args()
 
     if sys.version_info < (3, 8):
@@ -621,7 +622,6 @@ def main():
               file=sys.stderr)
         raise
 
-    expected_warns = 0 if args.rename_docs_readme else 1
     rc, output, errors, warns = run_validator(target)
 
     print(f"Derived project '{name}' at {target}   ({version})")
@@ -666,21 +666,13 @@ def main():
           "00_documentation/01_projectvault/system_overview.md")
     print("  - git init && git add -A && git commit  (no git required until "
           "here)")
-    if not args.rename_docs_readme:
-        print("  - decide the README basename collision (see 'Known validator"
-              " warning'")
-        print("    in the generated README.md)")
     print()
     print("Validator check of the derived vault:")
     print(output)
     print()
 
-    if expected_warns:
-        predicted = "0 error(s), 1 warning(s) - the known duplicate-basename WARN"
-    else:
-        predicted = "0 error(s), 0 warning(s)"
-    ok = (rc == 0 and errors == 0 and warns == expected_warns
-          and (expected_warns == 0 or "duplicate-basename" in output))
+    predicted = "0 error(s), 0 warning(s)"
+    ok = rc == 0 and errors == 0 and warns == 0
     if ok:
         print(f"Verified: matches the predicted state ({predicted}).")
         return 0

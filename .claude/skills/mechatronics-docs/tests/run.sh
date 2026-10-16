@@ -1054,6 +1054,9 @@ Duplicate basename fixture, first instance.
 Seeded conclusion.
 EOF
 cp "$W/07_testing_and_evidence_(TAE)/TAE_Dup.md" "$W/02_decisions_(DEC)/TAE_Dup.md"
+# A shared stem is only a defect where a link names it (DEC-MTH-053), so the
+# pair gets the one link that makes it ambiguous.
+printf 'Which evidence note is meant here: [[TAE_Dup]]?\n' > "$W/dup_link.md"
 
 # Fenced blocks past the record threshold. IMP_Host_Copy carries a bare one
 # (a copy - ERROR) and a declaration that names nothing (not a declaration -
@@ -2334,7 +2337,7 @@ if [ $rc -ne 2 ] && ! contains "$out" "id-vanished"; then ok x; else
 # - this asserts that mechanism rather than assuming it.
 SIDR="testsession-ratchet-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
-      "/tmp/claude-mechdocs/blocks-$SIDR"
+      "/tmp/claude-mechdocs/widehash-$SIDR"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDR" \
   "$I/03_architecture_(ARC)/ARC_Qualifier.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 rout=$(printf '{"session_id":"%s"}' "$SIDR" | python3 "$VALIDATOR" --hook stop 2>&1)
@@ -2367,7 +2370,7 @@ if ! contains "$rout" "^vault validator session report"; then ok x; else
   printf '%s\n' "$rout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR" \
-      "/tmp/claude-mechdocs/blocks-$SIDR"
+      "/tmp/claude-mechdocs/widehash-$SIDR"
 
 # Issue #31 at the gate. A file that was already UTF-16 at HEAD must not
 # block the session that opens it: its baseline is computed from the blob
@@ -2380,7 +2383,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDR" "/tmp/claude-mechdocs/baseline-$SIDR"
 # that decodes the blob before the baseline is taken.
 SIDE="testsession-encoding-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
-      "/tmp/claude-mechdocs/blocks-$SIDE"
+      "/tmp/claude-mechdocs/widehash-$SIDE"
 for f in ARC_Powershell.md ARC_Empty.md; do
   printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDE" \
     "$I/03_architecture_(ARC)/$f" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
@@ -2409,7 +2412,7 @@ if ! contains "$emsg" "files created this session"; then ok x; else
   printf '%s\n' "$emsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDE" "/tmp/claude-mechdocs/baseline-$SIDE" \
-      "/tmp/claude-mechdocs/blocks-$SIDE"
+      "/tmp/claude-mechdocs/widehash-$SIDE"
 
 # The repair path, which is the reason encoding-not-utf8 is added to a
 # file's findings instead of replacing them. The session does exactly what
@@ -2430,7 +2433,7 @@ body = ("---\ndomain: ARC\nstatus: active\ncreated: 2026-01-09\n"
 PY
 SIDF="testsession-encfix-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
-      "/tmp/claude-mechdocs/blocks-$SIDF"
+      "/tmp/claude-mechdocs/widehash-$SIDF"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDF" \
   "$I/03_architecture_(ARC)/ARC_Powershell.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 fout=$(printf '{"session_id":"%s"}' "$SIDF" | python3 "$VALIDATOR" --hook stop 2>&1)
@@ -2462,7 +2465,7 @@ if contains "$fmsg" "ARC_Powershell\.md \[encoding-not-utf8, frontmatter-missing
   printf '%s\n' "$fmsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDF" "/tmp/claude-mechdocs/baseline-$SIDF" \
-      "/tmp/claude-mechdocs/blocks-$SIDF"
+      "/tmp/claude-mechdocs/widehash-$SIDF"
 
 # The object disappears from the worktree while HEAD still carries it.
 rm -f "$I/03_architecture_(ARC)/ARC_Thermal.md" \
@@ -2520,7 +2523,7 @@ p.write_text(p.read_text(encoding="utf-8").replace("## Kontext", "## Context"),
 PY
 SIDG="testsession-resolved-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
-      "/tmp/claude-mechdocs/blocks-$SIDG"
+      "/tmp/claude-mechdocs/widehash-$SIDG"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDG" \
   "$I/03_architecture_(ARC)/ARC_Resolved.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 gout=$(printf '{"session_id":"%s"}' "$SIDG" | python3 "$VALIDATOR" --hook stop 2>&1)
@@ -2540,7 +2543,7 @@ if ! has_key decision "$gout"; then ok x; else
   printf '%s\n' "$gout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG" \
-      "/tmp/claude-mechdocs/blocks-$SIDG"
+      "/tmp/claude-mechdocs/widehash-$SIDG"
 
 # ... and the decision that the report asks a yes/no rather than comparing
 # counts, pinned so the next refactor cannot quietly widen it. The session
@@ -2556,7 +2559,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SIDG" "/tmp/claude-mechdocs/baseline-$SIDG"
 # the assertion below would pass against any implementation at all.
 SIDH="testsession-partial-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
-      "/tmp/claude-mechdocs/blocks-$SIDH"
+      "/tmp/claude-mechdocs/widehash-$SIDH"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDH" \
   "$I/03_architecture_(ARC)/ARC_Linker.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
 TESTS=$((TESTS + 1))
@@ -2584,7 +2587,7 @@ if ! contains "$pmsg" "ARC_Linker\.md \[link-unresolved\]"; then ok x; else
   printf '%s\n' "$pmsg" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDH" "/tmp/claude-mechdocs/baseline-$SIDH" \
-      "/tmp/claude-mechdocs/blocks-$SIDH"
+      "/tmp/claude-mechdocs/widehash-$SIDH"
 
 # ==========================================================================
 # Fixture 5: the schema itself. The validator reads vault_schema.json from
@@ -2963,8 +2966,10 @@ if ! contains "$out" "ARC_Prefix\.md.*\[template-sections\]"; then ok x; else
 # Hook modes (violation vault, synthetic payloads)
 # ==========================================================================
 SID="testsession-$$"
+# blocks-* is the counter file an older validator kept; removed so that the
+# assertion below that none is written cannot be satisfied by a leftover.
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
-      "/tmp/claude-mechdocs/blocks-$SID"
+      "/tmp/claude-mechdocs/widehash-$SID" "/tmp/claude-mechdocs/blocks-$SID"
 payload() { printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID" "$1"; }
 
 hout=$(payload "$W/03_architecture_(ARC)/ARC_Leaky.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
@@ -3013,15 +3018,22 @@ if contains "$(field systemMessage "$sout")" "vault validator blocked the turn e
   fail "a blocking turn must tell the user who blocked it:"
   printf '%s\n' "$sout" | sed 's/^/    /'
 fi
-sout=$(printf '{"session_id":"%s","stop_hook_active":true}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
-TESTS=$((TESTS + 1))
-if [ "$(field decision "$sout")" = "block" ]; then ok x; else fail "stop hook must block on 2nd attempt"; fi
+# The second stop of the same sequence: Claude Code marks the continuation
+# with stop_hook_active, and the gate has demanded the fix once already, so
+# it releases (DEC-MTH-055). No counter file: the payload decides.
 sout=$(printf '{"session_id":"%s","stop_hook_active":true}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
 smsg=$(field systemMessage "$sout")
+TESTS=$((TESTS + 1))
+if ! has_key decision "$sout"; then ok x; else
+  fail "the gate must release when stop_hook_active is true:"
+  printf '%s\n' "$sout" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ ! -e "/tmp/claude-mechdocs/blocks-$SID" ]; then ok x; else
+  fail "the gate must keep no block counter file"; fi
 # The fail-open report goes to the user and NOT to the model. The gate has
-# demanded these fixes twice already; a third automatic attempt is the
-# user's call. Asserting the field is what separates the two - the text
-# occurs in the output either way.
+# demanded these fixes once in this sequence already; another automatic
+# attempt is the user's call. Asserting the field is what separates the
+# two - the text occurs in the output either way.
 TESTS=$((TESTS + 1))
 if contains "$smsg" "UNRESOLVED"; then ok x; else
   fail "the fail-open report must reach the user as systemMessage:"
@@ -3030,8 +3042,6 @@ fi
 TESTS=$((TESTS + 1))
 if ! contains "$(field reason "$sout")" "UNRESOLVED"; then ok x; else
   fail "the fail-open report must not be handed back to the model as a reason"; fi
-TESTS=$((TESTS + 1))
-if ! has_key decision "$sout"; then ok x; else fail "stop hook must not block a 3rd time"; fi
 TESTS=$((TESTS + 1))
 if contains "$smsg" "vault-wide findings (advisory" && contains "$smsg" "req-uncovered"; then ok x; else
   fail "fail-open report must carry vault-wide advisory incl. req-uncovered"; fi
@@ -3044,6 +3054,19 @@ TESTS=$((TESTS + 1))
 n=$(printf '%s' "$smsg" | wc -c)
 if [ "$n" -lt 10000 ]; then ok x; else
   fail "the session report must stay under the 10000-character hook cap, got $n"; fi
+# A later stop sequence of the same session blocks again: the ERRORs are
+# still there and nothing has demanded them in this sequence. The counter
+# this replaced stayed advisory for the rest of the session after two.
+sout=$(printf '{"session_id":"%s","stop_hook_active":false}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if [ "$(field decision "$sout")" = "block" ]; then ok x; else
+  fail "a later stop sequence must block again on the same new ERRORs"; fi
+# Only a JSON true releases. A string is not the flag Claude Code sends,
+# and reading it as one would be the cheapest way to switch the gate off.
+sout=$(printf '{"session_id":"%s","stop_hook_active":"true"}' "$SID" | python3 "$VALIDATOR" --hook stop 2>&1)
+TESTS=$((TESTS + 1))
+if [ "$(field decision "$sout")" = "block" ]; then ok x; else
+  fail "stop_hook_active must release only as a JSON true"; fi
 
 # post hook outside any vault: silent no-op
 hout=$(payload "/tmp/not_a_vault_note.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
@@ -3053,7 +3076,7 @@ if [ $rc -eq 0 ] && [ -z "$hout" ]; then ok x; else fail "post hook outside vaul
 # clean precision file: post hook silent, stop report free of advisory noise
 SID2="testsession2-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2" \
-      "/tmp/claude-mechdocs/blocks-$SID2"
+      "/tmp/claude-mechdocs/widehash-$SID2"
 hout=$(printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID2" \
   "$V/06_implementation_(IMP)/IMP_MainBoard_ADC.md" | python3 "$VALIDATOR" --hook post 2>&1); rc=$?
 check "post hook on clean file exits 0" $rc
@@ -3064,7 +3087,7 @@ TESTS=$((TESTS + 1))
 if ! contains "$(field systemMessage "$sout")" "vault-wide"; then ok x; else
   fail "clean vault stop report must not add a vault-wide section"; fi
 rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2" \
-      "/tmp/claude-mechdocs/blocks-$SID2"
+      "/tmp/claude-mechdocs/widehash-$SID2"
 
 # Nothing to say -> say nothing. The report now renders in the transcript,
 # so an empty one is not a harmless newline any more: it would print
@@ -3074,7 +3097,7 @@ rm -f "/tmp/claude-mechdocs/touched-$SID2" "/tmp/claude-mechdocs/baseline-$SID2"
 # no longer exists, so no vault root is ever collected either).
 SID3="testsession3-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SID3" "/tmp/claude-mechdocs/baseline-$SID3" \
-      "/tmp/claude-mechdocs/blocks-$SID3"
+      "/tmp/claude-mechdocs/widehash-$SID3"
 cp "$V/06_implementation_(IMP)/IMP_MainBoard_ADC.md" \
    "$V/06_implementation_(IMP)/IMP_Transient.md"
 printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SID3" \
@@ -3087,7 +3110,7 @@ if [ $rc -eq 0 ] && [ -z "$sout" ]; then ok x; else
   printf '%s\n' "$sout" | sed 's/^/    /'
 fi
 rm -f "/tmp/claude-mechdocs/touched-$SID3" "/tmp/claude-mechdocs/baseline-$SID3" \
-      "/tmp/claude-mechdocs/blocks-$SID3"
+      "/tmp/claude-mechdocs/widehash-$SID3"
 
 # ==========================================================================
 # Fixture 8: the advisory cap. The whole report travels as one
@@ -3130,7 +3153,7 @@ EOF
 done
 SIDC="testsession-cap-$$"
 rm -f "/tmp/claude-mechdocs/touched-$SIDC" "/tmp/claude-mechdocs/baseline-$SIDC" \
-      "/tmp/claude-mechdocs/blocks-$SIDC"
+      "/tmp/claude-mechdocs/widehash-$SIDC"
 i=1
 while [ $i -le 20 ]; do
   printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDC" \
@@ -3176,7 +3199,7 @@ assert cap_report_lines([]) == []
 ' "$SKILL_DIR" 2>/dev/null; then ok x; else
   fail "the report cap must never drop an ERROR line"; fi
 rm -f "/tmp/claude-mechdocs/touched-$SIDC" "/tmp/claude-mechdocs/baseline-$SIDC" \
-      "/tmp/claude-mechdocs/blocks-$SIDC"
+      "/tmp/claude-mechdocs/widehash-$SIDC"
 
 # ==========================================================================
 # Crash mode and real template vault
@@ -3212,13 +3235,21 @@ else
 fi
 
 # The method vault carries the decision record of this skill. It is audited by
-# name in CI; this assertion says the same thing locally. Its length WARNs are
-# the measured result of migrating 31 real decisions and are not an ERROR.
+# name in CI; this assertion says the same thing locally. The long decision
+# records accept their length WARN in their own frontmatter (DEC-MTH-054).
 TESTS=$((TESTS + 1))
 if [ -d "$METHOD_VAULT" ]; then
   out=$(python3 "$VALIDATOR" "$METHOD_VAULT" 2>&1); rc=$?
   if [ $rc -eq 0 ]; then ok x; else
     fail "method vault must contain no ERRORs:"; printf '%s\n' "$out" | grep '^ERROR' | sed 's/^/    /'
+  fi
+  # A long record states that it is long on purpose in its own frontmatter;
+  # one that does not is a decision nobody made (DEC-MTH-054). Pinned so a
+  # dropped acceptance cannot hide behind the exit code, which WARNs never move.
+  TESTS=$((TESTS + 1))
+  if ! contains "$out" "\[length\]" && contains "$out" "^accepted: [0-9]* finding(s)"; then ok x; else
+    fail "every long method-vault record must accept its length WARN, and the audit must count them:"
+    printf '%s\n' "$out" | grep -E '\[length\]|^accepted' | sed 's/^/    /'
   fi
 else
   fail "method vault not found at $METHOD_VAULT"
@@ -4139,11 +4170,24 @@ def links(lines, **kw):
 
 # A link written the way a table requires resolves to the file it names.
 assert links(["## Context", r"| [[CMP_AD7175-2\|the converter]] | x |"]) == []
-# 60 same-file anchors trip neither counter: both are about OUTGOING links.
+# 60 same-file anchors do not trip the budget: it is about OUTGOING links.
 assert links(["## Context"] + ["see [[#Context]]"] * 60) == []
-# ... and the positive control that says those counters still work at all.
-assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 60) == \
-    ["link-budget", "link-repeat"]
+# ... and the positive control that says the budget still works at all.
+# link-repeat is gone: none of its measured findings was actionable
+# (DEC-MTH-053), and the budget covers the carpet it was meant to catch.
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 60) == ["link-budget"]
+# The budget's edge, both sides: twenty prose links are allowed, one more is not.
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 20) == []
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 21) == ["link-budget"]
+# Table rows are the template's relation slots - one allocation row per
+# requirement - and are not counted, escaped alias or not, indented or not.
+assert links(["## Context"] + [r"| [[CMP_AD7175-2]] | x |"] * 60) == []
+assert links(["## Context"] + [r"  | [[CMP_AD7175-2\|adc]] | x |"] * 60) == []
+# A link of a note to itself is a self-reference, not an outgoing link.
+assert links(["## Context"] + ["see [[ARC_Data_Acquisition]]"] * 60) == []
+# Twenty table rows plus twenty-one prose links: the prose alone decides.
+assert links(["## Context"] + ["| [[CMP_AD7175-2]] | x |"] * 20
+             + ["see [[CMP_AD7175-2]]"] * 21) == ["link-budget"]
 # A link naming nothing is no link - the shape a REF template writes as a
 # placeholder, and the one line in nine vaults where old and new disagree.
 assert links(["## Context", "- [[]] -", "- [[#]]", "- [[|alias]]"]) == []
@@ -4386,15 +4430,37 @@ if [ $ci_rc -eq 0 ] && contains "$ci_out" "OK - the entry reaches this copy"; th
 fi
 
 # The revision has to be ON the report, not merely defined in the module.
-# It is the only thing that tells two copies apart: the vendored copy of a
-# derived project ships without tests/ on purpose, so equal content is not
-# the question an installed-copy check can ask.
-CI_REV=$(python3 -c 'import re,sys; s=open(sys.argv[1]).read(); m=re.search(r"^SKILL_REVISION = \"([^\"]+)\"", s, re.M); print(m.group(1) if m else "")' "$VALIDATOR")
+# It is the only thing that tells two copies apart. Since DEC-MTH-055 it is
+# derived from the bytes of the files that decide behaviour, never from the
+# whole directory: the vendored copy of a derived project ships without
+# tests/ on purpose.
+CI_REV=$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import validate_vault as vv; print(vv.skill_revision())' "$SKILL_DIR")
 TESTS=$((TESTS + 1))
 if [ -n "$CI_REV" ] && contains "$ci_out" "(rev $CI_REV)"; then ok x; else
   fail "--check-install must name the revision of the copy that answers:"
   printf '%s\n' "$ci_out" | sed 's/^/    /'
 fi
+
+# Two copies that differ in one byte print two revisions; identical copies
+# print one, wherever they lie; a copy missing a file it would read still
+# answers. Measured on real copies, not by recomputing the formula - a
+# formula checked against itself proves nothing.
+rev_of() { env HOME="$CI_A" python3 "$1/validate_vault.py" --check-install 2>&1 \
+  | sed -n 's/^this copy: .*(rev \([0-9a-f]*\))$/\1/p'; }
+for c in same other bytes noexp; do
+  mkdir -p "$CI_TMP/rev-$c"
+  cp "$VALIDATOR" "$SKILL_DIR/vault_schema.json" "$SKILL_DIR/export_traceability.py" "$CI_TMP/rev-$c/"
+done
+printf ' ' >> "$CI_TMP/rev-bytes/vault_schema.json"
+rm -f "$CI_TMP/rev-noexp/export_traceability.py"
+TESTS=$((TESTS + 1))
+if [ "$(rev_of "$CI_TMP/rev-same")" = "$CI_REV" ] \
+   && [ "$(rev_of "$CI_TMP/rev-other")" = "$CI_REV" ] \
+   && [ -n "$(rev_of "$CI_TMP/rev-bytes")" ] \
+   && [ "$(rev_of "$CI_TMP/rev-bytes")" != "$CI_REV" ] \
+   && [ -n "$(rev_of "$CI_TMP/rev-noexp")" ] \
+   && [ "$(rev_of "$CI_TMP/rev-noexp")" != "$CI_REV" ]; then ok x; else
+  fail "the revision must follow the content: same=$(rev_of "$CI_TMP/rev-same") bytes=$(rev_of "$CI_TMP/rev-bytes") noexp=$(rev_of "$CI_TMP/rev-noexp") own=$CI_REV"; fi
 
 # Issue #40 itself: the link carries a path this host does not have. The
 # stored path must appear - it is what names the host that wrote it.
@@ -4444,7 +4510,7 @@ if [ $ci_rc -eq 1 ] && contains "$ci_out" "MISMATCH"; then ok x; else
 fi
 
 rm -f "/tmp/claude-mechdocs/touched-$SID" "/tmp/claude-mechdocs/baseline-$SID" \
-      "/tmp/claude-mechdocs/blocks-$SID"
+      "/tmp/claude-mechdocs/widehash-$SID"
 
 # ==========================================================================
 # Fixture 9b: which copy the hooks execute (DEC-MTH-045).
@@ -4628,7 +4694,9 @@ if grep -q "REQ-COV-002" "$CV/03_architecture_(ARC)/ARC_Coverage.md" && \
   ok x; else fail "the must-not-count identifiers are not in the fixture at all"; fi
 
 cv_out=$(python3 "$VALIDATOR" "$CV" 2>&1)
-uncovered() { contains "$cv_out" "\[req-uncovered\] $1"; }
+# One finding per REQ file and kind of gap since DEC-MTH-053: the
+# identifier is one of a list that ends at the first colon.
+uncovered() { contains "$cv_out" "\[req-uncovered\] [^:]*\b$1\b"; }
 
 # The closed loop: silent. Paired with the five below, so a check that
 # stopped running cannot pass as a pass.
@@ -4646,13 +4714,19 @@ done
 # The finding has to name which half of the loop is missing, or it cannot
 # be acted on. Three shapes, three sentences.
 TESTS=$((TESTS + 1))
-if contains "$cv_out" "\[req-uncovered\] REQ-COV-002 has no allocation row naming it and no TAE"; then
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-002, REQ-COV-003, REQ-COV-004: no allocation row names them and no TAE"; then
   ok x; else fail "a mention-only requirement must be reported as missing BOTH halves"; fi
 TESTS=$((TESTS + 1))
-if contains "$cv_out" "\[req-uncovered\] REQ-COV-005 is named by no TAE in 'verifies'"; then
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-005: named by no TAE in 'verifies'"; then
   ok x; else fail "an allocated requirement must be reported as missing the evidence half"; fi
+# ... and one line per kind, not one per requirement (DEC-MTH-053): five
+# uncovered requirements of one file, three kinds, three lines.
 TESTS=$((TESTS + 1))
-if contains "$cv_out" "\[req-uncovered\] REQ-COV-006 is verified by TAE_Coverage but no allocation row"; then
+if [ "$(printf '%s\n' "$cv_out" | grep -c '\[req-uncovered\]')" = "3" ]; then ok x; else
+  fail "req-uncovered must group one REQ file's gaps by kind:"
+  printf '%s\n' "$cv_out" | grep req-uncovered | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$cv_out" "\[req-uncovered\] REQ-COV-006: verified by TAE_Coverage but no allocation row"; then
   ok x; else fail "a verified requirement must be reported as missing the allocation half"; fi
 
 # A requirement row the graph does not carry - here one under a heading of
@@ -4684,11 +4758,11 @@ printf '## Context\n\n## Allocation and Verification\n' \
   > "$CV_B/03_architecture_(ARC)/00_ARC_file_template.md"
 cvb_out=$(python3 "$VALIDATOR" "$CV_B" 2>&1)
 TESTS=$((TESTS + 1))
-if ! contains "$cvb_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+if ! contains "$cvb_out" "\[req-uncovered\] [^:]*\bREQ-COV-006\b"; then ok x; else
   fail "without an allocation binding the allocation half must not be held against a REQ"; fi
 TESTS=$((TESTS + 1))
-if contains "$cvb_out" "\[req-uncovered\] REQ-COV-002" && \
-   contains "$cvb_out" "\[req-uncovered\] REQ-COV-005"; then ok x; else
+if contains "$cvb_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b" && \
+   contains "$cvb_out" "\[req-uncovered\] [^:]*\bREQ-COV-005\b"; then ok x; else
   fail "without an allocation binding the verification half must still be enforced"; fi
 
 # (c) The exporter missing beside the validator - what a project that
@@ -4702,8 +4776,8 @@ TESTS=$((TESTS + 1))
 if [ $cve_rc -ne 2 ]; then ok x; else
   fail "a missing exporter must not crash the validator"; fi
 TESTS=$((TESTS + 1))
-if contains "$cve_out" "\[req-uncovered\] REQ-COV-002" && \
-   ! contains "$cve_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+if contains "$cve_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b" && \
+   ! contains "$cve_out" "\[req-uncovered\] [^:]*\bREQ-COV-006\b"; then ok x; else
   fail "without the exporter the verification half must still decide alone"; fi
 
 # (d) A vault mid-translation: the requirements folder exists twice, and
@@ -4747,7 +4821,7 @@ TESTS=$((TESTS + 1))
 if [ $cvd_rc -ne 2 ]; then ok x; else
   fail "a vault carrying two requirement folders must not crash the validator"; fi
 TESTS=$((TESTS + 1))
-if ! contains "$cvd_out" "\[req-uncovered\] REQ-COV-001"; then ok x; else
+if ! contains "$cvd_out" "\[req-uncovered\] [^:]*\bREQ-COV-001\b"; then ok x; else
   fail "a mid-translation vault must not lose the coverage of a closed loop:"
   printf '%s\n' "$cvd_out" | grep "REQ-COV-001" | sed 's/^/    /'; fi
 
@@ -4890,8 +4964,8 @@ TESTS=$((TESTS + 1))
 if [ $cvf_rc -ne 2 ]; then ok x; else
   fail "a refused schema must not crash the validator"; fi
 TESTS=$((TESTS + 1))
-if contains "$cvf_out" "\[req-uncovered\] REQ-COV-002" && \
-   ! contains "$cvf_out" "\[req-uncovered\] REQ-COV-006"; then ok x; else
+if contains "$cvf_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b" && \
+   ! contains "$cvf_out" "\[req-uncovered\] [^:]*\bREQ-COV-006\b"; then ok x; else
   fail "under a refused schema the verification half must still decide alone"; fi
 # Issue #66: the coverage checks fire in translated vaults. Fixture 3's
 # twin pair carries a requirements and an evidence domain since this
@@ -4910,7 +4984,7 @@ if contains "$de66_out" "\[verifies-unknown-req\] ANF-MES-999 is not defined in 
   fail "a dangling 'verifies' id in a German vault must be reported with its own prefix:"
   printf '%s\n' "$de66_out" | grep -i "verifies" | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
-if contains "$de66_out" "\[req-uncovered\] ANF-MES-002"; then ok x; else
+if contains "$de66_out" "\[req-uncovered\] [^:]*\bANF-MES-002\b"; then ok x; else
   fail "an unverified requirement in a German vault must be reported as uncovered:"
   printf '%s\n' "$de66_out" | grep "ANF-MES" | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
@@ -4919,13 +4993,13 @@ if contains "$de66_out" "\[req-duplicate-global\].*ANF-MES-001"; then ok x; else
 # The verified row stays silent - a check that fires on everything would
 # also satisfy the three assertions above.
 TESTS=$((TESTS + 1))
-if ! contains "$de66_out" "\[req-uncovered\] ANF-MES-001"; then ok x; else
+if ! contains "$de66_out" "\[req-uncovered\] [^:]*\bANF-MES-001\b"; then ok x; else
   fail "a verified requirement must not be reported as uncovered"; fi
 # The English twin fires the same three codes under its own prefix; the
 # fixture 3 multiset assertion compares the whole runs code by code.
 TESTS=$((TESTS + 1))
 if contains "$en66_out" "\[verifies-unknown-req\] REQ-MES-999" && \
-   contains "$en66_out" "\[req-uncovered\] REQ-MES-002" && \
+   contains "$en66_out" "\[req-uncovered\] [^:]*\bREQ-MES-002\b" && \
    contains "$en66_out" "\[req-duplicate-global\].*REQ-MES-001"; then ok x; else
   fail "the English twin must fire the same three codes under its own prefix"; fi
 
@@ -4937,11 +5011,11 @@ if contains "$en66_out" "\[verifies-unknown-req\] REQ-MES-999" && \
 # handoff itself is the exporter's export-duplicate-role finding, and the
 # absence asserted in fixture 10(d) still holds beside these.
 TESTS=$((TESTS + 1))
-if contains "$cvd_out" "\[req-uncovered\] ANF-COV-001"; then ok x; else
+if contains "$cvd_out" "\[req-uncovered\] [^:]*\bANF-COV-001\b"; then ok x; else
   fail "the mid-translation vault's own German row must be reported as uncovered:"
   printf '%s\n' "$cvd_out" | grep "ANF-COV" | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
-if ! contains "$cvd_out" "\[req-uncovered\] REQ-COV-002"; then ok x; else
+if ! contains "$cvd_out" "\[req-uncovered\] [^:]*\bREQ-COV-002\b"; then ok x; else
   fail "English rows of a mid-translation vault leave the coverage path with the role"; fi
 
 # The fallback must not switch the role map off silently: FALLBACK_SCHEMA
@@ -5166,21 +5240,22 @@ if [ -f "$NP" ]; then
     fail "derivation-script reference survives in STRUCTURE.md/README.md"; else ok x; fi
 
   # The generated README carries the target's name and, on the default
-  # path, the explanation of the one WARN the validator will keep showing.
+  # path, the explanation of when the two README files become a finding.
   TESTS=$((TESTS + 1))
   if [ "$(head -n 1 "$ND/README.md")" = "# myproj" ]; then ok x; else
     fail "generated README must open with '# myproj'"; fi
   TESTS=$((TESTS + 1))
   if grep -q "duplicate-basename" "$ND/README.md"; then ok x; else
-    fail "default derivation must explain the duplicate-basename WARN in README.md"; fi
+    fail "default derivation must explain the duplicate-basename rule in README.md"; fi
 
-  # The state the script predicts is the state the validator reports.
+  # The state the script predicts is the state the validator reports. The
+  # two README files are unlinked, so they are no finding (DEC-MTH-053).
   npval=$(python3 "$ND/.claude/skills/mechatronics-docs/validate_vault.py" \
     "$ND/00_documentation/01_projectvault" 2>&1); npvrc=$?
   TESTS=$((TESTS + 1))
-  if [ $npvrc -eq 0 ] && contains "$npval" "0 error(s), 1 warning(s)" \
-      && contains "$npval" "duplicate-basename"; then ok x; else
-    fail "derived vault must report exactly the known WARN:"
+  if [ $npvrc -eq 0 ] && contains "$npval" "0 error(s), 0 warning(s)" \
+      && ! contains "$npval" "duplicate-basename"; then ok x; else
+    fail "derived vault must report no warning:"
     printf '%s\n' "$npval" | sed 's/^/    /'
   fi
 
@@ -5269,8 +5344,8 @@ EOF
 | --- | --- |
 EOF
 
-  # 25 root notes, so the overview can carry more links than the ordinary
-  # budget allows without a single unresolved target. Root files are
+  # 25 root notes, so the overview can carry more links than the budget
+  # allows for prose without a single unresolved target. Root files are
   # link-checked and nothing else, so they add no findings of their own.
   local i=1
   while [ $i -le 25 ]; do
@@ -5286,12 +5361,13 @@ EOF
     printf '| Module (ARC) | Brief Description |\n| --- | --- |\n'
     printf '| [[ARC_Top]] | The top-level module of this vault |\n'
     printf '| [[ARC_Hybrid]] | A module that both contains and allocates |\n\n'
+    # An overview is a table of modules and notes, the shape the template
+    # ships. Table rows are relation slots and stay out of the link budget
+    # (DEC-MTH-053), so 25 rows here are no finding - written as prose list
+    # items, the same 25 links would be one.
+    printf '| Note | Brief Description |\n| --- | --- |\n'
     i=1
-    # '--' is load-bearing: a format string opening with '- ' is read as an
-    # option and printf writes nothing at all, which would leave the
-    # overview under the ordinary budget and pass the hub assertion below
-    # for the wrong reason.
-    while [ $i -le 25 ]; do printf -- '- [[note%s]]\n' "$i"; i=$((i + 1)); done
+    while [ $i -le 25 ]; do printf '| [[note%s]] | a root note |\n' "$i"; i=$((i + 1)); done
   } > "$O/$OVW"
 
   # main module: two sections, and the submodule table that authors the
@@ -5496,10 +5572,11 @@ TESTS=$((TESTS + 1))
 if contains "$ovw_a" "ARC_Ping\.md.*\[arc-not-in-overview\]" \
    && contains "$ovw_a" "ARC_Pong\.md.*\[arc-not-in-overview\]"; then ok x; else
   fail "two modules listing each other must not silence both island findings"; fi
-# The hub link budget follows the marker, not the file name.
+# The overview's 27 links are table rows, which the budget does not count;
+# there is no hub budget any more to grant (DEC-MTH-053).
 TESTS=$((TESTS + 1))
 if ! contains "$ovw_a" "Uebersicht\.md.*\[link-budget\]"; then ok x; else
-  fail "the marked overview must be measured against the hub budget:"
+  fail "an overview whose links are table rows must not exceed the link budget:"
   printf '%s\n' "$ovw_a" | grep link-budget | sed 's/^/    /'
 fi
 # A file carrying both contracts is held to both.
@@ -5563,27 +5640,29 @@ fi
 TESTS=$((TESTS + 1))
 if ! contains "$ovw_b" "\[arc-not-in-overview\]"; then ok x; else
   fail "without an entry point the island scan must not run"; fi
+# The finding names what did not run and nothing else: the hub link budget
+# it used to mention no longer exists (DEC-MTH-053).
+TESTS=$((TESTS + 1))
+if contains "$ovw_b" "overview-unidentified.*the ARC reachability check did not run" \
+   && ! contains "$ovw_b" "hub link budget"; then ok x; else
+  fail "overview-unidentified must not promise a hub link budget:"
+  printf '%s\n' "$ovw_b" | grep overview | sed 's/^/    /'; fi
 
-# Two marked files: the same finding, and the hub budget granted to
-# neither - the looser half must not survive the stricter one.
+# Two marked files: the same finding, naming both.
 OVW_C="$OVW_TMP/twice/00_documentation/01_projectvault"
 build_overview_vault "$OVW_C" "Uebersicht.md"
 printf -- '---\nvault-role: system-overview\n---\nA second claimant.\n' \
   > "$OVW_C/Zweitfassung.md"
 ovw_c=$(python3 "$VALIDATOR" "$OVW_C" 2>&1)
 # Both names have to appear in the FINDING, not merely somewhere in the
-# run: 'Uebersicht.md' also occurs in the link-budget line the next
-# assertion requires, so a substring test over the whole output would pass
-# without the finding naming both claimants at all.
+# run: a substring test over the whole output would pass on any other line
+# naming 'Uebersicht.md' without the finding naming both claimants at all.
 TESTS=$((TESTS + 1))
 if printf '%s\n' "$ovw_c" | grep "overview-unidentified" \
    | grep -q "Uebersicht.md, Zweitfassung.md"; then
   ok x; else fail "two marked overviews must be reported once, naming both:"
   printf '%s\n' "$ovw_c" | grep overview | sed 's/^/    /'
 fi
-TESTS=$((TESTS + 1))
-if contains "$ovw_c" "Uebersicht\.md.*\[link-budget\]"; then ok x; else
-  fail "with no single entry point the hub budget must not be granted"; fi
 
 # A marker that is nearly right: the value misspelled. The finding names
 # what it found, so the author fixes a line instead of hunting a file.
@@ -5626,7 +5705,7 @@ fi
 
 # A vault whose ARC folder holds no note yet - the state every project
 # derived with the three-domain profile starts in. The reachability scan
-# has nothing to do, but the entry point still decides the hub budget, so
+# has nothing to do yet, but it will have from the first ARC note on, so
 # the missing marker must still be reported: a check that goes quiet
 # because the vault is young is the same silence one size smaller.
 OVW_G="$OVW_TMP/noarcnotes/00_documentation/01_projectvault"
@@ -6408,9 +6487,9 @@ if [ -f "$NP" ]; then
   minval=$(python3 "$MD/.claude/skills/mechatronics-docs/validate_vault.py" \
     "$minvault" 2>&1); minvrc=$?
   TESTS=$((TESTS + 1))
-  if [ $minvrc -eq 0 ] && contains "$minval" "0 error(s), 1 warning(s)" \
-      && contains "$minval" "duplicate-basename"; then ok x; else
-    fail "minimal vault must report exactly the known WARN:"
+  if [ $minvrc -eq 0 ] && contains "$minval" "0 error(s), 0 warning(s)" \
+      && ! contains "$minval" "duplicate-basename"; then ok x; else
+    fail "minimal vault must report no warning:"
     printf '%s\n' "$minval" | sed 's/^/    /'
   fi
   minexp=$(python3 "$MD/.claude/skills/mechatronics-docs/export_traceability.py" \
@@ -6439,7 +6518,7 @@ if [ -f "$NP" ]; then
     "$minvault" 2>&1)
   TESTS=$((TESTS + 1))
   if [ -d "$minvault/02_decisions_(DEC)" ] && [ ! -e "$MD/$MIN_PARK/02_decisions_(DEC)" ] \
-      && contains "$grownval" "0 error(s), 1 warning(s)"; then ok x; else
+      && contains "$grownval" "0 error(s), 0 warning(s)"; then ok x; else
     fail "a domain moved back into the vault must need no migration:"
     printf '%s\n' "$grownval" | sed 's/^/    /'
   fi
@@ -6578,6 +6657,9 @@ Sensor module of the boundary fixture. It links a note that exists only in
 the directory beside this vault, and its own basename exists there a second
 time: [[REF_Outside_Datasheet]].
 EOF
+  # The link that makes a shared ARC_Sensor stem a collision at all: a
+  # name nobody links is no finding (DEC-MTH-053).
+  printf 'The sensor module is [[ARC_Sensor]].\n' > "$1/links.md"
 }
 
 # --- the root vault: repository root == vault root -------------------------
@@ -6600,7 +6682,7 @@ TESTS=$((TESTS + 1))
 if [ $rvrc -eq 1 ]; then ok x; else
   fail "the unresolved link is an ERROR in a full run, so the exit code must be 1 (was $rvrc)"; fi
 TESTS=$((TESTS + 1))
-if ! contains "$rvout" "'ARC_Sensor' exists"; then ok x; else
+if ! contains "$rvout" "\[duplicate-basename\] \[\[ARC_Sensor\]\]"; then ok x; else
   fail "a basename collision outside the repository is not this vault's collision:"
   printf '%s\n' "$rvout" | grep duplicate-basename | sed 's/^/    /'
 fi
@@ -6618,15 +6700,15 @@ cp -a "$RV" "$RT_TMP/elsewhere_Rootproj"
 rvout2=$(python3 "$VALIDATOR" "$RT_TMP/elsewhere_Rootproj" 2>&1)
 TESTS=$((TESTS + 1))
 if contains "$rvout2" "REF_Outside_Datasheet" \
-    && ! contains "$rvout2" "'ARC_Sensor' exists"; then ok x; else
+    && ! contains "$rvout2" "\[duplicate-basename\] \[\[ARC_Sensor\]\]"; then ok x; else
   fail "one repository copied beside its own neighbour must report the same:"
   printf '%s\n' "$rvout2" | sed 's/^/    /'
 fi
 
 # --- the canonical vault: the boundary must NOT move -----------------------
-# 02_documents lies outside the vault and inside the repository, and its
-# collision is the one the shipped template carries and CONTRIBUTING.md
-# quotes. Narrowing the boundary to the vault root would silence it.
+# 02_documents lies outside the vault and inside the repository, and a
+# linked name colliding with a file there is the case duplicate-basename
+# exists for. Narrowing the boundary to the vault root would silence it.
 CV="$RT_TMP/Canonproj/00_documentation/01_projectvault"
 rt_domains "$CV"
 mkdir -p "$RT_TMP/Canonproj/00_documentation/02_documents"
@@ -6639,7 +6721,7 @@ rgit init -q "$RT_TMP/Canonproj"
 cvout=$(python3 "$VALIDATOR" "$CV" 2>&1)
 
 TESTS=$((TESTS + 1))
-if contains "$cvout" "'ARC_Sensor' exists 2x under 00_documentation"; then ok x; else
+if contains "$cvout" "\[duplicate-basename\] \[\[ARC_Sensor\]\] (linked from links.md:1) matches 2 files under 00_documentation: .*02_documents/ARC_Sensor\.md"; then ok x; else
   fail "the canonical layout must keep reporting the 02_documents collision:"
   printf '%s\n' "$cvout" | sed 's/^/    /'
 fi
@@ -6754,9 +6836,8 @@ rm -rf "$I5_TMP"
 # what earns it a place here:
 #   classify      - INB is a vault section, not a domain role; ID_EXCLUDED_DOMAINS
 #                   names it beside ADM and no alias map translates either.
-#   validate_file - the hub link budget is a property of the architecture
-#                   FOLDER; ARC is spelled identically in every language the
-#                   alias map knows, so the question never arises.
+#                   (validate_file left this list with the hub link budget,
+#                   DEC-MTH-053.)
 #   check_leaks   - decides by folder on purpose and is left there by this
 #                   change: it carries a second English lock of its own, the
 #                   'context' section title, and opening one without the
@@ -6772,7 +6853,7 @@ if python3 - "$VALIDATOR" <<'PY'
 import ast, sys
 TOKENS = {"REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF", "ADM", "INB"}
 EXPECTED = ["check_leaks:ARC", "check_leaks:ARC", "check_leaks:ARC,DEC",
-            "check_leaks:DEC", "classify:INB", "validate_file:ARC"]
+            "check_leaks:DEC", "classify:INB"]
 
 def tokens_of(node):
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -6810,6 +6891,403 @@ if got != EXPECTED:
 PY
 then ok x; else
   fail "a per-file check decides a domain role by folder abbreviation - see the allowlist above"; fi
+
+# ==========================================================================
+# BEGIN the validator noise cut (DEC-MTH-053, DEC-MTH-054, DEC-MTH-055)
+# ==========================================================================
+# Every finding the cut removes was measured as noise on six real vaults;
+# every assertion here pins that a defect the old rule caught still is.
+# Cleaned up with an explicit rm, not a trap: traps in this file overwrite.
+NC_TMP=$(mktemp -d)
+
+ngit() { # git, independent of this machine's config and of the caller's env
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+      GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
+      GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t git "$@"
+}
+
+nc_note() { # nc_note <path> <domain> <body line>
+  mkdir -p "$(dirname "$1")"
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-10-16\nlast-verified: 2026-10-16\n---\n' "$2"
+    printf '## Context\nA note of the noise-cut fixture. It is otherwise correct, so\n'
+    printf 'that the one finding under test is the only one it can produce.\n'
+    printf 'It says nothing else of interest and carries no value of its own.\n'
+    printf '%s\n' "$3"
+  } > "$1"
+}
+
+nc_vault() { # nc_vault <vault root> - three domains with templates
+  mkdir -p "$1/01_requirements_(REQ)" "$1/03_architecture_(ARC)" \
+           "$1/07_testing_and_evidence_(TAE)"
+  printf '## Context\n' > "$1/01_requirements_(REQ)/00_REQ_file_template.md"
+  printf '## Context\n' > "$1/03_architecture_(ARC)/00_ARC_file_template.md"
+  printf '## Context\n' > "$1/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+}
+
+# --- Unit 1: the name index lists the repository outside the vault --------
+# The vault is walked on disk, so a note written this session and a
+# gitignored note both resolve. Outside the vault only what the repository
+# counts is indexed: a gitignored scratch folder carrying a same-stem note is
+# not a second ARC_Sensor, while an untracked document and a nested
+# repository are part of the project.
+NI="$NC_TMP/Idx"
+NIV="$NI/00_documentation/01_projectvault"
+nc_vault "$NIV"
+nc_note "$NIV/03_architecture_(ARC)/ARC_Sensor.md" ARC \
+  "It links [[REF_Datasheet]], [[REF_Nested]] and [[ARC_Ignored]]."
+nc_note "$NIV/03_architecture_(ARC)/ARC_Probe.md" ARC "Its parent is [[ARC_Sensor]]."
+nc_note "$NIV/03_architecture_(ARC)/ARC_Ignored.md" ARC "Gitignored, and linked."
+nc_note "$NI/00_documentation/scratch/ARC_Sensor.md" ARC "A gitignored twin."
+mkdir -p "$NI/00_documentation/02_documents/nested"
+printf '# untracked, not ignored\n' > "$NI/00_documentation/02_documents/REF_Datasheet.md"
+printf '# inside a nested repository\n' > "$NI/00_documentation/02_documents/nested/REF_Nested.md"
+printf '00_documentation/scratch/\nARC_Ignored.md\n' > "$NI/.gitignore"
+cp -a "$NI" "$NC_TMP/IdxNoGit"
+ngit init -q "$NI"
+ngit init -q "$NI/00_documentation/02_documents/nested"
+ni_out=$(python3 "$VALIDATOR" "$NIV" 2>&1); ni_rc=$?
+TESTS=$((TESTS + 1))
+if [ $ni_rc -ne 2 ] && ! contains "$ni_out" "duplicate-basename"; then ok x; else
+  fail "a gitignored folder outside the vault must not enter the name index:"
+  printf '%s\n' "$ni_out" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$ni_out" "link-unresolved"; then ok x; else
+  fail "untracked documents, nested repositories and gitignored vault notes must resolve:"
+  printf '%s\n' "$ni_out" | grep link-unresolved | sed 's/^/    /'
+fi
+# Without a repository nothing is known to be ignored: the twin is indexed
+# and the collision of a linked name is reported, exactly as before.
+ng_out=$(python3 "$VALIDATOR" "$NC_TMP/IdxNoGit/00_documentation/01_projectvault" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$ng_out" "duplicate-basename.*ARC_Sensor"; then ok x; else
+  fail "outside version control the whole documentation root stays indexed:"
+  printf '%s\n' "$ng_out" | sed 's/^/    /'
+fi
+
+# --- Unit 2: a shared stem is a finding only where a link names it --------
+# The template's two README.md are linked by nobody and were reported on
+# every derived vault. A linked one is a real ambiguity and must stay one,
+# named with where it is linked from and every file it could mean. A link
+# matched by substring would also fire on [[README_x]]; one inside a code
+# span or a fence is no link in Obsidian.
+DB="$NC_TMP/Dup/00_documentation/01_projectvault"
+nc_vault "$DB"
+mkdir -p "$NC_TMP/Dup/00_documentation/02_documents"
+printf '# the vault readme\n' > "$DB/README.md"
+printf '# the documents readme\n' > "$NC_TMP/Dup/00_documentation/02_documents/README.md"
+nc_note "$DB/03_architecture_(ARC)/ARC_Twin.md" ARC "Unlinked twin, first copy."
+mkdir -p "$NC_TMP/Dup/00_documentation/02_documents/arc"
+printf '# unlinked twin, second copy\n' > "$NC_TMP/Dup/00_documentation/02_documents/arc/ARC_Twin.md"
+nc_note "$DB/03_architecture_(ARC)/ARC_Linker.md" ARC \
+  "It names [[README_x]], \`[[ARC_Twin]]\` and, in prose, nothing else."
+printf '# a note whose stem merely extends README\n' > "$DB/README_x.md"
+db_out=$(python3 "$VALIDATOR" "$DB" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$db_out" "duplicate-basename"; then ok x; else
+  fail "an unlinked shared stem, a substring and a code-span link are no ambiguity:"
+  printf '%s\n' "$db_out" | grep duplicate-basename | sed 's/^/    /'
+fi
+printf '```\n[[ARC_Twin]]\n```\nSee [[README.md|the readme]] and [[README]].\n' >> "$DB/README_x.md"
+db_out=$(python3 "$VALIDATOR" "$DB" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$db_out" "\[duplicate-basename\] \[\[README\]\] (linked from README_x.md:5, README_x.md:5) matches 2 files under 00_documentation: 01_projectvault/README.md, 02_documents/README.md - .*rename one of the files"; then
+  ok x; else
+  fail "a linked shared stem must name its link sources, every file and the remedy:"
+  printf '%s\n' "$db_out" | grep duplicate-basename | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$db_out" "duplicate-basename.*ARC_Twin"; then ok x; else
+  fail "a link inside a fenced block must not make a stem ambiguous"; fi
+
+# --- Unit 3: the link budget counts prose links only ----------------------
+# An ARC note whose allocation table names the module itself in every row -
+# the shape the template's own example has - carried link-budget and
+# link-repeat on every real vault. The same 25 links written as prose stay
+# a finding.
+LB="$NC_TMP/Links/00_documentation/01_projectvault"
+nc_vault "$LB"
+{
+  printf '| Submodule | Allocated Requirements | Verification | Status |\n'
+  printf '| --- | --- | --- | --- |\n'
+  i=1; while [ $i -le 25 ]; do
+    printf '| [[ARC_Rows]] | REQ-ROW-0%02d | [[TAE_Rows]] | Draft |\n' "$i"; i=$((i + 1)); done
+} > "$NC_TMP/rows.txt"
+nc_note "$LB/03_architecture_(ARC)/ARC_Rows.md" ARC "$(cat "$NC_TMP/rows.txt")"
+nc_note "$LB/07_testing_and_evidence_(TAE)/TAE_Rows.md" TAE "Evidence of the rows."
+i=1; : > "$NC_TMP/prose.txt"
+while [ $i -le 25 ]; do printf -- '- see [[TAE_Rows]]\n' >> "$NC_TMP/prose.txt"; i=$((i + 1)); done
+nc_note "$LB/03_architecture_(ARC)/ARC_Prose.md" ARC "$(cat "$NC_TMP/prose.txt")"
+lb_out=$(python3 "$VALIDATOR" "$LB" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$lb_out" "ARC_Rows\.md.*\[link-budget\]" \
+   && contains "$lb_out" "ARC_Prose\.md.*\[link-budget\] 25 outgoing prose links > 20" \
+   && ! contains "$lb_out" "link-repeat"; then ok x; else
+  fail "table rows and self links must stay out of the budget, prose must not:"
+  printf '%s\n' "$lb_out" | grep -E "link-budget|link-repeat" | sed 's/^/    /'
+fi
+
+# --- Unit 4a: a file accepts WARNs in its own frontmatter ------------------
+# Accepted means counted, not printed; an ERROR is never accepted, and
+# neither is a code outside the schema's closed list; without a reason
+# nothing is in force; a template accepts nothing.
+AC="$NC_TMP/Accept/00_documentation/01_projectvault"
+nc_vault "$AC"
+nc_long() { # nc_long <path> <frontmatter lines> <n body lines>
+  { printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-10-16\n'
+    printf '%b' "$2"
+    printf -- '---\n## Context\n'
+    i=1; while [ $i -le "$3" ]; do printf 'Line %s of a long but otherwise correct note.\n' "$i"; i=$((i + 1)); done
+  } > "$1"
+}
+LV='last-verified: 2026-10-16\n'
+nc_long "$AC/03_architecture_(ARC)/ARC_Accepted.md" \
+  "${LV}validator-accept: [length]\nvalidator-accept-reason: a long record kept whole\n" 160
+nc_long "$AC/03_architecture_(ARC)/ARC_No_Reason.md" "${LV}validator-accept: [length]\n" 160
+nc_long "$AC/03_architecture_(ARC)/ARC_Error_Entry.md" \
+  "validator-accept: [frontmatter-key, length]\nvalidator-accept-reason: tries to hide an ERROR\n" 160
+nc_long "$AC/03_architecture_(ARC)/ARC_Too_Long.md" \
+  "${LV}validator-accept: [length]\nvalidator-accept-reason: a record kept whole\n" 420
+printf -- '---\nvalidator-accept: [length]\nvalidator-accept-reason: copied everywhere\n---\n## Context\n' \
+  > "$AC/03_architecture_(ARC)/00_ARC_file_template.md"
+printf 'An index naming [[ARC_Accepted]], [[ARC_No_Reason]], [[ARC_Error_Entry]], [[ARC_Too_Long]].\n' \
+  > "$AC/index.md"
+ac_out=$(python3 "$VALIDATOR" "$AC" 2>&1)
+ac_has() { contains "$ac_out" "$1"; }
+TESTS=$((TESTS + 1))
+if ! ac_has "ARC_Accepted\.md.*\[length\]" && ! ac_has "ARC_Accepted\.md.*accept-"; then ok x; else
+  fail "an accepted WARN with a reason must not be printed:"
+  printf '%s\n' "$ac_out" | grep ARC_Accepted | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "ARC_No_Reason\.md \[length\]" && ac_has "ARC_No_Reason\.md:1 \[accept-reason-missing\]"; then ok x; else
+  fail "an acceptance without a reason must not be in force, and must say so:"
+  printf '%s\n' "$ac_out" | grep ARC_No_Reason | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "^ERROR .*ARC_Error_Entry\.md:1 \[frontmatter-key\]" \
+   && ac_has "ARC_Error_Entry\.md:1 \[accept-invalid\] validator-accept names \['frontmatter-key'\]" \
+   && ! ac_has "ARC_Error_Entry\.md \[length\]"; then ok x; else
+  fail "an ERROR code in the list must stay reported, its entry named, the valid entry kept:"
+  printf '%s\n' "$ac_out" | grep ARC_Error_Entry | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "^ERROR .*ARC_Too_Long\.md \[length\]"; then ok x; else
+  fail "an accepted code must never hide its ERROR severity:"
+  printf '%s\n' "$ac_out" | grep ARC_Too_Long | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ac_has "00_ARC_file_template\.md:1 \[accept-invalid\]"; then ok x; else
+  fail "a template's acceptance must be refused:"
+  printf '%s\n' "$ac_out" | grep 00_ARC | sed 's/^/    /'; fi
+# The count line: what was accepted, once, and never after the summary.
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$ac_out" | tail -n 2 | head -n 1)" = \
+     "accepted: 2 finding(s) in 2 file(s) - 2 by validator-accept" ] \
+   && contains "$(printf '%s\n' "$ac_out" | tail -n 1)" "^-- .* error(s)"; then ok x; else
+  fail "accepted findings must be counted in one line just above the summary:"
+  printf '%s\n' "$ac_out" | tail -n 3 | sed 's/^/    /'; fi
+# The vault-wide path: no packaged acceptable code is vault-wide, so a
+# schema that lists one proves the vault-wide filter on its own.
+mkdir -p "$NC_TMP/orphanok"
+cp "$VALIDATOR" "$SKILL_DIR/export_traceability.py" "$NC_TMP/orphanok/"
+python3 - "$SKILL_DIR/vault_schema.json" "$NC_TMP/orphanok/vault_schema.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+s["validator_accept"]["acceptable_codes"].append("orphan")
+json.dump(s, open(sys.argv[2], "w"))
+PY
+nc_note "$AC/07_testing_and_evidence_(TAE)/TAE_Alone.md" TAE "Nobody links it."
+python3 - "$AC/07_testing_and_evidence_(TAE)/TAE_Alone.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace(
+    "last-verified: 2026-10-16\n",
+    "last-verified: 2026-10-16\nvalidator-accept: [orphan]\nvalidator-accept-reason: kept for later\n", 1))
+PY
+ao_out=$(python3 "$NC_TMP/orphanok/validate_vault.py" "$AC" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$ao_out" "TAE_Alone\.md \[orphan\]" \
+   && contains "$ao_out" "accepted: 3 finding(s) in 3 file(s)" \
+   && contains "$(python3 "$VALIDATOR" "$AC" 2>&1)" "TAE_Alone\.md:1 \[accept-invalid\] validator-accept names \['orphan'\]"; then
+  ok x; else fail "a vault-wide WARN must follow its file's acceptance, and only where the schema lists it:"
+  printf '%s\n' "$ao_out" | grep -E "TAE_Alone|accepted" | sed 's/^/    /'; fi
+
+# The fallback carries the acceptance and the deferral vocabulary, pinned
+# against the packaged schema like the field profiles above.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+real, err = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+assert err is None, err
+assert vv.accept_spec(real) == vv.accept_spec({}), "validator_accept drift"
+assert vv.deferral_values(real) == vv.deferral_values({}), "deferral_status_values drift"
+assert vv.deferral_values(real), "no deferral value declared"
+PY
+then ok x; else fail "FALLBACK_SCHEMA and vault_schema.json disagree about acceptance or deferral"; fi
+
+# --- Unit 4b: a requirement deferred in its allocation row ---------------
+# Each deferral value on its own, and a qualified one, must turn the
+# requirement's req-uncovered into the count line; Draft must not, and one
+# deferred row beside an Approved one must not either.
+for status in "Blocked" "Deferred" "TBD" "Blocked (waiting for the maintainer)" "Draft" "MIXED"; do
+  DF="$NC_TMP/Defer-$(printf '%s' "$status" | tr -c 'A-Za-z' '_')/00_documentation/01_projectvault"
+  build_coverage_vault "$DF"
+  python3 - "$DF/03_architecture_(ARC)/ARC_Coverage.md" "$status" <<'PY'
+import sys, pathlib
+p, status = pathlib.Path(sys.argv[1]), sys.argv[2]
+row = "| supply path | REQ-COV-005 | measured during bring-up | Draft |"
+t = p.read_text()
+assert t.count(row) == 1
+if status == "MIXED":
+    new = row.replace("Draft", "Blocked") + "\n| backup path | REQ-COV-005 | measured | Approved |"
+else:
+    new = row.replace("Draft", status)
+p.write_text(t.replace(row, new))
+PY
+  df_out=$(python3 "$VALIDATOR" "$DF" 2>&1)
+  TESTS=$((TESTS + 1))
+  case "$status" in
+    Draft|MIXED)
+      if contains "$df_out" "\[req-uncovered\].*REQ-COV-005" \
+         && ! contains "$df_out" "deferred in an allocation row"; then ok x; else
+        fail "status '$status' must leave REQ-COV-005 reported:"
+        printf '%s\n' "$df_out" | grep -E "REQ-COV-005|accepted" | sed 's/^/    /'; fi ;;
+    *)
+      if ! contains "$df_out" "\[req-uncovered\].*REQ-COV-005" \
+         && contains "$df_out" "accepted: 1 finding(s) in 1 file(s) - 1 requirement(s) deferred in an allocation row"; then
+        ok x; else
+        fail "status '$status' must defer REQ-COV-005 into the count line:"
+        printf '%s\n' "$df_out" | grep -E "REQ-COV-005|accepted" | sed 's/^/    /'; fi ;;
+  esac
+done
+
+# --- Unit 6: a gitignored path that cannot exist here is unverifiable -----
+# A clone directory a fresh checkout never has: gitignored, folder absent -
+# WARN. A gitignored file whose folder IS there: the author's checkout can
+# tell a typo, so it stays an ERROR. Not ignored: ERROR. No repository:
+# nothing is known to be ignored, ERROR as before.
+GP="$NC_TMP/Paths"
+GPV="$GP/00_documentation/01_projectvault"
+nc_vault "$GPV"
+mkdir -p "$GPV/06_implementation_(IMP)" "$GP/30_testdata/run1"
+printf '## Context\n## References\n' > "$GPV/06_implementation_(IMP)/00_IMP_file_template.md"
+cat > "$GPV/06_implementation_(IMP)/IMP_Pointers.md" <<'EOF'
+---
+domain: IMP
+status: active
+created: 2026-10-16
+last-verified: 2026-10-16
+---
+## Context
+Pointers of the gitignored-path fixture, each under References where a
+dead pointer is an ERROR. Three shapes, one per line below.
+
+## References
+- 60_clones/upstream/server.go
+- 30_testdata/run1/run_typo.log
+- 20_software/missing_tool.py
+EOF
+printf '60_clones/\n*.log\n' > "$GP/.gitignore"
+cp -a "$GP" "$NC_TMP/PathsNoGit"
+ngit init -q "$GP"
+gp_out=$(python3 "$VALIDATOR" "$GPV" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gp_out" "^WARN .*IMP_Pointers\.md:12 \[path-missing\] .*60_clones/upstream/server\.go' is unverifiable on this checkout" \
+   && ! contains "$gp_out" "^ERROR .*60_clones"; then ok x; else
+  fail "a gitignored path whose folder is absent must be a WARN, not an ERROR:"
+  printf '%s\n' "$gp_out" | grep path-missing | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$gp_out" "^ERROR .*IMP_Pointers\.md:13 \[path-missing\] .*run_typo\.log" \
+   && contains "$gp_out" "^ERROR .*IMP_Pointers\.md:14 \[path-missing\] .*missing_tool\.py"; then ok x; else
+  fail "an ignored file in a present folder and a path nothing ignores must stay ERRORs:"
+  printf '%s\n' "$gp_out" | grep path-missing | sed 's/^/    /'; fi
+gn_out=$(python3 "$VALIDATOR" "$NC_TMP/PathsNoGit/00_documentation/01_projectvault" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gn_out" "^ERROR .*IMP_Pointers\.md:12 \[path-missing\] .*60_clones"; then ok x; else
+  fail "outside version control a missing path stays an ERROR:"
+  printf '%s\n' "$gn_out" | grep path-missing | sed 's/^/    /'; fi
+
+# --- Unit 7: the post hook shows only WARNs that are new since HEAD -------
+# A committed stub carries its WARN at HEAD. Editing it - which moves the
+# count in the message - is no news; a new WARN is, and comes with one line
+# saying how many known ones were not repeated. A file with no HEAD shows
+# everything.
+HP="$NC_TMP/Post"
+HPV="$HP/00_documentation/01_projectvault"
+nc_vault "$HPV"
+printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-10-16\nlast-verified: 2026-10-16\n---\n## Context\nA committed stub.\n' \
+  > "$HPV/03_architecture_(ARC)/ARC_Stub.md"
+ngit init -q "$HP"
+ngit -C "$HP" add -A >/dev/null 2>&1
+ngit -C "$HP" commit -q --no-verify --no-gpg-sign -m "post-hook fixture" >/dev/null 2>&1
+SIDP="testsession-post-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDP" "/tmp/claude-mechdocs/baseline-$SIDP" \
+      "/tmp/claude-mechdocs/widehash-$SIDP"
+post() { printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDP" "$1" \
+  | python3 "$VALIDATOR" --hook post 2>&1; }
+printf 'A second line, still a stub.\n' >> "$HPV/03_architecture_(ARC)/ARC_Stub.md"
+hp1=$(post "$HPV/03_architecture_(ARC)/ARC_Stub.md")
+TESTS=$((TESTS + 1))
+if [ -z "$hp1" ]; then ok x; else
+  fail "a WARN the file carried at HEAD must not be injected again:"
+  printf '%s\n' "$hp1" | sed 's/^/    /'; fi
+python3 - "$HPV/03_architecture_(ARC)/ARC_Stub.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace("created:", "crated: 2026-10-16\ncreated:", 1))
+PY
+hp2=$(post "$HPV/03_architecture_(ARC)/ARC_Stub.md")
+TESTS=$((TESTS + 1))
+if contains "$hp2" "frontmatter-undeclared" && ! contains "$hp2" "\[stub\]" \
+   && contains "$hp2" "1 pre-existing WARN(s) unchanged since git HEAD"; then ok x; else
+  fail "a new WARN must be shown with the count of known ones, the known ones not:"
+  printf '%s\n' "$hp2" | sed 's/^/    /'; fi
+printf -- '---\ndomain: ARC\nstatus: active\ncreated: 2026-10-16\nlast-verified: 2026-10-16\n---\n## Context\nNew.\n' \
+  > "$HPV/03_architecture_(ARC)/ARC_Fresh.md"
+hp3=$(post "$HPV/03_architecture_(ARC)/ARC_Fresh.md")
+TESTS=$((TESTS + 1))
+if contains "$hp3" "ARC_Fresh\.md \[stub\]" && ! contains "$hp3" "pre-existing WARN"; then ok x; else
+  fail "a file without a HEAD must show every WARN:"
+  printf '%s\n' "$hp3" | sed 's/^/    /'; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDP" "/tmp/claude-mechdocs/baseline-$SIDP" \
+      "/tmp/claude-mechdocs/widehash-$SIDP"
+
+# --- Unit 8: the vault-wide block once per session or when it changed -----
+WS="$NC_TMP/Wide/00_documentation/01_projectvault"
+build_coverage_vault "$WS"
+SIDW="testsession-wide-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDW" "/tmp/claude-mechdocs/baseline-$SIDW" \
+      "/tmp/claude-mechdocs/widehash-$SIDW"
+printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDW" \
+  "$WS/03_architecture_(ARC)/ARC_Coverage.md" | python3 "$VALIDATOR" --hook post >/dev/null 2>&1
+wstop() { field systemMessage "$(printf '{"session_id":"%s"}' "$SIDW" \
+  | python3 "$VALIDATOR" --hook stop 2>&1)"; }
+ws1=$(wstop); ws2=$(wstop)
+TESTS=$((TESTS + 1))
+if contains "$ws1" "vault-wide findings (advisory" && contains "$ws1" "req-uncovered"; then ok x; else
+  fail "the first report of a session must show the vault-wide block:"
+  printf '%s\n' "$ws1" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$ws2" "vault-wide findings unchanged (" && ! contains "$ws2" "req-uncovered"; then ok x; else
+  fail "an unchanged vault-wide block must shrink to one line:"
+  printf '%s\n' "$ws2" | sed 's/^/    /'; fi
+# A change shows the block again: one more requirement nobody verifies.
+printf '| M | 008 | added later | pass if measured | none |\n' \
+  >> "$WS/01_requirements_(REQ)/REQ_Coverage (COV).md"
+ws3=$(wstop)
+TESTS=$((TESTS + 1))
+if contains "$ws3" "vault-wide findings (advisory" && contains "$ws3" "REQ-COV-008"; then ok x; else
+  fail "a changed vault-wide block must be shown in full again:"
+  printf '%s\n' "$ws3" | sed 's/^/    /'; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDW" "/tmp/claude-mechdocs/baseline-$SIDW" \
+      "/tmp/claude-mechdocs/widehash-$SIDW"
+
+rm -rf "$NC_TMP"
+# ==========================================================================
+# END the validator noise cut
+# ==========================================================================
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then

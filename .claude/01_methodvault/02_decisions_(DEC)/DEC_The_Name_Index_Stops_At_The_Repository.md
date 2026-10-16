@@ -6,6 +6,7 @@ last-verified: 2026-08-09
 ---
 Date: 2026-08-09
 Status: Accepted
+Corrected by: [[DEC_The_Validator_Reports_What_Can_Be_Acted_On]] – the boundary stays, but the index no longer walks everything inside it: the vault is walked on disk, and the rest of the index root contributes only what git counts as the project.
 
 ## Context
 

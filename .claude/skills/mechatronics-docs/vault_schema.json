@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.5",
+  "schema_version": "0.6",
   "decision": "DECISIONS.md, amendments 2026-07-28b, 2026-07-28d and 2026-07-31b",
   "purpose": [
     "Declare, as data, which fields an object of a given domain carries and",
@@ -140,7 +140,7 @@
   "domain_defaults": {
     "note": "The vault-wide field vocabulary. It applies to EVERY domain, including the ones 'domains' below does not name - a vault in another language spells its folders ANF/ENT/KMP/SST/TUE/BUN, and reading only the named domains would leave those files unchecked. Per-domain entries in 'domains' merge into this profile attribute by attribute, so a domain that only changes 'required' keeps the type, the values and the finding code declared here. The vault's own SSOT rule applied to its schema: a field shared by every domain is declared once.",
     "field_keys": {
-      "type": "folder-abbreviation | enum | date | list | identifier",
+      "type": "folder-abbreviation | enum | date | list | identifier | text",
       "values": "permitted values, for type enum",
       "format": "for type date",
       "item": "element type, for type list",
@@ -202,8 +202,30 @@
         "code": "test-object-format",
         "note": "The objects a TAE note was measured on, as file identifiers. Frontmatter and not prose (amendment 2026-08-05d): a section binding would have to be discovered from template body text, which nothing enforces, and the Test Conditions section carries the setup and the equipment beside the test object. A key is also the only form the blocking layer can check - an identifier naming nothing is a finding, a missing prose annotation never is. Optional everywhere, including TAE: not every note has a physical test object.",
         "enforced": "schema-driven"
+      },
+      "validator-accept": {
+        "type": "list",
+        "required": false,
+        "note": "WARN codes the author has decided not to act on in this file. See validator_accept; the validator reads the list there, not here.",
+        "enforced": "declared-only"
+      },
+      "validator-accept-reason": {
+        "type": "text",
+        "required": false,
+        "note": "Why the codes in validator-accept are accepted. Without it the acceptance is not in force. See validator_accept.",
+        "enforced": "declared-only"
       }
     }
+  },
+
+  "validator_accept": {
+    "field": "validator-accept",
+    "reason_field": "validator-accept-reason",
+    "acceptable_codes": ["length", "structure", "stub", "link-budget"],
+    "statement": "A file may accept WARN findings of the codes listed here by naming them in its own frontmatter, with a reason. An accepted finding is not printed; the full audit prints one count line instead. An ERROR is never accepted, and neither is a code outside this list - both are reported as accept-invalid. A missing reason is reported as accept-reason-missing and leaves the acceptance out of force. A 00_ file - a template, or the README beside it - cannot accept anything: a template's frontmatter is copied into every file made from it.",
+    "why": "29 length WARNs of this repository's own method vault were accepted in a CI comment, the one place the vault could not see, so every audit repeated them (01_methodvault, DEC-MTH-054). The list is closed on purpose: a code whose severity depends on the run - link-unresolved is a WARN in the post hook and an ERROR at the stop gate - or a vault-wide code that speaks for every requirement of a file would let one line hide a defect nobody has looked at yet.",
+    "enforced": "validator-internal",
+    "enforced_detail": "validate_vault.py reads the two field names and the code list through accept_spec and carries the same three in FALLBACK_SCHEMA."
   },
 
   "domains": {
@@ -439,7 +461,9 @@
       "why": "The method's promise is a closed REQ->TAE loop. Until issue #50 the validator decided this with a substring search over whole ARC and TAE files, so a sentence explaining why a requirement was dropped counted as its proof.",
       "enforced": "validator-internal",
       "owed_to_issue": 50,
-      "enforced_detail": "req-uncovered (WARN), one finding per requirement, at the row that defines it. The 'verifies' half is read from the evidence domain's frontmatter by validate_vault.py itself; the allocation half is read from the graph export_traceability.py builds, because an allocation row sits in the section the project's own ARC template declares and only the binding discovery finds it. Both requirement and evidence domain are resolved through domain_aliases since issue #66, so the rule reaches translated vaults. Where the graph carries no requirement of that identifier - a row outside the bound section, a project whose templates declare no allocation table - the allocation half is not held against the requirement; the exporter names those cases as export-unbound-table and export-no-binding. A vault mid-translation is no longer such a case: index and graph follow one role map, so both read the same requirements folder (export-duplicate-role still names the folder that lost). WARN and not ERROR: the check cannot tell a requirement nobody has verified yet from one whose vault never adopted the 'verifies' convention, which is the same line verified-needs-evidence draws, and vault-wide findings never reach the stop gate's blocking set in any case."
+      "deferral_status_values": ["Blocked", "Deferred", "TBD"],
+      "deferral_note": "A requirement whose every allocation row carries one of these status values - exactly, or followed by a qualifier such as 'Blocked (waiting for the maintainer)' - is deferred in its allocation row, and its req-uncovered is counted in the audit's accepted line instead of printed (01_methodvault, DEC-MTH-054). Every row and not any row: one deferred row beside an Approved one leaves the requirement open.",
+      "enforced_detail": "req-uncovered (WARN), one finding per requirement file and kind of gap, at the row of the first requirement it lists (DEC-MTH-053). The 'verifies' half is read from the evidence domain's frontmatter by validate_vault.py itself; the allocation half is read from the graph export_traceability.py builds, because an allocation row sits in the section the project's own ARC template declares and only the binding discovery finds it. Both requirement and evidence domain are resolved through domain_aliases since issue #66, so the rule reaches translated vaults. Where the graph carries no requirement of that identifier - a row outside the bound section, a project whose templates declare no allocation table - the allocation half is not held against the requirement; the exporter names those cases as export-unbound-table and export-no-binding. A vault mid-translation is no longer such a case: index and graph follow one role map, so both read the same requirements folder (export-duplicate-role still names the folder that lost). WARN and not ERROR: the check cannot tell a requirement nobody has verified yet from one whose vault never adopted the 'verifies' convention, which is the same line verified-needs-evidence draws, and vault-wide findings never reach the stop gate's blocking set in any case."
     },
     {
       "id": "evidence-covers-allocation",

@@ -26,6 +26,7 @@ NOT relax any check.
 """
 
 import codecs
+import hashlib
 import json
 import os
 import re
@@ -38,14 +39,11 @@ from pathlib import Path
 
 STATE_DIR = Path("/tmp/claude-mechdocs")
 STATE_MAX_AGE_S = 7 * 24 * 3600
-MAX_STOP_BLOCKS = 2
 
 LENGTH_WARN = 150
 LENGTH_ERROR = 400
 STRUCTURE_WARN = 100
 LINK_BUDGET = 20
-LINK_BUDGET_HUB = 50
-LINK_REPEAT_WARN = 3
 STUB_MIN_LINES = 5
 INB_MAX_AGE_DAYS = 7
 
@@ -267,7 +265,21 @@ FALLBACK_SCHEMA = {
         "test-object": {"type": "list", "item": "object-identifier",
                         "required": False, "code": "test-object-format",
                         "enforced": "schema-driven"},
+        "validator-accept": {"type": "list", "required": False,
+                             "enforced": "declared-only"},
+        "validator-accept-reason": {"type": "text", "required": False,
+                                    "enforced": "declared-only"},
     }},
+    # In the essentials for overview_marker's reason: without it an
+    # unreadable schema would print every accepted finding again behind a
+    # single schema-unreadable WARN - and an ERROR is never accepted either
+    # way, so the fallback cannot hide anything the packaged schema shows.
+    "validator_accept": {"field": "validator-accept",
+                         "reason_field": "validator-accept-reason",
+                         "acceptable_codes": ["length", "structure", "stub",
+                                              "link-budget"]},
+    "consistency_rules": [{"id": "requirement-coverage",
+                           "deferral_status_values": ["Blocked", "Deferred", "TBD"]}],
     # In the essentials for the alias map's reason (issue #66): without it
     # a vault read under this fallback would have no entry point at all,
     # and the ARC reachability rule would switch off behind the single
@@ -369,6 +381,46 @@ def overview_marker(schema):
         if isinstance(field, str) and field and isinstance(value, str) and value:
             return field, value
     return None
+
+
+def accept_spec(schema):
+    """(field, reason field, acceptable codes) of a file's own acceptance.
+
+    Read like overview_marker: from the schema and, failing that, from
+    FALLBACK_SCHEMA. None when neither declares a usable triple, and then
+    nothing is ever accepted.
+    """
+    for src in (schema, FALLBACK_SCHEMA):
+        spec = _dict(src, "validator_accept")
+        field, reason = spec.get("field"), spec.get("reason_field")
+        codes = _strlist(spec, "acceptable_codes")
+        if (isinstance(field, str) and field and isinstance(reason, str)
+                and reason and codes):
+            return field, reason, set(codes)
+    return None
+
+
+def deferral_values(schema):
+    """Allocation status values that defer a requirement (DEC-MTH-054)."""
+    for src in (schema, FALLBACK_SCHEMA):
+        rules = src.get("consistency_rules") if isinstance(src, dict) else None
+        for rule in rules if isinstance(rules, list) else []:
+            if isinstance(rule, dict) and rule.get("id") == "requirement-coverage":
+                values = _strlist(rule, "deferral_status_values")
+                if values:
+                    return values
+    return []
+
+
+def is_deferral(status, values):
+    """A status cell that IS a deferral value, or one followed by a qualifier.
+
+    The exporter's prefix rule for a qualified status: 'Blocked (on #6137)'
+    is Blocked, 'Blockedness' is not.
+    """
+    s = (status or "").strip()
+    return any(s == v or (s.startswith(v) and not s[len(v)].isalnum())
+               for v in values)
 
 
 class Finding:
@@ -585,6 +637,12 @@ class Vault:
         self._overviews = None
         self._analysis = None
         self._analysis_error = None
+        # What the audit did not print and says it did not print: accepted
+        # findings per file, and the requirements deferred in an allocation
+        # row as (requirement, REQ file) (DEC-MTH-054).
+        self.accepted = Counter()
+        self.deferred = []
+        self._ignored = {}
 
     def schema(self):
         if self._schema is None:
@@ -698,6 +756,28 @@ class Vault:
             self._index_root = self.doc_root if repo is None or inside else self.root
         return self._index_root
 
+    def is_gitignored(self, path: Path):
+        """Does the vault's repository ignore this path? False when unsure.
+
+        Asked about paths that do not exist, which git answers from its
+        ignore rules alone. A path outside the repository, no repository,
+        or a git that cannot answer is 'not ignored' - the answer that keeps
+        a missing path an ERROR.
+        """
+        repo = self.git_root()
+        if repo is None:
+            return False
+        key = str(path)
+        if key not in self._ignored:
+            try:
+                r = subprocess.run(["git", "-C", str(repo), "check-ignore", "-q",
+                                    "--", key],
+                                   capture_output=True, timeout=10, env=git_env())
+                self._ignored[key] = r.returncode == 0
+            except (OSError, subprocess.TimeoutExpired):
+                self._ignored[key] = False
+        return self._ignored[key]
+
     def index_root_label(self):
         """The boundary as the two findings name it, relative to project_root.
 
@@ -748,25 +828,6 @@ class Vault:
                     near.append((p, f"{marker[0]}: {value}"))
             self._overviews = (found, near)
         return self._overviews
-
-    def overview(self):
-        """The one file that is this vault's entry point, or None.
-
-        None for zero claimants and for several: a vault has one entry
-        point, and picking one of two would grant the looser half of this
-        rule - the hub link budget - while the stricter half cannot run.
-        """
-        found, _near = self.overview_scan()
-        return found[0] if len(found) == 1 else None
-
-    def is_overview(self, path: Path):
-        ov = self.overview()
-        if ov is None:
-            return False
-        try:
-            return Path(path).resolve() == ov.resolve()
-        except OSError:
-            return False
 
     def templates_for(self, abbr):
         """H2 heading sets of each template of a domain (empty sets excluded).
@@ -821,13 +882,45 @@ class Vault:
         # the same collision on different files, which is the very
         # non-determinism issue #42 is about, one index further out.
         self._md_names, self._all_names = {}, {}
-        for p in sorted(self.index_root().rglob("*")):
+        for p in self._index_files():
             if any(part in (".obsidian", ".git") for part in p.parts):
                 continue
             if p.is_file():
                 self._all_names.setdefault(p.name, []).append(p)
                 if p.suffix == ".md":
                     self._md_names.setdefault(p.stem, []).append(p)
+
+    def _index_files(self):
+        """Every path the name index is built from, sorted and unique.
+
+        The vault itself is walked on disk - the same file set run_full
+        validates and the exporter reads, so a note written this session
+        resolves before anyone runs git add, and so does a gitignored note
+        lying right there. Only the part of index_root OUTSIDE the vault
+        is taken from the repository: tracked plus untracked-not-ignored
+        files. That is where the disk is not the project - a home
+        directory as index root carried plugin caches and session
+        memories into the index, 27 of the 28 duplicate-basename lines
+        measured on one vault (01_methodvault, DEC-MTH-053).
+
+        Without a repository, or when git cannot answer, the whole
+        index_root is walked as before: losing a link target to a failed
+        subprocess would be a confident wrong link-unresolved ERROR.
+        """
+        root = self.index_root()
+        paths = set(self.root.rglob("*"))
+        if root != self.root:
+            listed = (git_listed_files(root) if self.git_root() else None)
+            if listed is None:
+                paths |= set(root.rglob("*"))
+            else:
+                for p in listed:
+                    if p == self.root or self.root in p.parents:
+                        continue
+                    # A nested repository or a submodule is listed as its
+                    # directory; its files are still the project's.
+                    paths |= set(p.rglob("*")) if p.is_dir() else {p}
+        return sorted(paths)
 
     def md_names(self):
         if self._md_names is None:
@@ -1426,6 +1519,16 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     text, encoding_problem = (decode_source(content) if content is not None
                               else read_source(path))
     lines = text.splitlines()
+    accepted, accept_problems = file_acceptance(vault, path, kind, lines)
+
+    def finish(found):
+        # The file's own acceptance, WARNs only - an ERROR is never accepted
+        # (01_methodvault, DEC-MTH-054). Counted on the disk pass alone, so a
+        # HEAD baseline of the same file is not counted twice.
+        kept = [f for f in found if not (f.sev == "WARN" and f.code in accepted)]
+        if content is None and len(kept) < len(found):
+            vault.accepted[str(path)] += len(found) - len(kept)
+        return kept + accept_problems
 
     # Reported once per vault, and never on a git-HEAD baseline pass (whose
     # WARNs are discarded, which would swallow this one silently).
@@ -1453,10 +1556,10 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                                 "UTF-8 and read them again."))
 
     if kind == "inbox":
-        check_links(vault, path, lines, findings, strict_links, hub=False)
+        check_links(vault, path, lines, findings, strict_links)
         if content is None:
             check_inb_age(path, findings)
-        return findings
+        return finish(findings)
 
     if kind in ("root", "infra"):
         if kind == "infra":
@@ -1471,12 +1574,8 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                 # place where catching it is worth the most.
                 check_undeclared(vault, fm, abbr, path, findings)
         # infra/root files carry placeholder example links - never strict.
-        # The hub budget goes to the file that DECLARES itself the overview,
-        # never to a file name: a hub is a hub in every language, and the
-        # literal here was dark in every vault that renamed it (issue #116).
-        check_links(vault, path, lines, findings, strict=False,
-                    hub=vault.is_overview(path))
-        return findings
+        check_links(vault, path, lines, findings, strict=False)
+        return finish(findings)
 
     # ---- full domain-file checks ----
     role = vault.role_of(abbr)
@@ -1497,7 +1596,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
 
     check_sections(vault, abbr, path, lines, findings)
     check_length(path, lines, findings)
-    check_links(vault, path, lines, findings, strict_links, hub=abbr == "ARC")
+    check_links(vault, path, lines, findings, strict_links)
     check_leaks(abbr, path, lines, fm_end, findings)
     check_paths(vault, path, lines, fm_end, findings)
     # The three domain-specific checks decide by canonical ROLE, the rest
@@ -1520,7 +1619,53 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         findings.append(Finding("WARN", "stub", str(path), None,
                                 f"only {len(body)} content lines - stub file? "
                                 "Fill it or do not create it yet."))
-    return findings
+    return finish(findings)
+
+
+def file_acceptance(vault, path, kind, lines):
+    """-> (WARN codes this file accepts, findings about the acceptance).
+
+    The acceptance is the file's own frontmatter, read from the lines being
+    validated - so a HEAD baseline is read under the acceptance it carried
+    then. A code outside the schema's closed list is never accepted, an
+    ERROR least of all; a 00_ file accepts nothing, because a template's
+    frontmatter is copied into every file made from it and the README
+    beside it is classified the same way; and without a reason nothing is
+    in force. Each of those is said rather than silently ignored.
+    Never raises: malformed frontmatter accepts nothing.
+    """
+    spec = accept_spec(vault.schema())
+    if spec is None:
+        return set(), []
+    field, reason_field, acceptable = spec
+    fm, _, bad = parse_frontmatter(lines)
+    if bad or not fm or field not in fm:
+        return set(), []
+    raw = fm[field]
+    entries = [raw] if isinstance(raw, str) else raw if isinstance(raw, list) else []
+    entries = [e.strip() for e in entries if isinstance(e, str) and e.strip()]
+    problems = []
+    if kind == "infra":
+        problems.append(Finding("WARN", "accept-invalid", str(path), 1,
+                                f"'{field}' in a 00_ file accepts nothing - a "
+                                "template's frontmatter is copied into every file "
+                                "made from it; accept a finding in the file that "
+                                "carries it"))
+        return set(), problems
+    refused = [e for e in entries if e not in acceptable]
+    if refused:
+        problems.append(Finding("WARN", "accept-invalid", str(path), 1,
+                                f"{field} names {refused}, which cannot be accepted "
+                                "- an ERROR never is, and of the WARNs only "
+                                f"{', '.join(sorted(acceptable))} (vault_schema.json, "
+                                "validator_accept); remove the entry"))
+    reason = fm.get(reason_field)
+    if not (isinstance(reason, str) and reason.strip()):
+        problems.append(Finding("WARN", "accept-reason-missing", str(path), 1,
+                                f"{field} carries no '{reason_field}' - the "
+                                "acceptance is not in force until it says why"))
+        return set(), problems
+    return {e for e in entries if e in acceptable}, problems
 
 
 def check_frontmatter(vault, fm, abbr, path, findings):
@@ -1855,59 +2000,70 @@ def anchor_resolves(anchor, heads, blocks):
     return bool(segs) and all(fold_key(s) in heads for s in segs)
 
 
-def check_links(vault, path, lines, findings, strict, hub=False):
-    md_names, all_names = vault.md_names(), vault.all_names()
-    targets = Counter()
-    total = 0
-    mask = fence_mask(lines)
-    anchors = None      # built on the first same-file link, never for a file without one
+def iter_wikilinks(lines, mask=None):
+    """(line number, line, match) of every wikilink Obsidian would resolve.
+
+    Fenced blocks and inline code spans are skipped - Obsidian resolves
+    neither. One reader for check_links and for the vault-wide question
+    which names a link targets, so the two cannot disagree about what a
+    link is.
+    """
+    if mask is None:
+        mask = fence_mask(lines)
     for i, line in enumerate(lines, 1):
         if mask[i]:
             continue
-        # Obsidian does not resolve links inside code spans
-        line = re.sub(r"`[^`]*`", " ", line)
-        for m in WIKILINK_RE.finditer(line):
-            target = m.group(2).strip()
-            anchor = (m.group(3) or "").strip()
-            if not target:
-                # A link into this file. It names no other file, so it is
-                # resolved against this one - and it is deliberately kept
-                # out of the budget and the repeat counter below, both of
-                # which are about OUTGOING links: "link the responsible
-                # file once" has no addressee when the target is the file
-                # the reader is already in.
-                if not anchor.strip("#^"):
-                    # '[[]]', '[[#]]', '[[|alias]]' - a link naming nothing
-                    # at all. Skipped rather than reported, which is what
-                    # the old regex did by not matching it; a finding for
-                    # the empty placeholder is a rollout of its own.
-                    continue
-                if anchors is None:
-                    anchors = anchor_index(lines, mask)
-                if not anchor_resolves(anchor, *anchors):
-                    sev = "ERROR" if strict else "WARN"
-                    findings.append(Finding(sev, "link-unresolved", str(path), i,
-                                            f"[[{anchor}]] names no heading and no "
-                                            "block identifier in this file"))
+        for m in WIKILINK_RE.finditer(re.sub(r"`[^`]*`", " ", line)):
+            yield i, line, m
+
+
+def check_links(vault, path, lines, findings, strict):
+    md_names, all_names = vault.md_names(), vault.all_names()
+    total = 0
+    mask = fence_mask(lines)
+    anchors = None      # built on the first same-file link, never for a file without one
+    for i, line, m in iter_wikilinks(lines, mask):
+        target = m.group(2).strip()
+        anchor = (m.group(3) or "").strip()
+        if not target:
+            # A link into this file. It names no other file, so it is
+            # resolved against this one - and it is deliberately kept
+            # out of the budget below, which is about OUTGOING links:
+            # "link the responsible file once" has no addressee when the
+            # target is the file the reader is already in.
+            if not anchor.strip("#^"):
+                # '[[]]', '[[#]]', '[[|alias]]' - a link naming nothing
+                # at all. Skipped rather than reported, which is what
+                # the old regex did by not matching it; a finding for
+                # the empty placeholder is a rollout of its own.
                 continue
-            total += 1
-            targets[target] += 1
-            resolved = (target in md_names or target in all_names
-                        or f"{target}.md" in all_names)
-            if not resolved:
+            if anchors is None:
+                anchors = anchor_index(lines, mask)
+            if not anchor_resolves(anchor, *anchors):
                 sev = "ERROR" if strict else "WARN"
                 findings.append(Finding(sev, "link-unresolved", str(path), i,
-                                        f"[[{target}]] does not resolve to any file "
-                                        f"under {vault.index_root_label()}"))
-    budget = LINK_BUDGET_HUB if hub else LINK_BUDGET
-    if total > budget:
+                                        f"[[{anchor}]] names no heading and no "
+                                        "block identifier in this file"))
+            continue
+        # The budget counts prose links only. A table row is a relation slot
+        # the templates mandate - one allocation row per requirement, one
+        # source cell per row - and a link of a note to itself is the same
+        # self-reference as a same-file anchor. Measured on six vaults, 11
+        # of 14 budget findings came from exactly those two shapes
+        # (01_methodvault, DEC-MTH-053).
+        if target != path.stem and not line.lstrip().startswith("|"):
+            total += 1
+        resolved = (target in md_names or target in all_names
+                    or f"{target}.md" in all_names)
+        if not resolved:
+            sev = "ERROR" if strict else "WARN"
+            findings.append(Finding(sev, "link-unresolved", str(path), i,
+                                    f"[[{target}]] does not resolve to any file "
+                                    f"under {vault.index_root_label()}"))
+    if total > LINK_BUDGET:
         findings.append(Finding("WARN", "link-budget", str(path), None,
-                                f"{total} outgoing links > {budget}. Link the responsible "
-                                "file once - do not link every mention."))
-    for t, c in targets.items():
-        if c > LINK_REPEAT_WARN:
-            findings.append(Finding("WARN", "link-repeat", str(path), None,
-                                    f"[[{t}]] linked {c}x in one file."))
+                                f"{total} outgoing prose links > {LINK_BUDGET}. Link the "
+                                "responsible file once - do not link every mention."))
 
 
 def check_fence(abbr, path, line, info, body_lines, findings):
@@ -2075,6 +2231,23 @@ def check_paths(vault, path, lines, fm_end, findings):
             if len(segs) > 1:
                 candidates.append(vault.project_root / "/".join(segs[1:]))
             if not any(c.exists() for c in candidates):
+                # A gitignored path whose folder is absent too cannot exist
+                # on a fresh checkout - a clone directory CI never has. As an
+                # ERROR it made one project rewrite its paths until the
+                # check no longer saw them (01_methodvault, DEC-MTH-053).
+                # The folder test keeps a typo an ERROR: where the folder is
+                # there, the author's checkout can tell a wrong name from a
+                # missing file. Asked of the project-relative reading only:
+                # the fallback readings point at folders that never exist,
+                # and an ignore pattern like '*.log' matches them anywhere.
+                primary = candidates[0]
+                if not primary.parent.exists() and vault.is_gitignored(primary):
+                    findings.append(Finding(
+                        "WARN", "path-missing", str(path), i,
+                        f"referenced artifact '{token}' is unverifiable on this "
+                        "checkout (gitignored, and its folder is absent) - "
+                        "check it where the ignored files live"))
+                    continue
                 sev = "ERROR" if in_ref else "WARN"
                 msg = (f"referenced artifact '{token}' does not exist - "
                        "stale pointer (docs say A, disk says B)")
@@ -2497,6 +2670,26 @@ def allocation_index(vault: Vault):
     return {rid: "not-allocated" not in c["gaps"] for rid, c in coverage.items()}
 
 
+def deferred_requirements(vault: Vault):
+    """Requirements every allocation row of which carries a deferral status.
+
+    A deferral written into the allocation row - a status saying the
+    requirement is blocked, with a DEC saying why, the shape one real vault
+    used - was invisible to req-uncovered, which kept reporting a decision
+    the vault had already recorded (01_methodvault, DEC-MTH-054). Every row and not any: one
+    deferred row beside an Approved one leaves the requirement open.
+    Read off the exporter's graph like allocation_index, for its reason.
+    """
+    a = export_analysis(vault)
+    if a is None:
+        return set()
+    values = deferral_values(vault.schema())
+    coverage = a[4]
+    return {rid for rid, c in coverage.items()
+            if c.get("allocations")
+            and all(is_deferral(x.get("status"), values) for x in c["allocations"])}
+
+
 def export_analysis(vault: Vault):
     """(roles, bindings, graph, back, coverage) of this vault, or None.
 
@@ -2639,27 +2832,43 @@ def validate_vault_wide(vault: Vault):
     if idx:
         evidence = evidence_index(vault, corpus)
         allocated = allocation_index(vault)
-        tail = ("coverage is decided on the allocation table and on "
-                "'verifies', never on a mention in prose")
+        deferred = deferred_requirements(vault) if allocated is not None else set()
+        # One finding per requirement file and kind of gap, not one per
+        # requirement: the rationale repeated per identifier made six
+        # near-identical lines out of one fact on a real vault, and the
+        # rationale lives in SKILL.md (01_methodvault, DEC-MTH-053). The
+        # three kinds stay apart because their repairs differ.
+        groups = {}
         for rid, (f, i) in idx.items():
             notes = evidence.get(rid)
             alloc = allocated.get(rid) if allocated is not None else None
             if notes and alloc is not False:
                 continue
-            if notes:
-                by = ", ".join(sorted(p.stem for p in notes))
-                msg = (f"{rid} is verified by {by} but no allocation row "
-                       "allocates it - nothing states which part of the "
-                       f"system owes it; {tail}")
-            elif alloc is False:
-                msg = (f"{rid} has no allocation row naming it and no TAE "
-                       "naming it in 'verifies' - an unverified REQ is "
-                       f"indistinguishable from an unmet one; {tail}")
+            if not notes and rid in deferred:
+                vault.deferred.append((rid, str(f)))
+                continue
+            kind = "verified" if notes else "neither" if alloc is False else "unverified"
+            g = groups.setdefault((f, kind), {"line": i, "ids": [], "by": set()})
+            g["ids"].append(rid)
+            g["by"].update(p.stem for p in notes or ())
+        values = deferral_values(vault.schema()) or ["Blocked"]
+        defer = ("or allocate them in a row whose status is "
+                 + (", ".join(values[:-1]) + " or " if len(values) > 1 else "")
+                 + values[-1] + " with the reason in a DEC")
+        for (f, kind), g in groups.items():
+            ids = ", ".join(g["ids"])
+            if kind == "verified":
+                msg = (f"{ids}: verified by {', '.join(sorted(g['by']))} but no "
+                       "allocation row allocates them - add the row naming the "
+                       "part of the system that owes each")
+            elif kind == "neither":
+                msg = (f"{ids}: no allocation row names them and no TAE names "
+                       "them in 'verifies' - allocate each in a row and add it "
+                       f"to a TAE's verifies:, {defer}")
             else:
-                msg = (f"{rid} is named by no TAE in 'verifies' - an "
-                       "unverified REQ is indistinguishable from an unmet "
-                       f"one; {tail}")
-            findings.append(Finding("WARN", "req-uncovered", str(f), i, msg))
+                msg = (f"{ids}: named by no TAE in 'verifies' - add each to a "
+                       f"TAE's verifies:, {defer}")
+            findings.append(Finding("WARN", "req-uncovered", str(f), g["line"], msg))
 
     # Every ARC module is reachable from the overview. The overview names
     # the top-level modules and a main module names its submodules, so an
@@ -2678,12 +2887,11 @@ def validate_vault_wide(vault: Vault):
                  if not f.name.startswith("00_")] if arcdir else []
     marked, near = vault.overview_scan()
     if len(marked) != 1:
-        # Reported for EVERY vault, not only one with ARC notes in it. The
-        # entry point decides the hub link budget as well as the
-        # reachability scan, so a vault whose ARC folder is still empty -
-        # which every project derived with the three-domain profile is on
-        # day one - would otherwise have its overview drop to the ordinary
-        # budget with nothing said. That is the silence this rule exists
+        # Reported for EVERY vault, not only one with ARC notes in it. A
+        # vault whose ARC folder is still empty - which every project
+        # derived with the three-domain profile is on day one - would
+        # otherwise start skipping the reachability scan with its first ARC
+        # note and nothing said. That is the silence this rule exists
         # against, and gating the finding on ARC content would have kept a
         # smaller copy of it.
         marker = overview_marker(vault.schema())
@@ -2701,8 +2909,7 @@ def validate_vault_wide(vault: Vault):
                 f"{p.name} carries {d}" for p, d in near)
         findings.append(Finding(
             "WARN", "overview-unidentified", str(vault.root), None,
-            msg + " - the hub link budget is granted to no file and the ARC "
-            "reachability check did not run"))
+            msg + " - the ARC reachability check did not run"))
     if arc_files and len(marked) == 1:
         contained = arc_containment(vault)
         if contained is None:
@@ -2742,14 +2949,56 @@ def validate_vault_wide(vault: Vault):
             findings.append(Finding("WARN", "orphan", str(f), None,
                                     "no inbound links - unreachable except by search"))
 
-    # ambiguous wikilink targets
+    # Ambiguous wikilink targets. Two files sharing a stem are a defect only
+    # where a link names that stem: the template ships two README.md that no
+    # vault links, and reporting them made the finding fire on every derived
+    # vault forever (01_methodvault, DEC-MTH-053). The link is matched as a
+    # parsed target, not as a '[[name' substring, which '[[README_x' also
+    # carries.
+    linked = {}
+    for p, text in corpus.items():
+        for i, _line, m in iter_wikilinks(text.splitlines()):
+            target = m.group(2).strip()
+            if target.endswith(".md"):
+                target = target[:-3]
+            if target:
+                linked.setdefault(target, []).append(f"{p.name}:{i}")
+    label = vault.index_root_label()
     for name, paths in vault.md_names().items():
-        if len(paths) > 1:
-            findings.append(Finding("WARN", "duplicate-basename", str(paths[0]), None,
-                                    f"'{name}' exists {len(paths)}x under "
-                                    f"{vault.index_root_label()} - "
-                                    "wikilinks to it are ambiguous"))
-    return findings
+        if len(paths) < 2 or name not in linked:
+            continue
+        sources = linked[name]
+        where = ", ".join(sources[:3]) + (f", +{len(sources) - 3} more"
+                                          if len(sources) > 3 else "")
+        files = []
+        for p in paths:
+            try:
+                files.append(str(p.relative_to(vault.index_root())))
+            except ValueError:
+                files.append(str(p))
+        findings.append(Finding(
+            "WARN", "duplicate-basename", str(paths[0]), None,
+            f"[[{name}]] (linked from {where}) matches {len(paths)} files under "
+            f"{label}: {', '.join(files)} - the link is ambiguous, and a "
+            "path-qualified link does not resolve here either; rename one of "
+            "the files"))
+
+    # A file's own acceptance reaches its vault-wide WARNs too. Only files of
+    # this vault's corpus are asked - a finding about the vault root or the
+    # schema has no frontmatter to accept it. The acceptance's own findings
+    # come from the file-local pass, so they are not repeated here.
+    kept = []
+    for f in findings:
+        text = corpus.get(Path(f.path)) if f.sev == "WARN" else None
+        if text is not None:
+            accepted, _ = file_acceptance(vault, Path(f.path),
+                                          vault.classify(Path(f.path))[0],
+                                          text.splitlines())
+            if f.code in accepted:
+                vault.accepted[f.path] += 1
+                continue
+        kept.append(f)
+    return kept
 
 
 def run_full(vault: Vault):
@@ -2815,6 +3064,56 @@ def git_head_content(vault: Vault, path: Path):
     return r.stdout if r.returncode == 0 else None
 
 
+def git_env():
+    """The environment for a git call that must answer about a directory.
+
+    Inside 'git commit' - where the pre-commit hook runs this validator -
+    git exports GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE, and any of them
+    makes '-C <dir>' answer for a different tree or a temporary index.
+    GIT_OPTIONAL_LOCKS=0 keeps a read from refreshing the index.
+    """
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    return env
+
+
+def git_listed_files(directory: Path):
+    """Files git counts as part of the project below a directory, or None.
+
+    Tracked plus untracked-not-ignored, as absolute paths. A path that is
+    in the index but deleted from the working tree is still listed, and a
+    nested repository comes back as its directory - the caller tests what
+    exists. None means git could not answer, never "no files".
+    """
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(directory), "ls-files", "-z", "--cached",
+             "--others", "--exclude-standard"],
+            capture_output=True, timeout=10, env=git_env())
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return {directory / os.fsdecode(raw.rstrip(b"/"))
+            for raw in r.stdout.split(b"\0") if raw}
+
+
+def warn_key(f):
+    """A WARN's identity across edits: code and message, every number folded.
+
+    Line numbers and counts move with any edit elsewhere in the file - '163
+    lines > 150' becomes '164 lines' - and must not turn a known WARN into a
+    new one. link-unresolved is left to its own aggregation.
+    """
+    return f"{f.code}\0{re.sub(r'[0-9]+', 'N', f.msg)}"
+
+
+def warn_keys(findings):
+    return Counter(warn_key(f) for f in findings
+                   if f.sev == "WARN" and f.code != "link-unresolved")
+
+
 def error_counts(findings):
     return dict(Counter(f.code for f in findings if f.sev == "ERROR"))
 
@@ -2869,15 +3168,24 @@ def hook_post(payload):
         head = git_head_content(vault, path)
         if head is not None:
             base = validate_file(vault, path, content=head, strict_links=True)
-            baseline[key] = {"codes": error_counts(base), "new": False}
+            baseline[key] = {"codes": error_counts(base), "new": False,
+                             "warns": dict(warn_keys(base))}
         else:
-            baseline[key] = {"codes": {}, "new": True}
+            baseline[key] = {"codes": {}, "new": True, "warns": {}}
         baseline_f.write_text(json.dumps(baseline))
 
     findings = validate_file(vault, path, strict_links=False)
     if not findings:
         return 0
     base_codes = baseline.get(key, {}).get("codes", {})
+    # A WARN the file already carried at HEAD is not news. Repeating it on
+    # every edit of a legacy file re-paid the same tokens for nothing - 557
+    # characters per edit of one measured file (01_methodvault,
+    # DEC-MTH-054). Compared as a multiset, so a second identical WARN is
+    # still shown. A baseline written before this key existed has none and
+    # shows everything, as it always did.
+    base_warns = Counter(baseline.get(key, {}).get("warns", {}))
+    seen, pre_existing = Counter(), 0
     # Aggregate unresolved-link WARNs into one line: mid-pass forward
     # references are expected under the phased creation order, and dozens
     # of identical per-line WARNs train the reader to ignore the channel.
@@ -2887,6 +3195,12 @@ def hook_post(payload):
     for f in findings:
         if f in link_warns:
             continue
+        if f.sev == "WARN":
+            k = warn_key(f)
+            seen[k] += 1
+            if seen[k] <= base_warns[k]:
+                pre_existing += 1
+                continue
         tag = ""
         if f.sev == "ERROR" and base_codes.get(f.code, 0) > 0:
             tag = " (pre-existing before this session; non-blocking, fix if cheap)"
@@ -2913,6 +3227,11 @@ def hook_post(payload):
             f"WARN {rel} [link-unresolved] {len(targets)} unresolved link "
             f"target(s): {shown} - tolerated mid-pass; every target must "
             "exist by turn end" + note)
+    if not lines_out:
+        return 0
+    if pre_existing:
+        lines_out.append(f"{pre_existing} pre-existing WARN(s) unchanged since "
+                         "git HEAD - not repeated")
     msg = ("vault validator findings for the file just written "
            "(fix ERRORs now while context is fresh; WARNs are advisory):\n"
            + "\n".join(lines_out))
@@ -2993,10 +3312,15 @@ def hook_stop(payload):
                        + "\n".join(cap_report_lines(sorted(set(reports)))))
 
     if new_errors:
-        blocks_f = state_path("blocks", session)
-        blocks = load_json(blocks_f, 0)
-        if blocks < MAX_STOP_BLOCKS:
-            blocks_f.write_text(json.dumps(blocks + 1))
+        # Once per stop sequence, decided from the payload. Claude Code sets
+        # stop_hook_active when the turn is already a continuation forced by
+        # a Stop hook: the gate has demanded the fix once in this sequence,
+        # and a second demand would loop on a defect the session could not
+        # fix. A counter file did this per SESSION and was never reset, so
+        # after two blocks the gate stayed advisory for the rest of a long
+        # session; a later stop sequence now blocks again (01_methodvault,
+        # DEC-MTH-055). Only a JSON true counts - anything else blocks.
+        if payload.get("stop_hook_active") is not True:
             # Two channels, two audiences. `reason` reaches Claude - it
             # arrives as a synthetic user message "Stop hook feedback:" -
             # and carries the one obligation the block exists to impose,
@@ -3012,17 +3336,17 @@ def hook_stop(payload):
             # on Claude Code 2.1.220 - the turn simply ends and this gate
             # is off. Do not "harmonise" this with hook_post below.
             reason = ("vault validator: ERRORs introduced this session must be fixed "
-                      f"before finishing (attempt {blocks + 1}/{MAX_STOP_BLOCKS}):\n"
+                      "before finishing:\n"
                       + "\n".join(sorted(set(new_errors))))
-            note = ("vault validator blocked the turn end (attempt "
-                    f"{blocks + 1}/{MAX_STOP_BLOCKS}): ERRORs introduced this session")
+            note = ("vault validator blocked the turn end: ERRORs introduced "
+                    "this session")
             print(json.dumps({
                 "decision": "block", "reason": reason,
                 "systemMessage": note + ("\n" + "\n".join(summary) if summary else "")}))
             return 0
-        summary.insert(0, "UNRESOLVED vault ERRORs (gate released after "
-                       f"{MAX_STOP_BLOCKS} attempts - surface these to the user):\n"
-                       + "\n".join(sorted(set(new_errors))))
+        summary.insert(0, "UNRESOLVED vault ERRORs (the gate demanded these once "
+                       "in this stop sequence and released - surface these to "
+                       "the user):\n" + "\n".join(sorted(set(new_errors))))
 
     # Reported, never blocking. A repaired defect and a check that stopped
     # reaching the file produce the same absence, and where this layer
@@ -3045,15 +3369,30 @@ def hook_stop(payload):
     # reached only when the gate is not blocking, so the advisory can
     # never end up in a block reason; the try/except keeps an advisory
     # bug from ever crashing the gate (exit 2 would release it).
-    wide = []
+    wide, wide_keys = [], []
     try:
         for root in roots:
             v = Vault(root)
-            wide.extend(f.render(rel_to=v.project_root)
-                        for f in validate_vault_wide(v))
+            for f in validate_vault_wide(v):
+                wide.append(f.render(rel_to=v.project_root))
+                wide_keys.append(f"{f.sev} {f.code} {f.path} "
+                                 + re.sub(r"[0-9]+", "N", f.msg))
     except Exception:
-        wide = []
-    if wide:
+        wide, wide_keys = [], []
+    # Shown on a session's first report and whenever it changed, otherwise
+    # one line: the same block at every turn end was the channel that
+    # buries the user in legacy state (01_methodvault, DEC-MTH-054). The
+    # digest is taken over every finding, before the cap and without line
+    # numbers, so a shifted line is no change and a change past line 15 is.
+    digest = hashlib.sha256("\n".join(sorted(wide_keys)).encode(
+        "utf-8", "surrogateescape")).hexdigest()
+    wide_f = state_path("widehash", session)
+    unchanged = load_json(wide_f, None) == digest
+    wide_f.write_text(json.dumps(digest))
+    if wide and unchanged:
+        summary.append(f"vault-wide findings unchanged ({len(wide)}) - shown "
+                       "in full when this session first reported them")
+    elif wide:
         # ERROR-severity vault-wide findings must survive the cap: this
         # report is their only automatic channel, because hook_post never
         # shows vault-wide findings at all.
@@ -3074,8 +3413,8 @@ def hook_stop(payload):
         # turn, spending a model turn on legacy drift nobody asked about.
         # The fail-open ERROR report below rides this channel too, and
         # deliberately does not reach the model: the gate has already
-        # demanded those fixes twice: whether to spend a third attempt on
-        # them is the user's call, not the session's.
+        # demanded those fixes in this stop sequence; whether to spend
+        # another attempt on them is the user's call, not the session's.
         #
         # ensure_ascii stays at its default. A path that arrived through
         # surrogateescape carries lone surrogates, which print() cannot
@@ -3091,14 +3430,33 @@ def hook_stop(payload):
 
 SKILL_NAME = "mechatronics-docs"
 
-# Identifies this copy of the skill in one line, so "which copy just
-# enforced?" can be answered without diffing two directory trees. A tree
-# comparison cannot answer it: a derived project legitimately ships fewer
-# files than the template (tools/new_project.py strips tests/), so content
-# equality is the wrong question. Bump on every release that changes what
-# the validator or the hooks do; the release checklist in CONTRIBUTING.md
-# owns the bump.
-SKILL_REVISION = "2026-08-10.1"
+# The files whose bytes decide what this copy enforces: the validator, the
+# schema it reads, and the exporter it imports for the coverage and
+# containment checks. Not the whole directory - a derived project ships
+# without tests/ on purpose (tools/new_project.py), and that must not make
+# two copies enforcing the same rules look different.
+REVISION_FILES = ("validate_vault.py", "vault_schema.json", "export_traceability.py")
+
+
+def skill_revision():
+    """Identifies this copy of the skill in one line, derived from content.
+
+    "Which copy just enforced?" has to be answerable without diffing two
+    directory trees. A hand-bumped constant answered it until it was not
+    bumped for four behaviour changes and two different validators reported
+    one revision (01_methodvault, DEC-MTH-055). Raw bytes, so two copies
+    differing in one byte differ here; a missing file is named rather than
+    crashing the check that is supposed to diagnose a broken install.
+    """
+    here = Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for name in REVISION_FILES:
+        try:
+            data = hashlib.sha256((here / name).read_bytes()).digest()
+        except OSError:
+            data = b"missing"
+        h.update(name.encode() + b"\0" + data)
+    return h.hexdigest()[:12]
 
 
 def check_install():
@@ -3118,7 +3476,7 @@ def check_install():
     """
     own = Path(__file__).resolve().parent
     entry = Path.home() / ".claude" / "skills" / SKILL_NAME
-    print(f"this copy:      {own} (rev {SKILL_REVISION})")
+    print(f"this copy:      {own} (rev {skill_revision()})")
     print(f"personal entry: {entry}")
 
     # is_symlink() before exists(): exists() follows the link and is False
@@ -3188,7 +3546,8 @@ def main(argv):
         if root is None or not is_vault_root(root):
             print(f"ERROR - no vault root found for {path}", file=sys.stderr)
             return 2
-        findings = validate_file(Vault(root), path, strict_links=False)
+        vault = Vault(root)
+        findings = validate_file(vault, path, strict_links=False)
     else:
         if not args.vault_root:
             ap.error("vault_root or --file required")
@@ -3198,7 +3557,8 @@ def main(argv):
             print(f"ERROR - {root} is not a vault root (needs >=3 NN_name_(ABBR) "
                   f"domain folders containing {names} files)", file=sys.stderr)
             return 2
-        findings = run_full(Vault(root))
+        vault = Vault(root)
+        findings = run_full(vault)
 
     errors = [f for f in findings if f.sev == "ERROR"]
     warns = [f for f in findings if f.sev == "WARN"]
@@ -3208,6 +3568,16 @@ def main(argv):
     near = [f for f in findings if f.code in NEAR_MISS_CODES]
     for f in findings:
         print(f.render())
+    # What was not printed above, said once. Before the summary line, which
+    # stays last because tools read the last line, and only when there is
+    # something to say (01_methodvault, DEC-MTH-054).
+    n_acc, n_def = sum(vault.accepted.values()), len(vault.deferred)
+    if n_acc or n_def:
+        files = set(vault.accepted) | {f for _rid, f in vault.deferred}
+        parts = ([f"{n_acc} by validator-accept"] if n_acc else []) + (
+            [f"{n_def} requirement(s) deferred in an allocation row"] if n_def else [])
+        print(f"accepted: {n_acc + n_def} finding(s) in {len(files)} file(s) - "
+              + ", ".join(parts))
     print(f"-- {len(errors)} error(s), {len(warns)} warning(s), "
           f"{len(near)} near miss(es)")
     return 1 if errors else 0

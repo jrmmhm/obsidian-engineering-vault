@@ -115,24 +115,25 @@ cd my-project
 # 2. Check the vault is intact
 python3 .claude/skills/mechatronics-docs/validate_vault.py \
         00_documentation/01_projectvault
-# -> 0 error(s), 1 warning(s)
+# -> 0 error(s), 0 warning(s)
 ```
 
-Zero ERRORs is the gate, and that one warning is the known state of the shipped
-vault rather than something you broke. `01_projectvault/README.md` and
+Zero ERRORs is the gate. A WARN advises, it does not fail: a run that reports
+warnings and no ERROR exits 0, so no gate here blocks on one — not CI, not the
+pre-commit hook, not the hooks around a Claude Code session. Each warning is
+still a decision you make once, because the warning nobody triages is the one
+everybody learns to scroll past. A file that is, say, long on purpose can accept
+its warning in its own frontmatter with a reason, and the audit then counts it
+in one line instead of printing it. If your run shows an ERROR, or a warning you
+did not expect, that one is yours.
+
+One shape stays silent until you write it. `01_projectvault/README.md` and
 `02_documents/README.md` both ship under `00_documentation`, and this vault
 resolves a wikilink by its basename alone — Obsidian would tell the two apart by
-their path, this validator does not, so `[[README]]` is ambiguous and
-`[[01_projectvault/README]]` is reported as `link-unresolved` instead. Renaming
-one of them is the only remedy. Keeping both names is a fair choice, and while
-you do, no wikilink may address either file by that name.
-
-That generalises: a WARN advises, it does not fail. A run that reports warnings
-and no ERROR exits 0, so no gate here blocks on one — not CI, not the pre-commit
-hook, not the hooks around a Claude Code session. Each warning is still a
-decision you make once, because the warning nobody triages is the one everybody
-learns to scroll past. If your run shows an ERROR, or a second warning you did
-not expect, that one is yours.
+their path, this validator does not. The first `[[README]]` you write is
+therefore reported as `duplicate-basename`, and `[[01_projectvault/README]]` as
+`link-unresolved`. Renaming one of the files is the only remedy; keeping both
+names is a fair choice as long as no wikilink addresses either by that name.
 
 That was a check, though, not a result. **[Your first closed loop](TUTORIAL.md)**
 is the same method at working size, in roughly ten minutes: you derive a project
@@ -306,9 +307,9 @@ python3 tools/new_project.py ../my-project
 The script copies the template into a fresh directory, removes the example
 together with everything only this template repository needs — including its
 own `tools/` folder — and finishes by running the derived vault's validator,
-so the result is checked rather than assumed. The known duplicate-basename
-warning above stays by default and is explained in the generated README;
-`--rename-docs-readme` resolves it instead.
+so the result is checked rather than assumed. The two README files described
+above are kept by default and explained in the generated README;
+`--rename-docs-readme` renames one of them instead.
 
 Deriving by hand still works. Remove the seven notes of the example under
 `01_projectvault` — `REQ_Battery_Monitoring (BAT)`,

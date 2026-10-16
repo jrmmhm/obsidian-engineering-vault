@@ -33,6 +33,37 @@ decision.
 
 ### Added
 
+- **The validator says what can be acted on, and counts what it knows** —
+  on six real vaults it printed 94 WARN lines of which four were actionable;
+  it now prints 17, and catches the same 16 of 18 seeded defects with the
+  same ERROR codes. The name index takes the documentation root outside the
+  vault from git, so gitignored folders stop colliding; `duplicate-basename`
+  fires only for a stem a wikilink names, so the template's two README files
+  are silent until a `[[README]]` appears; the link budget counts prose links
+  only, and `link-repeat` and the hub budget are gone; `req-uncovered` is one
+  line per REQ file and kind of gap; a gitignored path whose folder is absent
+  is a WARN "unverifiable on this checkout" instead of an ERROR. A file may
+  accept WARNs of a closed list of codes in its own frontmatter
+  (`validator-accept` plus `validator-accept-reason`), and a requirement whose
+  every allocation row is Blocked, Deferred or TBD leaves `req-uncovered`;
+  both are counted in one line above the audit's summary, with two new WARNs
+  for a wrong acceptance (`accept-invalid`, `accept-reason-missing`). The
+  post hook injects only WARNs new since git HEAD, the stop report shows its
+  vault-wide block once per session and on change, the stop gate blocks once
+  per stop sequence by `stop_hook_active` instead of twice per session, and
+  `--check-install` prints a revision derived from the content of the
+  validator, the schema and the exporter. **MINOR** by the table in
+  [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
+  — new WARNs and an optional frontmatter field. An existing vault can gain
+  one finding: an ARC note or an overview with more than 20 prose links,
+  which the removed hub budget of 50 left silent, now reports
+  `link-budget` (none of the six measured vaults has one).
+  `schema_version` moves to `0.6`. The reasoning is
+  [`DEC_The_Validator_Reports_What_Can_Be_Acted_On`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Validator_Reports_What_Can_Be_Acted_On.md),
+  [`DEC_A_Known_Finding_Is_Counted_Not_Repeated`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Known_Finding_Is_Counted_Not_Repeated.md)
+  and
+  [`DEC_Enforcement_State_Is_Derived_Not_Kept`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Enforcement_State_Is_Derived_Not_Kept.md).
+
 - **The system overview declares itself, and two new WARNs say when the ARC
   reachability check did not run** — `arc-not-in-overview` resolved
   `system_overview.md` as a literal path and returned without a word when

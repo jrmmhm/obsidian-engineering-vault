@@ -65,16 +65,16 @@ silently skip if the layout ever moves.
 python3 .claude/skills/mechatronics-docs/validate_vault.py 00_documentation/01_projectvault
 ```
 
-It is not silent, and that is expected:
+It prints one line:
 
 ```
-WARN .../00_documentation/01_projectvault/README.md [duplicate-basename] 'README' exists 2x under 00_documentation - wikilinks to it are ambiguous
--- 0 error(s), 1 warning(s), 0 near miss(es)
+-- 0 error(s), 0 warning(s), 0 near miss(es)
 ```
 
-Exit code 0. **Zero ERRORs is the gate; that one WARN is the known state of the
-shipped vault**, not something you broke. If your run shows an ERROR, or a
-second warning you did not expect, that is yours.
+Exit code 0. **Zero ERRORs is the gate.** If your run shows an ERROR, or a
+warning you did not expect, that is yours. The method vault audit
+(`.claude/01_methodvault`) prints one more line above its summary, counting
+the findings its long decision records accept in their own frontmatter.
 
 **The export is deterministic.** Only relevant if you touched the exporter, but
 it is the property itself rather than a proxy for it — unsorted iteration is

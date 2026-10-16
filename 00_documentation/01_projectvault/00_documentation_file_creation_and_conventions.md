@@ -231,11 +231,11 @@ escaped — `[[TAE_ADC_Linearity\|linearity proof]]` — otherwise it is read
 as a column separator; the same applies to an embed size. Link the
 responsible file once where it matters —
 do not link every mention (guideline: under ~20 outgoing links per
-file; hub files carry more — ARC notes, and the file marked as the
-system overview). Two further
-link findings sit in the quick reference at the end of this file: the same
-target linked too often in one file (`link-repeat`), and two files sharing
-a basename, which makes every link to that name ambiguous
+file, counted in prose only — a table row is a relation slot the
+templates ask for, one allocation row per requirement, and a link of a
+note to itself is no outgoing link). A further link finding sits in the
+quick reference at the end of this file: two files sharing a basename
+that a link names, which makes that link ambiguous
 (`duplicate-basename`).
 
 A link into the same file (`[[#Heading]]`, `[[#^blockid]]`) is checked
@@ -251,6 +251,9 @@ optionally with the project folder name in front of it. Only that form is
 checked: a path that does not exist is an ERROR inside a References or
 Sources section and a WARN elsewhere in the body, where a
 `pending`/`planned`/`TBD` marker on the line or its heading suppresses it.
+A path the repository ignores and whose folder is absent as well — a
+clone directory a fresh checkout never has — is a WARN anywhere,
+reported as unverifiable on this checkout.
 
 An artifact that lives on a different machine is written the way that
 machine addresses it — absolute (`/etc/libvirt/network.conf`),
@@ -298,7 +301,11 @@ Above 400 lines the validator blocks — that size is a structural SSOT
 violation, not a formatting issue. Length is not the only shape the
 validator reads: a long file without a single subheading is reported as
 `structure`, a very short one as `stub` — both in the quick reference at
-the end of this file.
+the end of this file. A file that is long on purpose may accept the
+warning in its own frontmatter, `validator-accept: [length]` with a
+`validator-accept-reason:` line saying why; the audit then counts it
+instead of printing it. Which codes can be accepted is listed in the
+validator's schema, and an ERROR never can.
 
 ### Freshness
 Outdated documentation is worse than none: it actively misleads both
@@ -310,7 +317,7 @@ search the vault for files referencing it and update them.
 
 ### Validator-enforced rules (quick reference)
 
-Seven findings of `validate_vault.py` that the sections above do not name.
+Eight findings of `validate_vault.py` that the sections above do not name.
 This is not the tool's whole code list — the rules above produce findings
 of their own, and every message the validator writes names its own code.
 
@@ -321,26 +328,27 @@ file the validator reads** means the root files, the `00_` files, the
 inbox and the domain files together — but nothing below a folder that is
 not a domain folder, because the validator never descends there.
 
-Three of the seven are vault-wide rather than per-file. The stop gate
+Three of the eight are vault-wide rather than per-file. The stop gate
 lists those as advisory; the full audit is the pass that counts.
 
 | Code | Severity | Fires on | Rule |
 | --- | --- | --- | --- |
 | `stub` | WARN | domain files | Fewer than 5 non-blank lines below the frontmatter. Fill the file or do not create it yet. |
 | `structure` | WARN | domain files | More than 100 lines, frontmatter included, without a single `##` or `###` heading among them. |
-| `duplicate-basename` | WARN, vault-wide | every `.md` file under `00_documentation` | The same filename stem exists more than once. The scope reaches past the vault: `02_documents` counts, and the shipped template hits this with its two `README.md` files. It stops at the repository, so a project that versions the vault alone is compared against its own repository and the finding names that boundary instead. |
-| `link-repeat` | WARN | every file the validator reads | The same target linked more than three times in one file. An alias, an anchor and an embed all address the same target; a link into the file itself (`[[#Heading]]`, `[[#^blockid]]`) is not counted. |
+| `duplicate-basename` | WARN, vault-wide | every `.md` file under `00_documentation` | A wikilink names a filename stem that exists more than once. The scope reaches past the vault: `02_documents` counts, as far as the repository counts it — a gitignored folder does not. The shipped template carries two `README.md` files that nothing links, so it is silent until a `[[README]]` appears. It stops at the repository, so a project that versions the vault alone is compared against its own repository and the finding names that boundary instead. |
 | `encoding-not-utf8` | ERROR | every file the validator reads, templates included | The bytes are not UTF-8. Every other finding on that file is a consequence of the encoding — re-save as UTF-8 and read them again. |
 | `id-scope-mismatch` | WARN, vault-wide | REQ files carrying both an `id` and a `(SCOPE)` token | The scope in the frontmatter `id` differs from the token in the filename. The id wins, so every row of the file is addressed under the id's scope. |
 | `orphan` | WARN, vault-wide | domain files | No other file in the vault links to it — reachable by search alone. |
+| `accept-invalid` | WARN | every file the validator reads | `validator-accept` names a code that cannot be accepted — an ERROR, or a WARN outside the schema's list — or sits in a `00_` file — a template, whose frontmatter every copy would inherit, or the README beside it. The finding it names is still reported. |
+| `accept-reason-missing` | WARN | every file the validator reads | `validator-accept` without a `validator-accept-reason`. Nothing is accepted until the file says why. |
 
 `duplicate-basename` has one remedy here, and it is not the one Obsidian
 teaches. Obsidian tells two notes of the same name apart by their path
 (`[[folder/Note]]`); this vault resolves a wikilink by its basename alone,
 so a path-qualified link is reported as `link-unresolved` instead. Rename
 one of the two files. A collision you decide to keep — two `README.md` in
-two folders is the usual one — stays a standing WARN, and no wikilink may
-address either file by that name while it does.
+two folders is the usual one — is silent as long as no wikilink addresses
+either file by that name; the first one that does is reported.
 
 `impl-leak` is not an ARC rule alone. The rule is that ARC stores no
 values; what the check mechanically catches is a number carrying a unit

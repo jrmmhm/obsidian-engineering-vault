@@ -32,11 +32,12 @@ these five.
 
 `--check-install` is the odd one out: it answers whether the personal
 `~/.claude/skills/` entry reaches *this* copy of the skill, reads no vault and
-emits no finding at all. It also prints `SKILL_REVISION`, the module-level
-constant that names this copy. That constant exists because the copies that
-can disagree cannot be compared by content: a derived project ships the
-skill without `tests/` on purpose (`tools/new_project.py`), so equal
-directories are not the criterion — an equal revision is. The hooks resolve
+emits no finding at all. It also prints the revision `skill_revision`
+derives from the bytes of the files named in `REVISION_FILES` — the
+validator, the schema and the exporter it imports. Not from the whole
+directory: a derived project ships the skill without `tests/` on purpose
+(`tools/new_project.py`), so equal directories are not the criterion — an
+equal revision is. The hooks resolve
 through `CLAUDE_PLUGIN_ROOT` and therefore always run the loaded copy
 (DEC-MTH-045); the CI and the pre-commit hook run the vendored one, and the
 revision line is how a disagreement between the two becomes visible.
@@ -82,7 +83,7 @@ baseline pass.
 | --- | --- |
 | `outside`, `skip` | none — returns immediately |
 | `inbox` | `check_links`, then `check_inb_age` (disk pass only) |
-| `root` | `check_links` only, never strict, hub budget for the file `Vault.is_overview` recognises |
+| `root` | `check_links` only, never strict |
 | `infra` | frontmatter vocabulary via `check_undeclared`, `template-unreadable` for an unparseable template, then `check_links` |
 | `domain` | the full chain below |
 
@@ -97,15 +98,21 @@ The domain chain, in the order it executes:
 | 3b | `check_undeclared` | `frontmatter-undeclared` | WARN, one grouped finding per file |
 | 4 | `check_sections` | `template-sections`, `section-mismatch`, `section-near-miss` | ERROR, ERROR, WARN |
 | 5 | `check_length` | `length`, `structure` | `length` is ERROR above the hard limit, WARN above the soft one |
-| 6 | `check_links` | `link-unresolved`, `link-budget`, `link-repeat` | `link-unresolved` is ERROR when `strict_links`, WARN otherwise |
+| 6 | `check_links` | `link-unresolved`, `link-budget` | `link-unresolved` is ERROR when `strict_links`, WARN otherwise; the budget counts prose links only — no table row, no link to the file itself |
 | 7 | `check_leaks` | `impl-leak` | ERROR in ARC, WARN in a DEC Context section; no other domain is scanned, and a References/Sources section (`REF_SECTION_TOKENS`, English and German spellings) is exempt |
 | 7a | `check_fence` | `code-fence`, `fence-host`, `fence-record` | only in the banned domains; a declared over-long block is WARN, an undeclared one ERROR |
-| 8 | `check_paths` | `path-missing` | ERROR under a References or Sources heading (`REF_SECTION_TOKENS` — `Referenzen`, `Verweise` and `Quelle(n)` open the zone too), WARN in the rest of the body |
+| 8 | `check_paths` | `path-missing` | ERROR under a References or Sources heading (`REF_SECTION_TOKENS` — `Referenzen`, `Verweise` and `Quelle(n)` open the zone too), WARN in the rest of the body; WARN anywhere when `Vault.is_gitignored` says the repository ignores the path and its folder is absent |
 | 9 | `check_req_table` | `req-class`, `req-nnn`, `req-duplicate`, `req-criterion` | all ERROR; triggered on the **requirements role** |
 | 9a | `check_req_table_silence` | `req-table-unrecognized` | WARN |
 | 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered on the **evidence role** |
 | 11 | `check_dec_status` | `dec-status`, `dec-superseded` | ERROR; triggered on the **decisions role** |
 | 12 | `validate_file` | `stub` | WARN |
+
+Every kind ends in the same filter: `file_acceptance` reads the file's own
+`validator-accept` frontmatter and drops the WARNs it accepts, never an
+ERROR, and adds `accept-invalid` and `accept-reason-missing` where the
+acceptance itself is wrong. The full audit counts what was dropped in
+`Vault.accepted` and prints one line for it above the summary.
 
 Step 4 is the one that asks which contract a file is under. `check_sections`
 scores the file against every template of its domain and reports the
@@ -162,8 +169,11 @@ and membership against a named constant is invisible to it.
 2. the global requirement-id scan, inline → `req-duplicate-global`
 3. `check_identifiers`, with `head_identifiers` reading git HEAD →
    `id-duplicate`, `id-scope-mismatch`, `id-vanished`
-4. the coverage rule, inline, fed by `Vault.req_index`, `evidence_index` and
-   `allocation_index` → `req-uncovered`
+4. the coverage rule, inline, fed by `Vault.req_index`, `evidence_index`,
+   `allocation_index` and `deferred_requirements` → `req-uncovered`, one
+   finding per REQ file and kind of gap; a requirement whose every
+   allocation row carries a deferral status goes to `Vault.deferred`
+   instead
 5. the ARC reachability scan, inline → `arc-not-in-overview`,
    `overview-unidentified`, `arc-containment-unreadable`. Three findings for
    one rule, because the rule has two inputs and either can be missing. The
@@ -175,7 +185,12 @@ and membership against a named constant is invisible to it.
    says which one — the whole rule exists because a check that opts out
    without a word reads exactly like a clean result.
 6. the orphan scan, inline → `orphan`
-7. the basename scan, inline → `duplicate-basename`
+7. the basename scan, inline → `duplicate-basename`, only for a stem a
+   wikilink targets (`iter_wikilinks`, the reader `check_links` uses).
+   The name index behind it walks the vault on disk and takes the rest of
+   `index_root` from `git_listed_files`
+8. the acceptance filter over the vault-wide WARNs, by the same
+   `file_acceptance` as stage 2
 
 `export_analysis` is the one that reaches outside this file: it imports the
 exporter and builds the graph once per vault for the two checks that need it.
@@ -200,7 +215,15 @@ Three separate mechanisms, and conflating them is the usual mistake.
 **The per-file ratchet.** `hook_stop` compares each touched file's current
 ERROR codes against the same file's codes at git HEAD. Only a count that went
 *up* blocks. A pre-existing ERROR is reported and never blocks, so a session
-is never held responsible for legacy state it did not create.
+is never held responsible for legacy state it did not create. The gate
+blocks once per stop sequence: a payload carrying `stop_hook_active: true`
+is a continuation the gate already demanded the fix in, and it releases
+with the ERRORs in the user report. No counter is kept.
+
+**Known findings are not repeated.** `hook_post` stores the WARNs a file
+carried at git HEAD (`warn_keys`, numbers folded) and injects only new
+ones; `hook_stop` keeps a digest of the vault-wide block per session and
+shows it again only when it changed.
 
 **Vault-wide findings never block.** They have no per-file HEAD baseline, so
 they cannot enter the ratchet at all. `hook_stop` renders them into an
@@ -245,6 +268,8 @@ Python, which is why a grep of the source alone does not find them.
 
 | Code | Owner | Scope | Severity |
 | --- | --- | --- | --- |
+| `accept-invalid` | `file_acceptance` | every file read | WARN |
+| `accept-reason-missing` | `file_acceptance` | every file read | WARN |
 | `arc-containment-unreadable` | `validate_vault_wide` | vault-wide | WARN |
 | `arc-not-in-overview` | `validate_vault_wide` | vault-wide | WARN |
 | `code-fence` | `check_fence` | domain, banned domains only | ERROR |
@@ -271,11 +296,10 @@ Python, which is why a grep of the source alone does not find them.
 | `inb-age` | `check_inb_age` | inbox, disk pass only | WARN |
 | `length` | `check_length` | domain | ERROR above the hard limit, WARN above the soft one |
 | `link-budget` | `check_links` | every file read | WARN |
-| `link-repeat` | `check_links` | every file read | WARN |
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
 | `overview-unidentified` | `validate_vault_wide` | vault-wide | WARN |
-| `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere |
+| `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere, and WARN anywhere for a gitignored path whose folder is absent |
 | `req-class` | `check_req_table` | domain, requirements role | ERROR |
 | `req-criterion` | `check_req_table` | domain, requirements role | ERROR |
 | `req-duplicate` | `check_req_table` | domain, requirements role | ERROR |

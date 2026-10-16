@@ -70,6 +70,9 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-050 | 2026-08-21 | [[DEC_Per_File_Checks_Follow_The_Role_Map]] — the per-file domain checks decide by canonical role |
 | DEC-MTH-051 | 2026-08-21 | [[DEC_Reachability_Is_Decided_From_A_Self_Declared_Overview]] — the vault's entry point declares itself, and a module its parent contains is reachable |
 | DEC-MTH-052 | 2026-10-16 | [[DEC_A_Citation_States_What_Its_Source_Reports]] — the enforcement layer's research citations are corrected to what their sources report |
+| DEC-MTH-053 | 2026-10-16 | [[DEC_The_Validator_Reports_What_Can_Be_Acted_On]] — the validator reports only what can be acted on |
+| DEC-MTH-054 | 2026-10-16 | [[DEC_A_Known_Finding_Is_Counted_Not_Repeated]] — a known finding is counted, not repeated |
+| DEC-MTH-055 | 2026-10-16 | [[DEC_Enforcement_State_Is_Derived_Not_Kept]] — the gate's block decision and the skill's revision are derived, not kept |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather
