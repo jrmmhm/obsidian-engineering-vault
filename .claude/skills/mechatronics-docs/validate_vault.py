@@ -1628,8 +1628,9 @@ def file_acceptance(vault, path, kind, lines):
     The acceptance is the file's own frontmatter, read from the lines being
     validated - so a HEAD baseline is read under the acceptance it carried
     then. A code outside the schema's closed list is never accepted, an
-    ERROR least of all; a template accepts nothing, because its frontmatter
-    is copied into every file made from it; and without a reason nothing is
+    ERROR least of all; a 00_ file accepts nothing, because a template's
+    frontmatter is copied into every file made from it and the README
+    beside it is classified the same way; and without a reason nothing is
     in force. Each of those is said rather than silently ignored.
     Never raises: malformed frontmatter accepts nothing.
     """
@@ -1646,9 +1647,10 @@ def file_acceptance(vault, path, kind, lines):
     problems = []
     if kind == "infra":
         problems.append(Finding("WARN", "accept-invalid", str(path), 1,
-                                f"'{field}' in a template is copied into every "
-                                "file made from it - accept a finding in the file "
-                                "that carries it, never here"))
+                                f"'{field}' in a 00_ file accepts nothing - a "
+                                "template's frontmatter is copied into every file "
+                                "made from it; accept a finding in the file that "
+                                "carries it"))
         return set(), problems
     refused = [e for e in entries if e not in acceptable]
     if refused:
@@ -2671,10 +2673,10 @@ def allocation_index(vault: Vault):
 def deferred_requirements(vault: Vault):
     """Requirements every allocation row of which carries a deferral status.
 
-    The deferral the skill prescribes - an allocation row saying the
-    requirement is blocked, plus a DEC saying why - was invisible to
-    req-uncovered, which kept reporting a vault that had done exactly what
-    it was told (01_methodvault, DEC-MTH-054). Every row and not any: one
+    A deferral written into the allocation row - a status saying the
+    requirement is blocked, with a DEC saying why, the shape one real vault
+    used - was invisible to req-uncovered, which kept reporting a decision
+    the vault had already recorded (01_methodvault, DEC-MTH-054). Every row and not any: one
     deferred row beside an Approved one leaves the requirement open.
     Read off the exporter's graph like allocation_index, for its reason.
     """
