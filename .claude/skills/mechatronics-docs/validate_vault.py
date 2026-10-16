@@ -165,6 +165,14 @@ ARTIFACT_SEG_RE = re.compile(r"^\d{2}_")
 # Explicit open-item markers suppress the body-wide dead-path WARN only -
 # never the References/Sources ERROR (silent-bypass prevention).
 PENDING_RE = re.compile(r"\b(pending|planned|tbd|not\s+yet)\b", re.I)
+# pending-stale (DEC-MTH-060): a marker belongs to the path right before it
+# - '`20_software/linux` (planned, ...)', '`x/` clone (planned' - and to no
+# path further back than this many characters, nor across a '.' or ';'.
+PENDING_ATTACH_CHARS = 40
+# A relative path in backticks, directories included: what a marker most
+# often says is not there yet is a folder - a clone, a campaign directory -
+# which PATH_TOKEN_RE, built for files, does not read.
+PATH_SPAN_RE = re.compile(r"`((?:[\w.()-]+/)+[\w.()-]*)`")
 # Commit ids ref-unresolved reads (DEC-MTH-060): a backtick span that is
 # nothing but lowercase hex - git never prints an id in capitals, Xcode's
 # object ids are nothing else - and a hex word right after 'commit(s)',
@@ -3092,6 +3100,45 @@ def check_ref_unresolved(vault, notes, spec, findings):
             "not hold as repo@id"))
 
 
+def check_pending_stale(vault, notes, spec, findings):
+    """pending-stale: a pending/planned/TBD marker on a path that exists.
+
+    The marker silences path-missing on its line for good, so once the
+    artifact exists nothing else says the line is out of date. A marker
+    belongs to the nearest path before it within PENDING_ATTACH_CHARS and
+    no sentence break - a marker in a heading, before its path, or in the
+    next sentence says nothing about that path. Needs no git.
+    """
+    for p, _role, _fm, lines, fm_end, blocks in notes:
+        mask = fence_mask(lines, blocks)
+        seen = set()
+        for i, line in enumerate(lines, 1):
+            if i <= fm_end or mask[i] or HEADING_RE.match(line):
+                continue
+            blank = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), line)
+            markers = list(PENDING_RE.finditer(blank))
+            if not markers:
+                continue
+            tokens = [(m.end(), m.group(1)) for m in PATH_TOKEN_RE.finditer(line)]
+            tokens += [(m.end(), m.group(1)) for m in PATH_SPAN_RE.finditer(line)]
+            for mk in markers:
+                before = [t for t in tokens if t[0] <= mk.start()]
+                if not before:
+                    continue
+                end, token = max(before)
+                gap = line[end:mk.start()]
+                key = token.rstrip("/")
+                if (len(gap) > PENDING_ATTACH_CHARS or "." in gap or ";" in gap
+                        or key in seen):
+                    continue
+                if any(r.exists() for r in artifact_readings(vault, token)):
+                    seen.add(key)
+                    findings.append(Finding(
+                        "WARN", "pending-stale", str(p), i,
+                        f"'{mk.group(0)}' marks {key} as not created yet, and "
+                        "it exists - remove the marker or update the line"))
+
+
 def git_advisories(vault, corpus):
     """The git-aware advisory WARNs (DEC-MTH-060), each check on its own.
 
@@ -3105,7 +3152,7 @@ def git_advisories(vault, corpus):
         return []
     notes = advisory_notes(vault, corpus, spec["inactive_statuses"])
     found = []
-    for check in (check_pointer_drift, check_ref_unresolved):
+    for check in (check_pointer_drift, check_ref_unresolved, check_pending_stale):
         part = []
         try:
             check(vault, notes, spec, part)
