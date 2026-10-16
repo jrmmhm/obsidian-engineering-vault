@@ -47,9 +47,10 @@ the revision of the copy that answers, which is how the two are told apart.
   the written file and feeds findings back. Fix ERRORs immediately, while
   the context is fresh. WARNs are advisory — address them or state briefly
   why they are acceptable. WARNs the file already carried at git HEAD are
-  not repeated but counted in one line. Unresolved-link WARNs arrive as one
-  aggregated summary line: forward references are expected mid-pass under
-  the phased creation order, but every target must exist by turn end.
+  not repeated, only counted when anything else is shown. Unresolved-link
+  WARNs arrive as one aggregated summary line: forward references are
+  expected mid-pass under the phased creation order, but every target must
+  exist by turn end.
 - At turn end, a stop gate re-checks every vault file touched this session.
   ERRORs newly introduced this session block completion, once per stop
   sequence (pre-existing violations in legacy files are reported but never
@@ -208,10 +209,10 @@ names found on disk. Never assume English or German — use what exists.
 Read these before creating or modifying documentation; they are authoritative
 and evolve between projects, so never reproduce them from memory:
 
-1. The conventions file in `VAULT_ROOT` (`00_*convention*`/`00_*Konvention*`;
-   none: the root `README.md`) — SSOT principle, 4-question rule, role
-   matrix, timelines, file conventions (frontmatter, self-containedness,
-   wikilinks, length, freshness)
+1. The conventions file in `VAULT_ROOT` (`00_*convention*`/`00_*Konvention*`,
+   where present) — SSOT principle, 4-question rule, role matrix,
+   timelines, file conventions (frontmatter, self-containedness, wikilinks,
+   length, freshness)
 2. The subfolders conventions file (matches `*subfolder*` or `*Unterordner*`)
 3. For each domain you will write in: its `00_[DOMAIN]_README.md` and
    `00_[DOMAIN]_file_template.md` where present (locate by domain suffix). Do NOT read
