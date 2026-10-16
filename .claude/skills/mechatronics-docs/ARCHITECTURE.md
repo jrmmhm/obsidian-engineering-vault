@@ -245,6 +245,8 @@ Python, which is why a grep of the source alone does not find them.
 
 | Code | Owner | Scope | Severity |
 | --- | --- | --- | --- |
+| `accept-invalid` | `file_acceptance` | every file read | WARN |
+| `accept-reason-missing` | `file_acceptance` | every file read | WARN |
 | `arc-containment-unreadable` | `validate_vault_wide` | vault-wide | WARN |
 | `arc-not-in-overview` | `validate_vault_wide` | vault-wide | WARN |
 | `code-fence` | `check_fence` | domain, banned domains only | ERROR |
