@@ -189,6 +189,10 @@ either is `README.md`, under four conditions that include a CI step
 regenerating and diffing it — the exception is argued in the method vault, not
 assumed here.
 
+`REFERENCE.md` beside `SKILL.md` holds what an agent needs only on demand —
+the traceability export, the install check, the tiers outside a session and
+the stop gate's messages — so the skill text itself stays short.
+
 `ARCHITECTURE.md` in the same directory is the maintainer's view of the
 validator: its three stages and five entry points mapped onto the functions
 that own them, plus an index of every finding code. It answers where a check

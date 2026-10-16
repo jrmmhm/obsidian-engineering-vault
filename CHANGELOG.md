@@ -115,6 +115,23 @@ decision.
 
 ### Changed
 
+- **`SKILL.md` carries only what changes how notes are written** — it lost
+  more than half its length. The exporter, `--check-install`, the
+  out-of-session tiers and the full stop-gate messages moved to a new
+  `REFERENCE.md` beside it; text the conventions file, the IMP and testdata
+  READMEs or the method vault already own was deleted rather than kept as a
+  second copy, and so were one unsourced statistic and an instruction the
+  agent could not follow. The activation guard now asks the validator
+  whether a folder is a vault, so vaults whose folders are not numbered
+  `01_`–`09_` — the method vault's 02/09/98 — are no longer refused; the
+  role table quotes the conventions file again (CMP had drifted), and the
+  inert `invocation: auto` key is gone. The post-write hook reports a
+  validator crash to the user and to the session instead of to stderr,
+  which nobody saw. No rule moved and no finding code changed: new and
+  corrected documentation plus a hook fix, **MINOR** by the table. Why:
+  [DEC-MTH-057](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Skill_Text_Carries_Only_What_Changes_Note_Writing.md),
+  [DEC-MTH-056](.claude/01_methodvault/02_decisions_(DEC)/DEC_Vault_Hooks_Stay_Registered_By_The_Skill.md).
+
 - **A module its parent contains is no longer a documentation island** —
   `arc-not-in-overview` demanded that every ARC file appear in the overview,
   while `vault_schema.json` declares that ARC-to-ARC containment is authored
