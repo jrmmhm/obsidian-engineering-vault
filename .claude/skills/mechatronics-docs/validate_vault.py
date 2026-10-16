@@ -3428,14 +3428,33 @@ def hook_stop(payload):
 
 SKILL_NAME = "mechatronics-docs"
 
-# Identifies this copy of the skill in one line, so "which copy just
-# enforced?" can be answered without diffing two directory trees. A tree
-# comparison cannot answer it: a derived project legitimately ships fewer
-# files than the template (tools/new_project.py strips tests/), so content
-# equality is the wrong question. Bump on every release that changes what
-# the validator or the hooks do; the release checklist in CONTRIBUTING.md
-# owns the bump.
-SKILL_REVISION = "2026-08-10.1"
+# The files whose bytes decide what this copy enforces: the validator, the
+# schema it reads, and the exporter it imports for the coverage and
+# containment checks. Not the whole directory - a derived project ships
+# without tests/ on purpose (tools/new_project.py), and that must not make
+# two copies enforcing the same rules look different.
+REVISION_FILES = ("validate_vault.py", "vault_schema.json", "export_traceability.py")
+
+
+def skill_revision():
+    """Identifies this copy of the skill in one line, derived from content.
+
+    "Which copy just enforced?" has to be answerable without diffing two
+    directory trees. A hand-bumped constant answered it until it was not
+    bumped for four behaviour changes and two different validators reported
+    one revision (01_methodvault, DEC-MTH-055). Raw bytes, so two copies
+    differing in one byte differ here; a missing file is named rather than
+    crashing the check that is supposed to diagnose a broken install.
+    """
+    here = Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for name in REVISION_FILES:
+        try:
+            data = hashlib.sha256((here / name).read_bytes()).digest()
+        except OSError:
+            data = b"missing"
+        h.update(name.encode() + b"\0" + data)
+    return h.hexdigest()[:12]
 
 
 def check_install():
@@ -3455,7 +3474,7 @@ def check_install():
     """
     own = Path(__file__).resolve().parent
     entry = Path.home() / ".claude" / "skills" / SKILL_NAME
-    print(f"this copy:      {own} (rev {SKILL_REVISION})")
+    print(f"this copy:      {own} (rev {skill_revision()})")
     print(f"personal entry: {entry}")
 
     # is_symlink() before exists(): exists() follows the link and is False
