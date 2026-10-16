@@ -301,6 +301,7 @@ Python, which is why a grep of the source alone does not find them.
 | `overview-unidentified` | `validate_vault_wide` | vault-wide | WARN |
 | `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere, and WARN anywhere for a gitignored path whose folder is absent |
 | `pointer-drift` | `check_pointer_drift` | vault-wide, roles outside `drift_exempt_roles` | WARN |
+| `ref-unresolved` | `check_ref_unresolved` | vault-wide, roles in `ref_roles` | WARN |
 | `req-class` | `check_req_table` | domain, requirements role | ERROR |
 | `req-criterion` | `check_req_table` | domain, requirements role | ERROR |
 | `req-duplicate` | `check_req_table` | domain, requirements role | ERROR |
