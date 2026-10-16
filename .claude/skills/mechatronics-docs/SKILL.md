@@ -37,10 +37,11 @@ run `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py "<candidate>" 2>&1 >/dev/null
 No output: it is a vault, your `VAULT_ROOT`. Output naming
 `is not a vault root`: **stop**, tell the user this skill requires a
 mechatronics baseproject vault, and do not adapt it to another layout.
-Output starting `validator crash`: tell the user, start no vault work. If the
-vault's `00_*template*` files do not open with `---`, they predate the
-frontmatter schema: update them first (`/baseproject-sync` where installed)
-or stop. Use the folder names and domains found on disk, in any language.
+Any other output, such as `validator crash`: tell the user, start no vault
+work. If the vault's `00_*template*` files do not open with `---`, they
+predate the frontmatter schema: update them first (`/baseproject-sync` where
+installed) or stop. Use the folder names found on disk, in any language, and
+only the domains present on disk — a missing one is not yours to assume.
 
 ## Before Any Action — Read Project Conventions
 
@@ -110,10 +111,9 @@ the full audit reports either missing half as `req-uncovered`.
 
 ## Creation Order — Dependencies Matter
 
-Earlier phases produce the link targets of later ones; never skip a phase:
-1 REF, REQ → 2 DEC → 3 CMP parts → 4 IFC, CMP assemblies → 5 IMP → 6 TAE,
-OAU → 7 ARC → 8 system overview (new modules), glossary (new terms).
-Unresolved links are tolerated mid-pass (WARN) but block at turn end (ERROR).
+Earlier phases produce later link targets; never skip one, and work within a
+phase in parallel: 1 REF, REQ → 2 DEC → 3 CMP parts → 4 IFC, CMP assemblies
+→ 5 IMP → 6 TAE, OAU → 7 ARC → 8 system overview (new modules), glossary.
 **Before writing a new DEC,** read the 3 most recently dated DEC files — they
 prevent contradicting or duplicating a live decision.
 
@@ -162,10 +162,11 @@ prevent contradicting or duplicating a live decision.
 
 ## Process — Documenting a Feature
 
-1. **Assess scope** — hardware: REF, DEC, CMP, IFC, IMP, ARC (+TAE, OAU);
-   software: DEC, IMP, ARC (+REQ, TAE, OAU); test campaign: TAE, OAU.
+1. **Assess scope** among the domains present — hardware: REF, DEC, CMP, IFC,
+   IMP, ARC (+TAE, OAU); software: DEC, IMP, ARC (+REQ, TAE, OAU); tests: TAE, OAU.
 2. **Ask for what is missing** after checking the vault, as few questions as
-   possible; then read the templates of each domain and follow them exactly.
+   possible — alternatives (DEC), parameters (IMP), verified requirements
+   (TAE); then read the templates of each domain and follow them exactly.
 3. **Create files in phase order** — four questions, template structure,
    frontmatter, links to files already made, TBD for genuinely open points.
 4. **Invalidation sweep after every change** — search the vault for the
@@ -181,7 +182,7 @@ prevent contradicting or duplicating a live decision.
 ## Enforcement Layer — What the Hooks Tell You
 
 From the skill's first invocation to the end of the session, two hooks run
-`validate_vault.py` from this directory — structure, not truth.
+`validate_vault.py` (which copy: `REFERENCE.md`) — structure, not truth.
 
 - **After each `Edit`/`Write`/`MultiEdit`** into a vault, that file's
   findings reach you: fix ERRORs now, fix WARNs or say why they stand.
