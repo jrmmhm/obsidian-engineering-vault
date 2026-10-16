@@ -58,7 +58,12 @@ the revision of the copy that answers, which is how the two are told apart.
   report also lists vault-wide findings (uncovered REQs, orphans, ...) as
   advisory — in full the first time and whenever they change, otherwise
   as one `vault-wide findings unchanged` line; they never block, and the
-  full audit in step 7 remains the authoritative pass.
+  full audit in step 7 remains the authoritative pass. Three of them come
+  from git: `pointer-drift` (a file the note names changed after its
+  `last-verified` — re-check the note, then bump `last-verified`, which
+  clears it), `ref-unresolved` (a cited commit id no local repository
+  holds) and `pending-stale` (a pending/planned marker on a path that
+  exists).
 
 The two halves of the gate address two readers, and the transcript shows
 which is which. Everything advisory reaches the user as `Stop says: ...`
