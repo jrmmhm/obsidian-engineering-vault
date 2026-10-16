@@ -9,7 +9,6 @@ description: >
   needs documentation. Also triggers on "document this", "write it up",
   "add to the vault", or any vault domain prefix. Only activates in projects
   with the mechatronics baseproject directory layout.
-invocation: auto
 hooks:
   PostToolUse:
     - matcher: "Edit|Write|MultiEdit"
@@ -33,46 +32,44 @@ of copying content.
 
 ## Enforcement Layer — How This Skill Is Gated
 
-While this skill is active, two hooks enforce the mechanically checkable
-vault rules (`validate_vault.py`, same directory). "Same directory" is the
-whole point: both hooks resolve their script through `CLAUDE_PLUGIN_ROOT`,
-which Claude Code sets to the skill directory it actually loaded, so the
-copy whose text you are reading is the copy that enforces. A project that
-carries its own vendored copy no longer overrides that — the vendored copy
-serves the CI and the pre-commit hook, which have no session to ask
-(DEC-MTH-045). `--check-install` prints the revision of the copy that
-answers, which is how the two are told apart when they disagree.
+From this skill's first invocation to the end of the session, two hooks
+enforce the mechanically checkable vault rules (`validate_vault.py`, same
+directory) — never in a session that does not invoke it, nor on subagent
+writes. "Same directory" is the whole point: both hooks resolve their
+script through `CLAUDE_PLUGIN_ROOT`, which Claude Code sets to the skill
+directory it actually loaded, so the copy whose text you are reading is
+the copy that enforces. A project that carries its own vendored copy no
+longer overrides that — the vendored copy serves the CI and the pre-commit
+hook, which have no session to ask (DEC-MTH-045). `--check-install` prints
+the revision of the copy that answers, which is how the two are told apart.
 
 - After every `Edit`/`Write`/`MultiEdit` into a vault, the validator checks
   the written file and feeds findings back. Fix ERRORs immediately, while
   the context is fresh. WARNs are advisory — address them or state briefly
-  why they are acceptable. Unresolved-link WARNs arrive as one aggregated
-  summary line: forward references are expected mid-pass under the phased
-  creation order, but every target must exist by turn end.
+  why they are acceptable. WARNs the file already carried at git HEAD are
+  not repeated but counted in one line. Unresolved-link WARNs arrive as one
+  aggregated summary line: forward references are expected mid-pass under
+  the phased creation order, but every target must exist by turn end.
 - At turn end, a stop gate re-checks every vault file touched this session.
-  ERRORs newly introduced this session block completion (pre-existing
-  violations in legacy files are reported but never block — ratcheted
-  against the git HEAD state). The non-blocking session report also lists
-  vault-wide findings (uncovered REQs, orphans, ...) as advisory — they
-  never block; the full audit in step 7 remains the authoritative pass.
-  It further names every ERROR code a file carried at git HEAD that did
-  not fire at all this session. Say which of them you fixed: a defect you
-  repaired and a check that stopped reaching the file produce the same
-  absence, and only the session knows which of the two it did.
+  ERRORs newly introduced this session block completion, once per stop
+  sequence (pre-existing violations in legacy files are reported but never
+  block — ratcheted against the git HEAD state). The non-blocking session
+  report also lists vault-wide findings (uncovered REQs, orphans, ...) as
+  advisory — in full the first time and whenever they change, otherwise
+  as one `vault-wide findings unchanged` line; they never block, and the
+  full audit in step 7 remains the authoritative pass.
 
 The two halves of the gate address two readers, and the transcript shows
 which is which. Everything advisory reaches the user as `Stop says: ...`
 — it lists legacy findings, created files and questions the session owner
 has to answer, and it is not an instruction to you. Its first line names
-the turn it belongs to: `vault validator blocked the turn end (attempt
-n/2)` when the gate blocked, `vault validator session report:` when it
-did not — including the turn after two blocked attempts, where the report
-opens with `UNRESOLVED vault ERRORs` and the gate has already released.
-What the gate wants from *you* arrives as `Stop hook feedback:` and names
-only the ERRORs this session introduced. A gate that could not run says
-so as well: `vault validator crashed - stop gate released` means the
-vault rules went unchecked for that turn, so verify by hand before
-finishing.
+the turn it belongs to: `vault validator blocked the turn end` when the
+gate blocked, `vault validator session report:` when it did not — also
+when it released after one demand in this stop sequence, where the report
+opens with `UNRESOLVED vault ERRORs`. What the gate wants from *you*
+arrives as `Stop hook feedback:` and names only the ERRORs this session
+introduced. A hook that could not run says so too: `vault validator crashed`
+means that write or turn went unchecked, so verify by hand before finishing.
 
 A vault carrying two folders for one domain — `03_architecture_(ARC)`
 beside `03_Architektur_(ARC)`, which is what a half-finished translation
@@ -155,8 +152,8 @@ is hosted with Actions enabled, and that file is the only current answer
 to which checks it runs; a project derived from this template gets a
 workflow written for it, and no run of this skill's own test suite is
 among them, because that suite does not travel with the vendored copy.
-Until one of the two is turned on, an edit made in Obsidian, by hand or
-by a subagent reaches the vault unchecked.
+Until one of the two is turned on, an edit made in Obsidian, by hand, by a
+subagent or without invoking this skill reaches the vault unchecked.
 
 Which copy of this skill a session is actually running is a separate
 question, and one a global `~/.claude/skills/` entry cannot answer by
@@ -182,25 +179,26 @@ Rules that follow from this mechanism:
    subagent tool calls. Research may be delegated; writing stays here.
 3. **Do not evade findings.** Moving content to `99_inbox` to dodge an
    ERROR, creating stub link targets, or deleting a reference instead of
-   fixing it defeats the purpose and is visible in the session report.
+   fixing it defeats the purpose and is visible in the session report — so
+   does a `validator-accept` entry the user did not ask for: never add one.
 4. The validator enforces structure, not truth. Everything semantic —
    correct domain choice, content boundaries, factual accuracy — remains
    your responsibility under the rules below.
 
 ## Activation Guard — MUST CHECK FIRST
 
-This skill applies ONLY to mechatronics projects derived from the baseproject
-template. Projects may use English, German, or mixed folder names. Before
-doing anything else, verify the layout:
-
-1. **Documentation root exists:** a subfolder starting with `01_` (the vault)
-   or named `docs`/`documentation`. Store the vault path as `VAULT_ROOT`.
-2. **Vault has numbered domain subfolders:** `VAULT_ROOT` contains at least
-   3 subfolders with numeric prefixes `01_`–`09_` and `(ABBR)` suffixes.
-
-If ANY check fails: **stop immediately.** Tell the user this skill requires a
-mechatronics baseproject layout. Do not attempt partial documentation. Do not
-adapt the skill to a different structure.
+This skill applies ONLY to a vault the validator recognises; folder names may
+be English, German or mixed. Before doing anything else, take the folder the
+user names, otherwise the `01_*` folder under the documentation root, and run
+`python3 ${CLAUDE_SKILL_DIR}/validate_vault.py "<candidate>" 2>&1 >/dev/null`.
+No output: it is a vault — store it as `VAULT_ROOT`. Output naming
+`is not a vault root`, or any other output such as `validator crash`:
+**stop immediately**, tell the user this skill requires a mechatronics
+baseproject vault (or that the check failed), and do not attempt partial
+documentation or adapt the skill to a different structure. If the vault's
+`00_*template*` files do not open with `---`, they predate the frontmatter
+schema: bring them to the current base template first (`/baseproject-sync`
+where installed).
 
 If the checks pass: use the discovered `VAULT_ROOT` and the actual folder
 names found on disk. Never assume English or German — use what exists.
@@ -210,12 +208,13 @@ names found on disk. Never assume English or German — use what exists.
 Read these before creating or modifying documentation; they are authoritative
 and evolve between projects, so never reproduce them from memory:
 
-1. The conventions file (matches `*convention*` or `*Konvention*`) — SSOT
-   principle, 4-question rule, role matrix, timelines, file conventions
-   (frontmatter, self-containedness, wikilinks, length, freshness)
+1. The conventions file in `VAULT_ROOT` (`00_*convention*`/`00_*Konvention*`;
+   none: the root `README.md`) — SSOT principle, 4-question rule, role
+   matrix, timelines, file conventions (frontmatter, self-containedness,
+   wikilinks, length, freshness)
 2. The subfolders conventions file (matches `*subfolder*` or `*Unterordner*`)
 3. For each domain you will write in: its `00_[DOMAIN]_README.md` and
-   `00_[DOMAIN]_file_template.md` (locate by domain suffix). Do NOT read
+   `00_[DOMAIN]_file_template.md` where present (locate by domain suffix). Do NOT read
    READMEs/templates of domains you will not touch this pass.
 4. When placing non-markdown artifacts: the documents README (sibling of
    `VAULT_ROOT`), `50_sources/README.md`, or `30_testdata/README.md` —
@@ -223,19 +222,19 @@ and evolve between projects, so never reproduce them from memory:
 
 ## Domain Reference — The 9 Roles
 
-Each file answers ONE question and lives in ONE timeline:
+Each file answers ONE question in ONE timeline, quoted from the conventions file:
 
 | Domain | Question | Timeline | Typical Trigger |
 |--------|----------|----------|-----------------|
 | REQ | What should be achieved? | Stable | New requirement, project start |
-| DEC | Why was X chosen over Y? | Slow | Trade-off between alternatives |
+| DEC | Why was something chosen? | Slow | Trade-off between alternatives |
 | ARC | How does everything connect? | Medium | Module decomposition, allocation |
-| CMP | What are the building blocks? | Stable | New component with a datasheet |
-| IFC | How do two modules communicate? | Slow | New connection contract |
-| IMP | How is it concretely implemented? | Fast | Design files, parameters, paths |
+| CMP | What do references say about a component? | Stable | New component with a datasheet |
+| IFC | How do two system modules communicate? | Slow | New connection contract |
+| IMP | How is it implemented? | Fast | Design files, parameters, paths |
 | TAE | Did it work? | Slow | Test/verification completed |
-| OAU | How is it operated/used? | Medium | Repeatable procedure needed |
-| REF | What does the external source say? | Stable | External document referenced |
+| OAU | What do operation and usage look like? | Medium | Repeatable procedure needed |
+| REF | What does the external reference say? | Stable | External document referenced |
 
 Two additional folders are NOT engineering documentation:
 - **ADM** (98_administration): project management — ToDos, blockers, milestones
