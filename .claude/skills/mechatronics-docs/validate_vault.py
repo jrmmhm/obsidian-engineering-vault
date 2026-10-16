@@ -26,6 +26,7 @@ NOT relax any check.
 """
 
 import codecs
+import hashlib
 import json
 import os
 import re
@@ -3097,6 +3098,21 @@ def git_listed_files(directory: Path):
             for raw in r.stdout.split(b"\0") if raw}
 
 
+def warn_key(f):
+    """A WARN's identity across edits: code and message, every number folded.
+
+    Line numbers and counts move with any edit elsewhere in the file - '163
+    lines > 150' becomes '164 lines' - and must not turn a known WARN into a
+    new one. link-unresolved is left to its own aggregation.
+    """
+    return f"{f.code}\0{re.sub(r'[0-9]+', 'N', f.msg)}"
+
+
+def warn_keys(findings):
+    return Counter(warn_key(f) for f in findings
+                   if f.sev == "WARN" and f.code != "link-unresolved")
+
+
 def error_counts(findings):
     return dict(Counter(f.code for f in findings if f.sev == "ERROR"))
 
@@ -3151,15 +3167,24 @@ def hook_post(payload):
         head = git_head_content(vault, path)
         if head is not None:
             base = validate_file(vault, path, content=head, strict_links=True)
-            baseline[key] = {"codes": error_counts(base), "new": False}
+            baseline[key] = {"codes": error_counts(base), "new": False,
+                             "warns": dict(warn_keys(base))}
         else:
-            baseline[key] = {"codes": {}, "new": True}
+            baseline[key] = {"codes": {}, "new": True, "warns": {}}
         baseline_f.write_text(json.dumps(baseline))
 
     findings = validate_file(vault, path, strict_links=False)
     if not findings:
         return 0
     base_codes = baseline.get(key, {}).get("codes", {})
+    # A WARN the file already carried at HEAD is not news. Repeating it on
+    # every edit of a legacy file re-paid the same tokens for nothing - 557
+    # characters per edit of one measured file (01_methodvault,
+    # DEC-MTH-054). Compared as a multiset, so a second identical WARN is
+    # still shown. A baseline written before this key existed has none and
+    # shows everything, as it always did.
+    base_warns = Counter(baseline.get(key, {}).get("warns", {}))
+    seen, pre_existing = Counter(), 0
     # Aggregate unresolved-link WARNs into one line: mid-pass forward
     # references are expected under the phased creation order, and dozens
     # of identical per-line WARNs train the reader to ignore the channel.
@@ -3169,6 +3194,12 @@ def hook_post(payload):
     for f in findings:
         if f in link_warns:
             continue
+        if f.sev == "WARN":
+            k = warn_key(f)
+            seen[k] += 1
+            if seen[k] <= base_warns[k]:
+                pre_existing += 1
+                continue
         tag = ""
         if f.sev == "ERROR" and base_codes.get(f.code, 0) > 0:
             tag = " (pre-existing before this session; non-blocking, fix if cheap)"
@@ -3195,6 +3226,11 @@ def hook_post(payload):
             f"WARN {rel} [link-unresolved] {len(targets)} unresolved link "
             f"target(s): {shown} - tolerated mid-pass; every target must "
             "exist by turn end" + note)
+    if not lines_out:
+        return 0
+    if pre_existing:
+        lines_out.append(f"{pre_existing} pre-existing WARN(s) unchanged since "
+                         "git HEAD - not repeated")
     msg = ("vault validator findings for the file just written "
            "(fix ERRORs now while context is fresh; WARNs are advisory):\n"
            + "\n".join(lines_out))
@@ -3327,15 +3363,30 @@ def hook_stop(payload):
     # reached only when the gate is not blocking, so the advisory can
     # never end up in a block reason; the try/except keeps an advisory
     # bug from ever crashing the gate (exit 2 would release it).
-    wide = []
+    wide, wide_keys = [], []
     try:
         for root in roots:
             v = Vault(root)
-            wide.extend(f.render(rel_to=v.project_root)
-                        for f in validate_vault_wide(v))
+            for f in validate_vault_wide(v):
+                wide.append(f.render(rel_to=v.project_root))
+                wide_keys.append(f"{f.sev} {f.code} {f.path} "
+                                 + re.sub(r"[0-9]+", "N", f.msg))
     except Exception:
-        wide = []
-    if wide:
+        wide, wide_keys = [], []
+    # Shown on a session's first report and whenever it changed, otherwise
+    # one line: the same block at every turn end was the channel that
+    # buries the user in legacy state (01_methodvault, DEC-MTH-054). The
+    # digest is taken over every finding, before the cap and without line
+    # numbers, so a shifted line is no change and a change past line 15 is.
+    digest = hashlib.sha256("\n".join(sorted(wide_keys)).encode(
+        "utf-8", "surrogateescape")).hexdigest()
+    wide_f = state_path("widehash", session)
+    unchanged = load_json(wide_f, None) == digest
+    wide_f.write_text(json.dumps(digest))
+    if wide and unchanged:
+        summary.append(f"vault-wide findings unchanged ({len(wide)}) - shown "
+                       "in full when this session first reported them")
+    elif wide:
         # ERROR-severity vault-wide findings must survive the cap: this
         # report is their only automatic channel, because hook_post never
         # shows vault-wide findings at all.
