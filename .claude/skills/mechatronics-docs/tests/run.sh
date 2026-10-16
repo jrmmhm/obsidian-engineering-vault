@@ -4142,11 +4142,24 @@ def links(lines, **kw):
 
 # A link written the way a table requires resolves to the file it names.
 assert links(["## Context", r"| [[CMP_AD7175-2\|the converter]] | x |"]) == []
-# 60 same-file anchors trip neither counter: both are about OUTGOING links.
+# 60 same-file anchors do not trip the budget: it is about OUTGOING links.
 assert links(["## Context"] + ["see [[#Context]]"] * 60) == []
-# ... and the positive control that says those counters still work at all.
-assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 60) == \
-    ["link-budget", "link-repeat"]
+# ... and the positive control that says the budget still works at all.
+# link-repeat is gone: none of its measured findings was actionable
+# (DEC-MTH-053), and the budget covers the carpet it was meant to catch.
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 60) == ["link-budget"]
+# The budget's edge, both sides: twenty prose links are allowed, one more is not.
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 20) == []
+assert links(["## Context"] + ["see [[CMP_AD7175-2]]"] * 21) == ["link-budget"]
+# Table rows are the template's relation slots - one allocation row per
+# requirement - and are not counted, escaped alias or not, indented or not.
+assert links(["## Context"] + [r"| [[CMP_AD7175-2]] | x |"] * 60) == []
+assert links(["## Context"] + [r"  | [[CMP_AD7175-2\|adc]] | x |"] * 60) == []
+# A link of a note to itself is a self-reference, not an outgoing link.
+assert links(["## Context"] + ["see [[ARC_Data_Acquisition]]"] * 60) == []
+# Twenty table rows plus twenty-one prose links: the prose alone decides.
+assert links(["## Context"] + ["| [[CMP_AD7175-2]] | x |"] * 20
+             + ["see [[CMP_AD7175-2]]"] * 21) == ["link-budget"]
 # A link naming nothing is no link - the shape a REF template writes as a
 # placeholder, and the one line in nine vaults where old and new disagree.
 assert links(["## Context", "- [[]] -", "- [[#]]", "- [[|alias]]"]) == []
@@ -5273,8 +5286,8 @@ EOF
 | --- | --- |
 EOF
 
-  # 25 root notes, so the overview can carry more links than the ordinary
-  # budget allows without a single unresolved target. Root files are
+  # 25 root notes, so the overview can carry more links than the budget
+  # allows for prose without a single unresolved target. Root files are
   # link-checked and nothing else, so they add no findings of their own.
   local i=1
   while [ $i -le 25 ]; do
@@ -5290,12 +5303,13 @@ EOF
     printf '| Module (ARC) | Brief Description |\n| --- | --- |\n'
     printf '| [[ARC_Top]] | The top-level module of this vault |\n'
     printf '| [[ARC_Hybrid]] | A module that both contains and allocates |\n\n'
+    # An overview is a table of modules and notes, the shape the template
+    # ships. Table rows are relation slots and stay out of the link budget
+    # (DEC-MTH-053), so 25 rows here are no finding - written as prose list
+    # items, the same 25 links would be one.
+    printf '| Note | Brief Description |\n| --- | --- |\n'
     i=1
-    # '--' is load-bearing: a format string opening with '- ' is read as an
-    # option and printf writes nothing at all, which would leave the
-    # overview under the ordinary budget and pass the hub assertion below
-    # for the wrong reason.
-    while [ $i -le 25 ]; do printf -- '- [[note%s]]\n' "$i"; i=$((i + 1)); done
+    while [ $i -le 25 ]; do printf '| [[note%s]] | a root note |\n' "$i"; i=$((i + 1)); done
   } > "$O/$OVW"
 
   # main module: two sections, and the submodule table that authors the
@@ -5500,10 +5514,11 @@ TESTS=$((TESTS + 1))
 if contains "$ovw_a" "ARC_Ping\.md.*\[arc-not-in-overview\]" \
    && contains "$ovw_a" "ARC_Pong\.md.*\[arc-not-in-overview\]"; then ok x; else
   fail "two modules listing each other must not silence both island findings"; fi
-# The hub link budget follows the marker, not the file name.
+# The overview's 27 links are table rows, which the budget does not count;
+# there is no hub budget any more to grant (DEC-MTH-053).
 TESTS=$((TESTS + 1))
 if ! contains "$ovw_a" "Uebersicht\.md.*\[link-budget\]"; then ok x; else
-  fail "the marked overview must be measured against the hub budget:"
+  fail "an overview whose links are table rows must not exceed the link budget:"
   printf '%s\n' "$ovw_a" | grep link-budget | sed 's/^/    /'
 fi
 # A file carrying both contracts is held to both.
@@ -5568,26 +5583,21 @@ TESTS=$((TESTS + 1))
 if ! contains "$ovw_b" "\[arc-not-in-overview\]"; then ok x; else
   fail "without an entry point the island scan must not run"; fi
 
-# Two marked files: the same finding, and the hub budget granted to
-# neither - the looser half must not survive the stricter one.
+# Two marked files: the same finding, naming both.
 OVW_C="$OVW_TMP/twice/00_documentation/01_projectvault"
 build_overview_vault "$OVW_C" "Uebersicht.md"
 printf -- '---\nvault-role: system-overview\n---\nA second claimant.\n' \
   > "$OVW_C/Zweitfassung.md"
 ovw_c=$(python3 "$VALIDATOR" "$OVW_C" 2>&1)
 # Both names have to appear in the FINDING, not merely somewhere in the
-# run: 'Uebersicht.md' also occurs in the link-budget line the next
-# assertion requires, so a substring test over the whole output would pass
-# without the finding naming both claimants at all.
+# run: a substring test over the whole output would pass on any other line
+# naming 'Uebersicht.md' without the finding naming both claimants at all.
 TESTS=$((TESTS + 1))
 if printf '%s\n' "$ovw_c" | grep "overview-unidentified" \
    | grep -q "Uebersicht.md, Zweitfassung.md"; then
   ok x; else fail "two marked overviews must be reported once, naming both:"
   printf '%s\n' "$ovw_c" | grep overview | sed 's/^/    /'
 fi
-TESTS=$((TESTS + 1))
-if contains "$ovw_c" "Uebersicht\.md.*\[link-budget\]"; then ok x; else
-  fail "with no single entry point the hub budget must not be granted"; fi
 
 # A marker that is nearly right: the value misspelled. The finding names
 # what it found, so the author fixes a line instead of hunting a file.
@@ -5630,7 +5640,7 @@ fi
 
 # A vault whose ARC folder holds no note yet - the state every project
 # derived with the three-domain profile starts in. The reachability scan
-# has nothing to do, but the entry point still decides the hub budget, so
+# has nothing to do yet, but it will have from the first ARC note on, so
 # the missing marker must still be reported: a check that goes quiet
 # because the vault is young is the same silence one size smaller.
 OVW_G="$OVW_TMP/noarcnotes/00_documentation/01_projectvault"
@@ -6761,9 +6771,8 @@ rm -rf "$I5_TMP"
 # what earns it a place here:
 #   classify      - INB is a vault section, not a domain role; ID_EXCLUDED_DOMAINS
 #                   names it beside ADM and no alias map translates either.
-#   validate_file - the hub link budget is a property of the architecture
-#                   FOLDER; ARC is spelled identically in every language the
-#                   alias map knows, so the question never arises.
+#                   (validate_file left this list with the hub link budget,
+#                   DEC-MTH-053.)
 #   check_leaks   - decides by folder on purpose and is left there by this
 #                   change: it carries a second English lock of its own, the
 #                   'context' section title, and opening one without the
@@ -6779,7 +6788,7 @@ if python3 - "$VALIDATOR" <<'PY'
 import ast, sys
 TOKENS = {"REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF", "ADM", "INB"}
 EXPECTED = ["check_leaks:ARC", "check_leaks:ARC", "check_leaks:ARC,DEC",
-            "check_leaks:DEC", "classify:INB", "validate_file:ARC"]
+            "check_leaks:DEC", "classify:INB"]
 
 def tokens_of(node):
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -6927,6 +6936,33 @@ fi
 TESTS=$((TESTS + 1))
 if ! contains "$db_out" "duplicate-basename.*ARC_Twin"; then ok x; else
   fail "a link inside a fenced block must not make a stem ambiguous"; fi
+
+# --- Unit 3: the link budget counts prose links only ----------------------
+# An ARC note whose allocation table names the module itself in every row -
+# the shape the template's own example has - carried link-budget and
+# link-repeat on every real vault. The same 25 links written as prose stay
+# a finding.
+LB="$NC_TMP/Links/00_documentation/01_projectvault"
+nc_vault "$LB"
+{
+  printf '| Submodule | Allocated Requirements | Verification | Status |\n'
+  printf '| --- | --- | --- | --- |\n'
+  i=1; while [ $i -le 25 ]; do
+    printf '| [[ARC_Rows]] | REQ-ROW-0%02d | [[TAE_Rows]] | Draft |\n' "$i"; i=$((i + 1)); done
+} > "$NC_TMP/rows.txt"
+nc_note "$LB/03_architecture_(ARC)/ARC_Rows.md" ARC "$(cat "$NC_TMP/rows.txt")"
+nc_note "$LB/07_testing_and_evidence_(TAE)/TAE_Rows.md" TAE "Evidence of the rows."
+i=1; : > "$NC_TMP/prose.txt"
+while [ $i -le 25 ]; do printf -- '- see [[TAE_Rows]]\n' >> "$NC_TMP/prose.txt"; i=$((i + 1)); done
+nc_note "$LB/03_architecture_(ARC)/ARC_Prose.md" ARC "$(cat "$NC_TMP/prose.txt")"
+lb_out=$(python3 "$VALIDATOR" "$LB" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$lb_out" "ARC_Rows\.md.*\[link-budget\]" \
+   && contains "$lb_out" "ARC_Prose\.md.*\[link-budget\] 25 outgoing prose links > 20" \
+   && ! contains "$lb_out" "link-repeat"; then ok x; else
+  fail "table rows and self links must stay out of the budget, prose must not:"
+  printf '%s\n' "$lb_out" | grep -E "link-budget|link-repeat" | sed 's/^/    /'
+fi
 
 rm -rf "$NC_TMP"
 # ==========================================================================
