@@ -7524,6 +7524,17 @@ note("98_administration_(ADM)/ADM_Fenced.md", "ADM",
 note("98_administration_(ADM)/ADM_Open_Fence.md", "ADM",
      "```\nan example nobody closed\n" + table + f"| a | sent | {x(700)} |\n")
 note("03_architecture_(ARC)/ARC_Long_Cell.md", "ARC", table + f"| a | sent | {x(700)} |\n")
+note("98_administration_(ADM)/ADM_Accept_Cell.md", "ADM", table + f"| a | sent | {x(700)} |\n",
+     "validator-accept: [adm-cell-long]\nvalidator-accept-reason: tries to keep its log\n")
+# Exactly at and one past the word limit: the frontmatter and the Context
+# count too, so the body is padded to the total.
+for name, total in (("ARC_Words_2500", 2500), ("ARC_Words_2501", 2501)):
+    note(f"03_architecture_(ARC)/{name}.md", "ARC", "")
+    p = v / f"03_architecture_(ARC)/{name}.md"
+    have = len(p.read_text().split())
+    p.write_text(p.read_text() + "".join(words(100) + "\n" for _ in range((total - have) // 100))
+                 + words((total - have) % 100) + "\n")
+    assert len(p.read_text().split()) == total, name
 PY
 sz_out=$(python3 "$VALIDATOR" "$SZ" 2>&1)
 sz_has() { contains "$sz_out" "$1"; }
@@ -7563,6 +7574,21 @@ if ! sz_has "ADM_Prose\.md.*adm-cell-long" && ! sz_has "ADM_Fenced\.md.*adm-cell
    && ! sz_has "ARC_Long_Cell\.md.*adm-cell-long"; then ok x; else
   fail "prose, a fenced example and a table outside ADM must not be read as an ADM cell:"
   printf '%s\n' "$sz_out" | grep -E "ADM_Prose|ADM_Fenced|ARC_Long_Cell" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "^WARN .*ARC_Dense\.md \[length\] 26[0-9][0-9] words" \
+   && sz_has "^WARN .*ADM_Cell_601\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
+  fail "both size measures must stay advisory (WARN):"
+  printf '%s\n' "$sz_out" | grep -E "ARC_Dense\.md|ADM_Cell_601" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "ARC_Words_2501\.md \[length\] 2501 words > 2500" \
+   && ! sz_has "ARC_Words_2500\.md \[length\]"; then ok x; else
+  fail "the word limit must hold at 2500 and fire at 2501:"
+  printf '%s\n' "$sz_out" | grep -E "ARC_Words_250" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "ADM_Accept_Cell\.md:1 \[accept-invalid\] validator-accept names \['adm-cell-long'\]" \
+   && sz_has "ADM_Accept_Cell\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
+  fail "adm-cell-long must not be acceptable in a file's frontmatter:"
+  printf '%s\n' "$sz_out" | grep ADM_Accept_Cell | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
 if sz_has "adm-cell-long\].*_Closed sibling"; then ok x; else
   fail "the cell finding must name the repair:"; printf '%s\n' "$sz_out" | grep adm-cell-long | sed 's/^/    /'; fi
