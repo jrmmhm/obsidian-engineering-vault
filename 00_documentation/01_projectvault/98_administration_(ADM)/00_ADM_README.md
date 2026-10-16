@@ -33,12 +33,14 @@ Lifecycle state is the state of an external action or of a plan step after the w
 ## Tracker shape
 One tracker per kind of tracked thing (contributions, orders, submissions), one row per item:
 
-| Item | State | Since | Next step | Detail |
-| --- | --- | --- | --- | --- |
-| Battery log rotation fix | sent | 2026-10-01 | Answer review comments inline. | \[\[TAE_Battery_Log_Rotation]] |
+| Item | State | Since | Next-step facts | Next step | Detail |
+| --- | --- | --- | --- | --- | --- |
+| Battery log rotation fix | sent | 2026-10-01 | current version v2 (message id in \[\[IMP_Battery_Log_Rotation]]); v1 acked by the driver maintainer; reply to the driver list, Cc both reviewers | Answer review comments inline. | \[\[TAE_Battery_Log_Rotation]] |
 
 - **State and Since are replaced, never appended.** The previous state is in the git log of the commit that changed the row.
-- **Next step is one sentence.** A cell that grows into a dated account of what happened is a log; the log is git, the evidence is the TAE, the reasoning is the DEC — link them in the Detail column.
+- **Next-step facts stay in the row.** Whatever the next step needs to be taken correctly — who reviewed or acked, who must be addressed next (recipients, Cc), the identifier of the current version — is written in the row, or one link away with the row naming where. Shortening a row never drops them.
+- **Next step is one sentence.** A cell that grows into a dated account of what happened has become a log.
+- **History moves; it is never dropped.** When a cell grows past the limit, its dated events and review narrative move to the note that owns them — the TAE of the test, the DEC of the decision, the IMP of the change — or into the commit message of the change that records them, and the row links that note in Detail. Nothing leaves the vault without a place it moved to.
 - **No dated follow-up sections and no session log.** "Follow-ups from the check of 2026-10-13" appended below the table is the same log in a different place. Open follow-ups are rows; findings of a check are its TAE.
 - **A plan keeps one short status cell per phase**, under the same rules.
 
@@ -46,7 +48,7 @@ One tracker per kind of tracked thing (contributions, orders, submissions), one 
 ## Finished rows leave
 In the session that finishes an item — merged, rejected, delivered, abandoned — its row leaves the tracker:
 
-1. Move the row to a sibling note named after the tracker with the suffix `_Closed` (e.g. `ADM_Upstream_Tracker_Closed`), reduced to final state, date and the Detail link. The suffix may be written in the vault's language.
+1. Move the row to a sibling note named after the tracker with the suffix `_Closed` (e.g. `ADM_Upstream_Tracker_Closed`), reduced to final state, date and the Detail link — after anything else it held has moved to its owning note, as above. The suffix may be written in the vault's language.
 2. The tracker's Context links its `_Closed` sibling, so the closed note is reachable and every row stays findable.
 3. Search the vault for notes linking the tracker about this item and bring them along (Freshness rule of the conventions file).
 4. When the `_Closed` note itself reaches the length warning, split it by year (`ADM_Upstream_Tracker_Closed_2026`).

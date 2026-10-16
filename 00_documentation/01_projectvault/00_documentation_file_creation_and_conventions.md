@@ -330,8 +330,13 @@ that tracker and says what role the state plays, never the state itself.
 A note's own status — its frontmatter `status`, a DEC's `Status:` line,
 the status column of an allocation row, the follow-ups a DEC lists in its
 own Consequences — is the note's, not an external action's, and stays
-where it is. How a tracker row is shaped, and the
-`_Closed` sibling a finished row moves to, is in [[00_ADM_README]].
+where it is. Keeping a row short never deletes anything: its history moves
+to the note that owns it — the TAE of the test, the DEC of the decision,
+the IMP of the change — or into the commit message that records it, and
+the row links that note; the facts the next step needs (who acked, who is
+addressed next, the current version) stay in the row. How a tracker row
+is shaped, and the `_Closed` sibling a finished row moves to, is in
+[[00_ADM_README]].
 
 ### Validator-enforced rules (quick reference)
 
