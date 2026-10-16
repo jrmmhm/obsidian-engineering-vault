@@ -7694,6 +7694,60 @@ if [ "$(ga_git 2026-01-09 -C "$GR/20_software/part" config remote.origin.promiso
    && ! GIT_NO_LAZY_FETCH=1 ga_git 2026-01-09 -C "$GR/20_software/part" cat-file -e "$gp_new" 2>/dev/null; then ok x; else
   fail "ref-unresolved must never make a partial clone fetch a missing object"; fi
 
+# --- Unit 3: pending-stale ----------------------------------------------
+# Needs no repository, so this fixture has none.
+GPV="$GA_TMP/Pending/00_documentation/01_projectvault"
+ga_vault "$GPV"
+mkdir -p "$GA_TMP/Pending/20_software/linux"
+printf '#!/bin/sh\n' > "$GA_TMP/Pending/20_software/run.sh"
+printf '# project\n' > "$GA_TMP/Pending/README.md"
+IMPP="$GPV/06_implementation_(IMP)"
+ga_note "$IMPP/IMP_Planned_Dir.md" IMP 2026-01-05 active \
+  "The clone \`20_software/linux\` (planned, created later) holds the tree."
+ga_note "$IMPP/IMP_Not_Yet_File.md" IMP 2026-01-05 active \
+  "The runner \`20_software/run.sh\` is not yet written."
+ga_note "$IMPP/IMP_Second_Path.md" IMP 2026-01-05 active \
+  "First \`20_software/absent.py\` (planned), then \`20_software/run.sh\` (TBD)."
+ga_note "$IMPP/IMP_Absent.md" IMP 2026-01-05 active "The tool \`20_software/absent.py\` (planned)."
+ga_note "$IMPP/IMP_Far.md" IMP 2026-01-05 active \
+  "The clone \`20_software/linux\` holds the whole tree of the upstream kernel and its remotes (planned)"
+ga_note "$IMPP/IMP_Sentence.md" IMP 2026-01-05 active \
+  "The clone is \`20_software/linux\`. Its fuzz configuration is planned"
+ga_note "$IMPP/IMP_Before.md" IMP 2026-01-05 active "Planned: the clone \`20_software/linux\` of the tree."
+ga_note "$IMPP/IMP_Heading.md" IMP 2026-01-05 active "### The clone \`20_software/linux\` (planned)"
+ga_note "$IMPP/IMP_Fenced.md" IMP 2026-01-05 active '```text'
+printf '`20_software/linux` (planned)\n```\n' >> "$IMPP/IMP_Fenced.md"
+ga_note "$IMPP/IMP_Two_Segments.md" IMP 2026-01-05 active "The board notes \`30_hw/README.md\` (not yet written)."
+ga_note "$IMPP/IMP_Retired_Plan.md" IMP 2026-01-05 deprecated \
+  "The clone \`20_software/linux\` (planned, created later) holds the tree."
+gp3_out=$(python3 "$VALIDATOR" "$GPV" 2>&1); gp3_rc=$?
+TESTS=$((TESTS + 1))
+if [ $gp3_rc -ne 2 ] && contains "$gp3_out" \
+  "^WARN .*IMP_Planned_Dir\.md:11 \[pending-stale\] 'planned' marks 20_software/linux as not created yet, and it exists - remove the marker or update the line"; then ok x; else
+  fail "a planned directory that exists must be reported as pending-stale:"
+  printf '%s\n' "$gp3_out" | grep -E 'pending-stale|crash' | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$gp3_out" "IMP_Not_Yet_File\.md:11 \[pending-stale\] 'not yet' marks 20_software/run\.sh"; then ok x; else
+  fail "a 'not yet' file that exists must be reported as pending-stale:"
+  printf '%s\n' "$gp3_out" | grep pending-stale | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$gp3_out" "IMP_Second_Path\.md:11 \[pending-stale\] 'TBD' marks 20_software/run\.sh" \
+   && ! contains "$gp3_out" "absent\.py as not created yet"; then ok x; else
+  fail "each marker must belong to the path right before it:"
+  printf '%s\n' "$gp3_out" | grep pending-stale | sed 's/^/    /'; fi
+for quiet in IMP_Absent IMP_Far IMP_Sentence IMP_Before IMP_Heading IMP_Fenced \
+             IMP_Two_Segments IMP_Retired_Plan; do
+  TESTS=$((TESTS + 1))
+  if ! contains "$gp3_out" "$quiet\.md:[0-9]* \[pending-stale\]"; then ok x; else
+    fail "$quiet must not be reported as pending-stale:"
+    printf '%s\n' "$gp3_out" | grep "$quiet" | sed 's/^/    /'; fi
+done
+# The marker still silences path-missing on a path that does not exist.
+TESTS=$((TESTS + 1))
+if ! contains "$gp3_out" "IMP_Absent\.md:[0-9]* \[path-missing\]"; then ok x; else
+  fail "a planned path that does not exist must stay silent:"
+  printf '%s\n' "$gp3_out" | grep IMP_Absent | sed 's/^/    /'; fi
+
 rm -rf "$GA_TMP"
 # ==========================================================================
 # END the git-aware advisories
