@@ -7313,6 +7313,108 @@ rm -rf "$NC_TMP"
 # END the validator noise cut
 # ==========================================================================
 
+# ==========================================================================
+# SKILL.md's activation guard is the validator's own recognition. The prose
+# used to demand >=3 folders numbered 01_-09_ and so told the agent to
+# refuse a vault of 02/09/98 folders that the validator and the hooks accept
+# (DEC-MTH-041 counts ADM and INB toward the floor). The guard now runs the
+# validator with stdout dropped and reads stderr: nothing for a vault, one
+# phrase for a non-vault, another for a crash. Each phrase SKILL.md quotes
+# is pinned against what the validator really prints, so rewording either
+# side turns this red.
+# ==========================================================================
+skill_flat=$(tr '\n' ' ' < "$SKILL_DIR/SKILL.md" | tr -s ' ')
+TESTS=$((TESTS + 1))
+if contains "$skill_flat" '"<candidate>" 2>&1 >/dev/null'; then ok x; else
+  fail "SKILL.md's activation guard no longer runs the validator with stdout dropped"; fi
+for gd_vault in "$REAL_VAULT" "$METHOD_VAULT"; do
+  gd_out=$(python3 "$VALIDATOR" "$gd_vault" 2>&1 >/dev/null)
+  TESTS=$((TESTS + 1))
+  if [ -z "$gd_out" ]; then ok x; else
+    fail "the guard reads 'no output' as a vault, but $gd_vault printed:"
+    printf '%s\n' "$gd_out" | sed 's/^/    /'
+  fi
+done
+GD_TMP=$(mktemp -d)
+gd_out=$(python3 "$VALIDATOR" "$GD_TMP" 2>&1 >/dev/null)
+rm -rf "$GD_TMP"
+TESTS=$((TESTS + 1))
+if contains "$skill_flat" '`is not a vault root`' && contains "$gd_out" "is not a vault root"; then
+  ok x; else
+  fail "SKILL.md's non-vault phrase must match the validator's output, got: $gd_out"; fi
+gd_out=$(printf 'not json at all' | python3 "$VALIDATOR" --hook post 2>&1 >/dev/null)
+TESTS=$((TESTS + 1))
+if contains "$skill_flat" '`validator crash`' && contains "$gd_out" "^validator crash"; then
+  ok x; else
+  fail "SKILL.md's crash phrase must match the validator's output, got: $gd_out"; fi
+# The hooks' own crash notice, which SKILL.md tells the session to act on:
+# both scripts must still say the phrase SKILL.md quotes.
+for gd_hook in post_write_check.sh stop_gate.sh; do
+  gd_out=$(printf 'not json at all' | bash "$SKILL_DIR/hooks/$gd_hook" 2>/dev/null)
+  TESTS=$((TESTS + 1))
+  if contains "$skill_flat" '`vault validator crashed`' \
+      && contains "$(field systemMessage "$gd_out")" "vault validator crashed"; then
+    ok x; else
+    fail "SKILL.md's hook crash phrase must match what $gd_hook prints, got: $gd_out"; fi
+done
+
+# The stop-gate lines SKILL.md quotes must be lines the validator can print.
+# They went false once already: "attempt n/2" outlived the per-session block
+# counter it described (DEC-MTH-055). One assertion per quoted line.
+for gd_phrase in "vault validator blocked the turn end" \
+    "vault validator session report:" "UNRESOLVED vault ERRORs" \
+    "vault-wide findings unchanged"; do
+  TESTS=$((TESTS + 1))
+  if contains "$skill_flat" "\`$gd_phrase" && grep -qF "$gd_phrase" "$VALIDATOR"; then
+    ok x; else
+    fail "SKILL.md quotes '$gd_phrase' but the validator does not print it (or SKILL.md lost it)"; fi
+done
+# ... and the statements those corrections replaced stay gone: an
+# ineffective frontmatter key, the per-session block count, the "while
+# active" hook lifetime, and an instruction about a list only the user sees
+# (DEC-MTH-023).
+for gd_phrase in "invocation: auto" "attempt n/2" "two blocked attempts" \
+    "Say which of them you fixed" "While this skill is active"; do
+  TESTS=$((TESTS + 1))
+  if contains "$skill_flat" "$gd_phrase"; then
+    fail "SKILL.md carries the retired statement again: $gd_phrase"; else ok x; fi
+done
+
+# SKILL.md quotes the question and timeline of every role from the template
+# conventions file, which owns them. The copy had drifted (CMP read "What are
+# the building blocks?"), so each row is compared, one assertion per domain
+# so a failure names the row. A conventions table that cannot be read leaves
+# every row unmatched - red, never silently green.
+gd_rows=$(python3 - "$SKILL_DIR/SKILL.md" \
+    "$REAL_VAULT/00_documentation_file_creation_and_conventions.md" <<'PY' 2>&1
+import re, sys
+def cells(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+conv = {}
+for line in open(sys.argv[2], encoding="utf-8-sig").read().splitlines():
+    m = re.match(r"\|\s*`\d\d_[^`]*_\((\w+)\)`\s*\|", line)
+    if m and len(cells(line)) == 4:
+        c = cells(line)
+        conv[m.group(1)] = (c[3], c[2])
+skill = {}
+for line in open(sys.argv[1], encoding="utf-8-sig").read().splitlines():
+    c = cells(line) if line.startswith("|") else []
+    if len(c) == 4 and c[0] in conv:
+        skill[c[0]] = (c[1], c[2])
+for abbr in ("REQ", "DEC", "ARC", "CMP", "IFC", "IMP", "TAE", "OAU", "REF"):
+    if abbr in skill and skill[abbr] == conv.get(abbr):
+        print(abbr, "ok")
+    else:
+        print(abbr, "skill=%r conventions=%r" % (skill.get(abbr), conv.get(abbr)))
+PY
+)
+for gd_abbr in REQ DEC ARC CMP IFC IMP TAE OAU REF; do
+  gd_line=$(printf '%s\n' "$gd_rows" | grep "^$gd_abbr ")
+  TESTS=$((TESTS + 1))
+  if [ "$gd_line" = "$gd_abbr ok" ]; then ok x; else
+    fail "SKILL.md role row $gd_abbr differs from the conventions file: ${gd_line:-no row}"; fi
+done
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
