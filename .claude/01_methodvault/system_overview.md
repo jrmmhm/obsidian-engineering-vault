@@ -74,6 +74,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-054 | 2026-10-16 | [[DEC_A_Known_Finding_Is_Counted_Not_Repeated]] — a known finding is counted, not repeated |
 | DEC-MTH-055 | 2026-10-16 | [[DEC_Enforcement_State_Is_Derived_Not_Kept]] — the gate's block decision and the skill's revision are derived, not kept |
 | DEC-MTH-056 | 2026-10-16 | [[DEC_Vault_Hooks_Stay_Registered_By_The_Skill]] — the vault hooks stay skill-scoped, and the residual is stated where the agent reads it |
+| DEC-MTH-062 | 2026-10-16 | [[DEC_The_Thresholds_Are_The_Methods_Own_Numbers]] — the length and link-budget thresholds are the method's own numbers, and their three sources are cited for what they report |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather

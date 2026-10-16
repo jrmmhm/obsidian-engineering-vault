@@ -6,6 +6,7 @@ last-verified: 2026-10-16
 ---
 Date: 2026-10-16
 Status: Accepted
+Corrected by: [[DEC_The_Thresholds_Are_The_Methods_Own_Numbers]] – the non-arXiv sources this record left unchecked were checked on 2026-10-16; its residual is closed
 
 ## Context
 
