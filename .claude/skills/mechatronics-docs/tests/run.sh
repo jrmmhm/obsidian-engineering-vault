@@ -3215,8 +3215,8 @@ else
 fi
 
 # The method vault carries the decision record of this skill. It is audited by
-# name in CI; this assertion says the same thing locally. Its length WARNs are
-# the measured result of migrating 31 real decisions and are not an ERROR.
+# name in CI; this assertion says the same thing locally. The long decision
+# records accept their length WARN in their own frontmatter (DEC-MTH-054).
 TESTS=$((TESTS + 1))
 if [ -d "$METHOD_VAULT" ]; then
   out=$(python3 "$VALIDATOR" "$METHOD_VAULT" 2>&1); rc=$?
