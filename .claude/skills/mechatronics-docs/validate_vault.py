@@ -821,13 +821,45 @@ class Vault:
         # the same collision on different files, which is the very
         # non-determinism issue #42 is about, one index further out.
         self._md_names, self._all_names = {}, {}
-        for p in sorted(self.index_root().rglob("*")):
+        for p in self._index_files():
             if any(part in (".obsidian", ".git") for part in p.parts):
                 continue
             if p.is_file():
                 self._all_names.setdefault(p.name, []).append(p)
                 if p.suffix == ".md":
                     self._md_names.setdefault(p.stem, []).append(p)
+
+    def _index_files(self):
+        """Every path the name index is built from, sorted and unique.
+
+        The vault itself is walked on disk - the same file set run_full
+        validates and the exporter reads, so a note written this session
+        resolves before anyone runs git add, and so does a gitignored note
+        lying right there. Only the part of index_root OUTSIDE the vault
+        is taken from the repository: tracked plus untracked-not-ignored
+        files. That is where the disk is not the project - a home
+        directory as index root carried plugin caches and session
+        memories into the index, 27 of the 28 duplicate-basename lines
+        measured on one vault (01_methodvault, DEC-MTH-053).
+
+        Without a repository, or when git cannot answer, the whole
+        index_root is walked as before: losing a link target to a failed
+        subprocess would be a confident wrong link-unresolved ERROR.
+        """
+        root = self.index_root()
+        paths = set(self.root.rglob("*"))
+        if root != self.root:
+            listed = (git_listed_files(root) if self.git_root() else None)
+            if listed is None:
+                paths |= set(root.rglob("*"))
+            else:
+                for p in listed:
+                    if p == self.root or self.root in p.parents:
+                        continue
+                    # A nested repository or a submodule is listed as its
+                    # directory; its files are still the project's.
+                    paths |= set(p.rglob("*")) if p.is_dir() else {p}
+        return sorted(paths)
 
     def md_names(self):
         if self._md_names is None:
@@ -2813,6 +2845,41 @@ def git_head_content(vault: Vault, path: Path):
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout if r.returncode == 0 else None
+
+
+def git_env():
+    """The environment for a git call that must answer about a directory.
+
+    Inside 'git commit' - where the pre-commit hook runs this validator -
+    git exports GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE, and any of them
+    makes '-C <dir>' answer for a different tree or a temporary index.
+    GIT_OPTIONAL_LOCKS=0 keeps a read from refreshing the index.
+    """
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    return env
+
+
+def git_listed_files(directory: Path):
+    """Files git counts as part of the project below a directory, or None.
+
+    Tracked plus untracked-not-ignored, as absolute paths. A path that is
+    in the index but deleted from the working tree is still listed, and a
+    nested repository comes back as its directory - the caller tests what
+    exists. None means git could not answer, never "no files".
+    """
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(directory), "ls-files", "-z", "--cached",
+             "--others", "--exclude-standard"],
+            capture_output=True, timeout=10, env=git_env())
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return {directory / os.fsdecode(raw.rstrip(b"/"))
+            for raw in r.stdout.split(b"\0") if raw}
 
 
 def error_counts(findings):
