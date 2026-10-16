@@ -7369,6 +7369,26 @@ for gd_phrase in "vault validator blocked the turn end" \
     ok x; else
     fail "SKILL.md quotes '$gd_phrase' but the validator does not print it (or SKILL.md lost it)"; fi
 done
+# The corrected statements themselves, each tied to the code fact it states
+# where one exists: the gate blocks once per stop sequence (stop_hook_active),
+# pre-existing WARNs are counted rather than repeated, validator-accept is a
+# schema field, the residual of skill-scoped hooks is spelled out, and a vault
+# whose templates carry no frontmatter is updated first.
+gd_check() { # gd_check <phrase in SKILL.md> <fixed string> <file holding it>
+  TESTS=$((TESTS + 1))
+  if contains "$skill_flat" "$1" && grep -qF "$2" "$3"; then ok x; else
+    fail "SKILL.md must state '$1', backed by '$2' in $(basename "$3")"; fi
+}
+gd_check "once per stop sequence" "stop_hook_active" "$VALIDATOR"
+gd_check "not repeated, only counted" "pre-existing WARN(s) unchanged" "$VALIDATOR"
+gd_check "never add one" "validator-accept" "$SKILL_DIR/vault_schema.json"
+gd_check "never in a session that does not invoke it, nor on subagent writes" \
+  "stop_gate.sh" "$SKILL_DIR/SKILL.md"
+gd_check "do not open with \`---\`" "00_" "$SKILL_DIR/SKILL.md"
+TESTS=$((TESTS + 1))
+if grep -q "once per" "$SKILL_DIR/hooks/stop_gate.sh" \
+    && ! grep -q "max 2x" "$SKILL_DIR/hooks/stop_gate.sh"; then ok x; else
+  fail "stop_gate.sh's header must describe the once-per-sequence block"; fi
 # ... and the statements those corrections replaced stay gone: an
 # ineffective frontmatter key, the per-session block count, the "while
 # active" hook lifetime, and an instruction about a list only the user sees
