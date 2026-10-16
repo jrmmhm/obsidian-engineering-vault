@@ -1995,8 +1995,9 @@ def check_length(path, lines, findings, max_words=None):
 def check_adm_cells(path, lines, findings, max_chars):
     """ADM table cells longer than max_chars, one finding per file.
 
-    A tracker row holds the current state, a one-sentence next step and a
-    link (DEC-MTH-058); a cell past the limit has become a log. Rows come
+    A tracker row holds the current state, its next-step facts, a
+    one-sentence next step and a link (DEC-MTH-058); a cell past the limit
+    has become a log, whose history moves rather than goes. Rows come
     from req_rows, the one reader of a table body - escaped pipes, fences
     and an unclosed fence handled the way every other table check sees them.
     """
@@ -2007,11 +2008,11 @@ def check_adm_cells(path, lines, findings, max_chars):
     if long_cells:
         findings.append(Finding("WARN", "adm-cell-long", str(path), long_cells[0],
                                 f"{len(long_cells)} table cell(s) longer than {max_chars} "
-                                "characters, the first on this line - a tracker cell holds "
-                                "the current state in one sentence and a link; the history "
-                                "belongs to the git log, the evidence to the owning TAE or "
-                                "DEC, and a finished row moves to the tracker's _Closed "
-                                "sibling (00_ADM_README)."))
+                                "characters, the first on this line - move the history to "
+                                "the owning TAE, DEC or IMP (or the commit message of the "
+                                "change) and link it; keep the next-step facts (acks, "
+                                "recipients, current version) in the row; a finished row "
+                                "moves to the tracker's _Closed sibling (00_ADM_README)."))
 
 
 def anchor_index(lines, mask):
