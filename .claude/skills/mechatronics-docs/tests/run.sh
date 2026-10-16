@@ -3243,6 +3243,14 @@ if [ -d "$METHOD_VAULT" ]; then
   if [ $rc -eq 0 ]; then ok x; else
     fail "method vault must contain no ERRORs:"; printf '%s\n' "$out" | grep '^ERROR' | sed 's/^/    /'
   fi
+  # A long record states that it is long on purpose in its own frontmatter;
+  # one that does not is a decision nobody made (DEC-MTH-054). Pinned so a
+  # dropped acceptance cannot hide behind the exit code, which WARNs never move.
+  TESTS=$((TESTS + 1))
+  if ! contains "$out" "\[length\]" && contains "$out" "^accepted: [0-9]* finding(s)"; then ok x; else
+    fail "every long method-vault record must accept its length WARN, and the audit must count them:"
+    printf '%s\n' "$out" | grep -E '\[length\]|^accepted' | sed 's/^/    /'
+  fi
 else
   fail "method vault not found at $METHOD_VAULT"
 fi
@@ -5632,6 +5640,13 @@ fi
 TESTS=$((TESTS + 1))
 if ! contains "$ovw_b" "\[arc-not-in-overview\]"; then ok x; else
   fail "without an entry point the island scan must not run"; fi
+# The finding names what did not run and nothing else: the hub link budget
+# it used to mention no longer exists (DEC-MTH-053).
+TESTS=$((TESTS + 1))
+if contains "$ovw_b" "overview-unidentified.*the ARC reachability check did not run" \
+   && ! contains "$ovw_b" "hub link budget"; then ok x; else
+  fail "overview-unidentified must not promise a hub link budget:"
+  printf '%s\n' "$ovw_b" | grep overview | sed 's/^/    /'; fi
 
 # Two marked files: the same finding, naming both.
 OVW_C="$OVW_TMP/twice/00_documentation/01_projectvault"
