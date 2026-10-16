@@ -7503,6 +7503,9 @@ ga_note "$IMPD/IMP_Clone.md" IMP 2026-01-05 active "The library is \`20_software
 ga_note "$IMPD/IMP_Bad_Date.md" IMP 2026-02-30 active "The tool is \`20_software/tool.py\`."
 ga_note "$GDV/02_decisions_(DEC)/DEC_Tool.md" DEC 2026-01-05 active "Chose \`20_software/tool.py\`."
 ga_note "$GDV/07_testing_and_evidence_(TAE)/TAE_Tool.md" TAE 2026-01-05 active "Ran \`20_software/tool.py\`."
+# A block declaring the machine it is true on names that machine's paths.
+ga_note "$IMPD/IMP_Hosted.md" IMP 2026-01-05 active '```bash host=userver'
+printf '20_software/tool.py --check\n```\n' >> "$IMPD/IMP_Hosted.md"
 cp -a "$GD" "$GA_TMP/DriftNoGit"
 ga_git 2026-01-01 init -q -b main "$GD"
 ga_commit "$GD" 2026-01-01 "baseline"
@@ -7537,7 +7540,7 @@ TESTS=$((TESTS + 1))
 if contains "$gd_out" "IMP_Merge\.md:11 \[pointer-drift\] 20_software/merged\.py changed in [0-9a-f]* on 2026-01-10"; then ok x; else
   fail "a change merged after last-verified must be dated at the merge (first parent):"
   printf '%s\n' "$gd_out" | grep pointer-drift | sed 's/^/    /'; fi
-for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool; do
+for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool IMP_Hosted; do
   TESTS=$((TESTS + 1))
   if ! contains "$gd_out" "$quiet\.md:[0-9]* \[pointer-drift\]"; then ok x; else
     fail "$quiet must not be reported as pointer-drift:"
@@ -7636,6 +7639,11 @@ ga_note "$IMPR/IMP_Shapes.md" IMP 2026-01-05 active \
   "Ids it must not read: \`DEADBEEF12\`, \`12345678901\`, \`9d55b199192a4be7d02c\`, \`0xdeadbeef\`, \`strictdoc@deadbee4\`."
 printf '```text\ndeadbee2\n`deadbee2`\n```\n' >> "$IMPR/IMP_Shapes.md"
 ga_note "$GRV/98_administration_(ADM)/ADM_Tracker.md" ADM 2026-01-05 active "Sent at \`deadbee3\`."
+ga_note "$GRV/07_testing_and_evidence_(TAE)/TAE_Run.md" TAE 2026-01-05 active "Ran at \`deadbee5\`."
+# A DEC carries its status on the body line, not in the frontmatter.
+mkdir -p "$GRV/02_decisions_(DEC)"
+printf -- '---\ndomain: DEC\ncreated: 2026-01-01\nlast-verified: 2026-01-05\n---\nDate: 2026-01-05\nStatus: Superseded\n\n## Context\nA superseded decision citing commit `deadbee6`.\n' \
+  > "$GRV/02_decisions_(DEC)/DEC_Old.md"
 cp -a "$GR" "$GA_TMP/RefsNoGit"
 rm -rf "$GA_TMP/RefsNoGit/.git" "$GA_TMP/RefsNoGit/20_software/lib/.git"
 gr_out=$(python3 "$VALIDATOR" "$GRV" 2>&1); gr_rc=$?
@@ -7652,7 +7660,11 @@ TESTS=$((TESTS + 1))
 if ! contains "$gr_out" "IMP_Rewrite\.md:[0-9]* \[ref-unresolved\]"; then ok x; else
   fail "an amended-away commit resolves until its objects are pruned:"
   printf '%s\n' "$gr_out" | grep IMP_Rewrite | sed 's/^/    /'; fi
-for quiet in IMP_Live IMP_Shapes ADM_Tracker; do
+TESTS=$((TESTS + 1))
+if contains "$gr_out" "TAE_Run\.md:11 \[ref-unresolved\] commit id(s) \`deadbee5\`"; then ok x; else
+  fail "a dead id in a TAE must be reported (TAE is a ref role):"
+  printf '%s\n' "$gr_out" | grep ref-unresolved | sed 's/^/    /'; fi
+for quiet in IMP_Live IMP_Shapes ADM_Tracker DEC_Old; do
   TESTS=$((TESTS + 1))
   if ! contains "$gr_out" "$quiet\.md:[0-9]* \[ref-unresolved\]"; then ok x; else
     fail "$quiet must not be reported as ref-unresolved:"
@@ -7678,6 +7690,22 @@ if [ -e "$GR/20_software/shallow/.git/shallow" ] && ! contains "$grs_out" "ref-u
   fail "a shallow repository among those asked must silence ref-unresolved:"
   printf '%s\n' "$grs_out" | grep ref-unresolved | sed 's/^/    /'; fi
 rm -rf "$GR/20_software/shallow"
+# One check that raises must not take the others with it.
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" "$GRV" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+def boom(*_args):
+    raise RuntimeError("injected")
+vv.check_pointer_drift = boom
+v = vv.Vault(Path(sys.argv[2]))
+corpus = {p: vv.read_text(p) for p in sorted(v.root.rglob("*.md"))}
+codes = [f.code for f in vv.git_advisories(v, corpus)]
+assert "ref-unresolved" in codes, codes
+PY
+then ok x; else fail "a raising advisory check must leave the other checks' findings in place"; fi
 # A partial clone is never asked to fetch. Its promisor holds a commit the
 # clone does not: a lazy fetch would make the id resolve and leave the
 # object behind; the network block keeps it missing.
@@ -7719,6 +7747,8 @@ ga_note "$IMPP/IMP_Far.md" IMP 2026-01-05 active \
 ga_note "$IMPP/IMP_Sentence.md" IMP 2026-01-05 active \
   "The clone is \`20_software/linux\`. Its fuzz configuration is planned"
 ga_note "$IMPP/IMP_Before.md" IMP 2026-01-05 active "Planned: the clone \`20_software/linux\` of the tree."
+ga_note "$IMPP/IMP_Semicolon.md" IMP 2026-01-05 active \
+  "The clone is \`20_software/linux\`; its fuzz configuration is planned"
 ga_note "$IMPP/IMP_Heading.md" IMP 2026-01-05 active "### The clone \`20_software/linux\` (planned)"
 ga_note "$IMPP/IMP_Fenced.md" IMP 2026-01-05 active '```text'
 printf '`20_software/linux` (planned)\n```\n' >> "$IMPP/IMP_Fenced.md"
@@ -7740,7 +7770,7 @@ if contains "$gp3_out" "IMP_Second_Path\.md:11 \[pending-stale\] 'TBD' marks 20_
    && ! contains "$gp3_out" "absent\.py as not created yet"; then ok x; else
   fail "each marker must belong to the path right before it:"
   printf '%s\n' "$gp3_out" | grep pending-stale | sed 's/^/    /'; fi
-for quiet in IMP_Absent IMP_Far IMP_Sentence IMP_Before IMP_Heading IMP_Fenced \
+for quiet in IMP_Absent IMP_Far IMP_Sentence IMP_Semicolon IMP_Before IMP_Heading IMP_Fenced \
              IMP_Two_Segments IMP_Retired_Plan; do
   TESTS=$((TESTS + 1))
   if ! contains "$gp3_out" "$quiet\.md:[0-9]* \[pending-stale\]"; then ok x; else
