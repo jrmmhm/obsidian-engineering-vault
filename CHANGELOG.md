@@ -33,6 +33,22 @@ decision.
 
 ### Added
 
+- **The validator says which notes git says to re-verify** — three
+  vault-wide WARNs that never block. `pointer-drift`: a project file a note
+  names changed after the note's `last-verified` (TAE and DEC exempt; bumping
+  `last-verified` clears it). `ref-unresolved`: a commit id an IMP, TAE or
+  DEC note cites resolves in no local repository; an id of a foreign
+  repository is written `repo@id`. `pending-stale`: a pending/planned marker
+  sits right after a path that exists. No git query fetches anything, and a
+  shallow clone or a vault without a repository gets no finding from the
+  first two. Measured on the two working vaults: 1 and 10 new WARNs, two of
+  them ids of repositories the project does not hold, which the `repo@id`
+  form silences. **MINOR** by the table in
+  [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
+  — new WARNs. `schema_version` moves to `0.7` for the `git_advisories`
+  block. The reasoning is
+  [`DEC_Git_History_Says_Which_Notes_To_Reverify`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Git_History_Says_Which_Notes_To_Reverify.md).
+
 - **The validator says what can be acted on, and counts what it knows** —
   on six real vaults it printed 94 WARN lines of which four were actionable;
   it now prints 17, and catches the same 16 of 18 seeded defects with the
