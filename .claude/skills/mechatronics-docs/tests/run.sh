@@ -3222,6 +3222,30 @@ if contains "$(field systemMessage "$gout")" "stop gate released"; then ok x; el
   printf '%s\n' "$gout" | sed 's/^/    /'
 fi
 
+# The post hook's crash notice had the same dead channel: a stderr line at
+# exit 0 (RESEARCH-R5 F7). It now goes to both readers - systemMessage for the
+# user, additionalContext for the model, because SKILL.md tells the SESSION to
+# verify by hand after it, and an instruction the model cannot see is the F2
+# defect again. The nested field is read structurally, not by substring.
+pout=$(printf 'not json at all' | bash "$SKILL_DIR/hooks/post_write_check.sh" 2>/dev/null); rc=$?
+TESTS=$((TESTS + 1))
+if [ $rc -eq 0 ]; then ok x; else fail "a post-hook validator crash must exit 0, got rc=$rc"; fi
+TESTS=$((TESTS + 1))
+if contains "$(field systemMessage "$pout")" "validation skipped"; then ok x; else
+  fail "a post-hook validator crash must reach the user as systemMessage:"
+  printf '%s\n' "$pout" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if printf '%s' "$pout" | python3 -c '
+import json, sys
+h = json.loads(sys.stdin.read())["hookSpecificOutput"]
+assert h["hookEventName"] == "PostToolUse"
+assert "validation skipped" in h["additionalContext"]
+' 2>/dev/null; then ok x; else
+  fail "a post-hook validator crash must reach the model as additionalContext:"
+  printf '%s\n' "$pout" | sed 's/^/    /'
+fi
+
 TESTS=$((TESTS + 1))
 if [ -d "$REAL_VAULT" ]; then
   out=$(python3 "$VALIDATOR" "$REAL_VAULT" 2>&1); rc=$?
