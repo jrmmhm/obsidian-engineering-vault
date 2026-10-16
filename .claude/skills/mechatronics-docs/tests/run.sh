@@ -7589,6 +7589,13 @@ if sz_has "ADM_Accept_Cell\.md:1 \[accept-invalid\] validator-accept names \['ad
    && sz_has "ADM_Accept_Cell\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
   fail "adm-cell-long must not be acceptable in a file's frontmatter:"
   printf '%s\n' "$sz_out" | grep ADM_Accept_Cell | sed 's/^/    /'; fi
+# The repair is a move, never a cut: agents told only to shorten dropped
+# the acker's name and the Cc list of an open row (A/B, DEC-MTH-058).
+TESTS=$((TESTS + 1))
+if sz_has "adm-cell-long\] .* move the history to the owning TAE, DEC or IMP (or the commit message of the change) and link it; keep the next-step facts (acks, recipients, current version) in the row" \
+   && ! sz_has "adm-cell-long\].*shorten"; then ok x; else
+  fail "the cell finding must name moving the history and keeping the next-step facts:"
+  printf '%s\n' "$sz_out" | grep adm-cell-long | head -n 1 | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
 if sz_has "adm-cell-long\].*_Closed sibling"; then ok x; else
   fail "the cell finding must name the repair:"; printf '%s\n' "$sz_out" | grep adm-cell-long | sed 's/^/    /'; fi
