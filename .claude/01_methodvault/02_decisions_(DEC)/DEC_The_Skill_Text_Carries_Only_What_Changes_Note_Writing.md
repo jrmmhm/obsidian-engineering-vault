@@ -65,7 +65,8 @@ Option B, applied as one rule for every future edit of `SKILL.md`:
 ## Justification
 
 - Claude Code's skill guidance asks for a `SKILL.md` under 500 lines with
-  detailed reference in separate files; the file stood at 514.
+  detailed reference in separate files (code.claude.com/docs/en/skills,
+  read 2026-10-15); the file stood at 514.
 - Every restatement in `SKILL.md` was a second owner of a fact, the defect
   [[DEC_A_Volatile_Fact_Has_One_Owning_File]] (DEC-MTH-048) describes; the
   CMP question showed the second owner drifting.
