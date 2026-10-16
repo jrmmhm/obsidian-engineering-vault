@@ -4422,15 +4422,37 @@ if [ $ci_rc -eq 0 ] && contains "$ci_out" "OK - the entry reaches this copy"; th
 fi
 
 # The revision has to be ON the report, not merely defined in the module.
-# It is the only thing that tells two copies apart: the vendored copy of a
-# derived project ships without tests/ on purpose, so equal content is not
-# the question an installed-copy check can ask.
-CI_REV=$(python3 -c 'import re,sys; s=open(sys.argv[1]).read(); m=re.search(r"^SKILL_REVISION = \"([^\"]+)\"", s, re.M); print(m.group(1) if m else "")' "$VALIDATOR")
+# It is the only thing that tells two copies apart. Since DEC-MTH-055 it is
+# derived from the bytes of the files that decide behaviour, never from the
+# whole directory: the vendored copy of a derived project ships without
+# tests/ on purpose.
+CI_REV=$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import validate_vault as vv; print(vv.skill_revision())' "$SKILL_DIR")
 TESTS=$((TESTS + 1))
 if [ -n "$CI_REV" ] && contains "$ci_out" "(rev $CI_REV)"; then ok x; else
   fail "--check-install must name the revision of the copy that answers:"
   printf '%s\n' "$ci_out" | sed 's/^/    /'
 fi
+
+# Two copies that differ in one byte print two revisions; identical copies
+# print one, wherever they lie; a copy missing a file it would read still
+# answers. Measured on real copies, not by recomputing the formula - a
+# formula checked against itself proves nothing.
+rev_of() { env HOME="$CI_A" python3 "$1/validate_vault.py" --check-install 2>&1 \
+  | sed -n 's/^this copy: .*(rev \([0-9a-f]*\))$/\1/p'; }
+for c in same other bytes noexp; do
+  mkdir -p "$CI_TMP/rev-$c"
+  cp "$VALIDATOR" "$SKILL_DIR/vault_schema.json" "$SKILL_DIR/export_traceability.py" "$CI_TMP/rev-$c/"
+done
+printf ' ' >> "$CI_TMP/rev-bytes/vault_schema.json"
+rm -f "$CI_TMP/rev-noexp/export_traceability.py"
+TESTS=$((TESTS + 1))
+if [ "$(rev_of "$CI_TMP/rev-same")" = "$CI_REV" ] \
+   && [ "$(rev_of "$CI_TMP/rev-other")" = "$CI_REV" ] \
+   && [ -n "$(rev_of "$CI_TMP/rev-bytes")" ] \
+   && [ "$(rev_of "$CI_TMP/rev-bytes")" != "$CI_REV" ] \
+   && [ -n "$(rev_of "$CI_TMP/rev-noexp")" ] \
+   && [ "$(rev_of "$CI_TMP/rev-noexp")" != "$CI_REV" ]; then ok x; else
+  fail "the revision must follow the content: same=$(rev_of "$CI_TMP/rev-same") bytes=$(rev_of "$CI_TMP/rev-bytes") noexp=$(rev_of "$CI_TMP/rev-noexp") own=$CI_REV"; fi
 
 # Issue #40 itself: the link carries a path this host does not have. The
 # stored path must appear - it is what names the host that wrote it.
