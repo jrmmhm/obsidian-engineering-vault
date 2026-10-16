@@ -6,9 +6,11 @@ last-verified: 2026-10-16
 ---
 Date: 2026-07-25
 Status: Accepted
-Migrated 2026-08-05 from the appended decision log, base record "Decision Record — AI Documentation Enforcement Layer". Corrected 2026-10-16: six research citations — in Context, option A, option B, the leak-detection design point and follow-up 1 — said more than their sources report; each now states what its source reports, and option B stands on the corrected evidence; and the stop gate's "max 2 blocks per session" no longer holds - it blocks once per stop sequence.
+Migrated 2026-08-05 from the appended decision log, base record "Decision Record — AI Documentation Enforcement Layer". Corrected 2026-10-16: six research citations — in Context, option A, option B, the leak-detection design point and follow-up 1 — said more than their sources report; each now states what its source reports, and option B stands on the corrected evidence; and the stop gate's "max 2 blocks per session" no longer holds - it blocks once per stop sequence; and the thresholds design point said more than its three non-arXiv sources report and still named a hub link budget - it now states what each source reports, that the numbers are the method's own, and no hub budget.
 Corrected by: [[DEC_A_Citation_States_What_Its_Source_Reports]] – the DocPrism figures were misquoted, "collapse" and "only" overstated their sources, and caveats the sources attach were dropped
 Corrected by: [[DEC_Enforcement_State_Is_Derived_Not_Kept]] – the gate decides from the Stop payload's `stop_hook_active` and blocks once per stop sequence; the per-session counter behind "max 2 blocks per session" is gone
+Corrected by: [[DEC_The_Thresholds_Are_The_Methods_Own_Numbers]] – the 500-line figure is guidance and not the only published one, the context-rot report does not say "well below" the limit, and the Manual of Style sets no link count
+Corrected by: [[DEC_The_Validator_Reports_What_Can_Be_Acted_On]] – the hub link budget no longer exists
 
 ## Context
 
@@ -73,11 +75,16 @@ validator cannot drift against per-project templates.
 - Stop gate: max 2 blocks per session, then fail-open with a visible
   report; validator crash (exit 2) always fails open. A gate that can
   brick a session gets disabled by its user — the worst outcome.
-- Thresholds: length WARN >150 / ERROR >400 lines (Anthropic's 500-line
-  skill ceiling is the only published hard number; retrieval quality
-  degrades well below context limits — Chroma context rot); link budget
-  WARN >20 (hubs 50), from Wikipedia MOS norms; no LLM-specific link
-  study exists.
+- Thresholds: length WARN >150 / ERROR >400 lines and link budget WARN
+  >20 are the method's own numbers; no source names them. Anthropic
+  recommends keeping a SKILL.md body under 500 lines "for optimal
+  performance", one of several length guides it publishes for instruction
+  files, and model performance degrades as input grows inside the context
+  window, even on simple retrieval and text-replication tasks (Chroma,
+  Context Rot). The Wikipedia Manual of Style sets no link count: it calls
+  an article overlinked at "an excessive number of links" and reports
+  stubs averaging about 10 to 20; no LLM-specific link study was known
+  when the budget was set.
 - `status: draft` relaxes nothing (silent-bypass prevention).
 
 ## Consequences

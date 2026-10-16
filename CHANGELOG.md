@@ -206,6 +206,18 @@ decision.
   [`DEC_A_Citation_States_What_Its_Source_Reports`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Citation_States_What_Its_Source_Reports.md)
   with a `Corrected by:` line. No rule moves and no vault gains a finding;
   corrected documentation: MINOR.
+- **The length and link-budget thresholds cite what their sources say** —
+  the same record called Anthropic's 500-line SKILL.md guidance the "only
+  published hard number" where it is a recommendation beside others, read
+  "well below context limits" into Chroma's context-rot report, which does
+  not say how far below, and drew the link budget "from Wikipedia MOS
+  norms", which set no link count. Checked against the three pages on
+  2026-10-16, the design point now says what each reports and that 150,
+  400 and 20 are the method's own numbers, and it no longer names the hub
+  link budget that was deleted. The record points at
+  [`DEC_The_Thresholds_Are_The_Methods_Own_Numbers`](.claude/01_methodvault/02_decisions_(DEC)/DEC_The_Thresholds_Are_The_Methods_Own_Numbers.md),
+  which closes the residual the citation correction above left open. No
+  threshold, rule or finding moves; corrected documentation: MINOR.
 - **A file carrying two template contracts is held to both** —
   `check_sections` scored a file against every template of its domain and
   kept the best, so an ARC file carrying the main-module template's two
