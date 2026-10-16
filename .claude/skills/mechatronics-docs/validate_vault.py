@@ -39,7 +39,6 @@ from pathlib import Path
 
 STATE_DIR = Path("/tmp/claude-mechdocs")
 STATE_MAX_AGE_S = 7 * 24 * 3600
-MAX_STOP_BLOCKS = 2
 
 LENGTH_WARN = 150
 LENGTH_ERROR = 400
@@ -3311,10 +3310,15 @@ def hook_stop(payload):
                        + "\n".join(cap_report_lines(sorted(set(reports)))))
 
     if new_errors:
-        blocks_f = state_path("blocks", session)
-        blocks = load_json(blocks_f, 0)
-        if blocks < MAX_STOP_BLOCKS:
-            blocks_f.write_text(json.dumps(blocks + 1))
+        # Once per stop sequence, decided from the payload. Claude Code sets
+        # stop_hook_active when the turn is already a continuation forced by
+        # a Stop hook: the gate has demanded the fix once in this sequence,
+        # and a second demand would loop on a defect the session could not
+        # fix. A counter file did this per SESSION and was never reset, so
+        # after two blocks the gate stayed advisory for the rest of a long
+        # session; a later stop sequence now blocks again (01_methodvault,
+        # DEC-MTH-055). Only a JSON true counts - anything else blocks.
+        if payload.get("stop_hook_active") is not True:
             # Two channels, two audiences. `reason` reaches Claude - it
             # arrives as a synthetic user message "Stop hook feedback:" -
             # and carries the one obligation the block exists to impose,
@@ -3330,17 +3334,17 @@ def hook_stop(payload):
             # on Claude Code 2.1.220 - the turn simply ends and this gate
             # is off. Do not "harmonise" this with hook_post below.
             reason = ("vault validator: ERRORs introduced this session must be fixed "
-                      f"before finishing (attempt {blocks + 1}/{MAX_STOP_BLOCKS}):\n"
+                      "before finishing:\n"
                       + "\n".join(sorted(set(new_errors))))
-            note = ("vault validator blocked the turn end (attempt "
-                    f"{blocks + 1}/{MAX_STOP_BLOCKS}): ERRORs introduced this session")
+            note = ("vault validator blocked the turn end: ERRORs introduced "
+                    "this session")
             print(json.dumps({
                 "decision": "block", "reason": reason,
                 "systemMessage": note + ("\n" + "\n".join(summary) if summary else "")}))
             return 0
-        summary.insert(0, "UNRESOLVED vault ERRORs (gate released after "
-                       f"{MAX_STOP_BLOCKS} attempts - surface these to the user):\n"
-                       + "\n".join(sorted(set(new_errors))))
+        summary.insert(0, "UNRESOLVED vault ERRORs (the gate demanded these once "
+                       "in this stop sequence and released - surface these to "
+                       "the user):\n" + "\n".join(sorted(set(new_errors))))
 
     # Reported, never blocking. A repaired defect and a check that stopped
     # reaching the file produce the same absence, and where this layer
@@ -3407,8 +3411,8 @@ def hook_stop(payload):
         # turn, spending a model turn on legacy drift nobody asked about.
         # The fail-open ERROR report below rides this channel too, and
         # deliberately does not reach the model: the gate has already
-        # demanded those fixes twice: whether to spend a third attempt on
-        # them is the user's call, not the session's.
+        # demanded those fixes in this stop sequence; whether to spend
+        # another attempt on them is the user's call, not the session's.
         #
         # ensure_ascii stays at its default. A path that arrived through
         # surrogateescape carries lone surrogates, which print() cannot
