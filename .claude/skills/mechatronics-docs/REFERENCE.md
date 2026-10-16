@@ -98,8 +98,12 @@ session that never invoked the skill reaches the vault unchecked.
 At turn end, the stop gate re-checks every vault file touched this session.
 ERRORs newly introduced this session block completion; pre-existing
 violations in legacy files are reported but never block — ratcheted against
-the git HEAD state. Vault-wide findings (uncovered REQs, orphans, ...) are
-listed as advisory and never block; the full audit remains the
+the git HEAD state. The gate blocks once per stop sequence: if the session
+stops again without fixing them, it releases rather than loop, and the next
+stop sequence blocks again. Vault-wide findings (uncovered REQs, orphans,
+...) are listed as advisory and never block — in full on the session's
+first report and whenever they change, otherwise as one
+`vault-wide findings unchanged (n)` line; the full audit remains the
 authoritative pass for them.
 
 The two halves of the gate address two readers, and the transcript shows
@@ -107,12 +111,23 @@ which is which. Everything advisory reaches the user as `Stop says: ...` —
 legacy findings, created files, the ERROR codes a file carried at git HEAD
 that did not fire this session, and questions the session owner has to
 answer. Its first line names the turn it belongs to:
-`vault validator blocked the turn end (attempt n/2)` when the gate blocked,
-`vault validator session report:` when it did not — including the turn
-after two blocked attempts, where the report opens with
-`UNRESOLVED vault ERRORs` and the gate has already released. What the gate
-wants from the session arrives as `Stop hook feedback:` and names only the
-ERRORs this session introduced.
+`vault validator blocked the turn end` when the gate blocked,
+`vault validator session report:` when it did not — including the turn in
+which the gate released, where the report opens with
+`UNRESOLVED vault ERRORs` naming what it demanded once in that stop
+sequence. What the gate wants from the session arrives as
+`Stop hook feedback:` and names only the ERRORs this session introduced.
+
+The post-write hook is quieter in the same way: after a write it shows the
+ERRORs and only the WARNs the file did not already carry at git HEAD, and
+counts the rest as one `pre-existing WARN(s) unchanged` line.
+
+A file that is long, unstructured or short on purpose can accept that one
+WARN in its own frontmatter (`validator-accept` with a
+`validator-accept-reason`); the conventions file says which codes qualify
+and the audit counts what was accepted. Accepting is the owner's decision
+about a file, never a session's way past a finding — add an acceptance
+only when the user asks for it.
 
 A gate that could not run says so as well:
 `vault validator crashed - stop gate released` at turn end, and

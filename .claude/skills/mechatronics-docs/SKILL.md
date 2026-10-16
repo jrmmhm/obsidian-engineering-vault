@@ -184,21 +184,21 @@ prevent contradicting or duplicating a live decision.
 From the skill's first invocation to the end of the session, two hooks run
 `validate_vault.py` (which copy: `REFERENCE.md`) — structure, not truth.
 
-- **After each `Edit`/`Write`/`MultiEdit`** into a vault, that file's
+- **After each `Edit`/`Write`/`MultiEdit`** into a vault, that file's new
   findings reach you: fix ERRORs now, fix WARNs or say why they stand.
   Unresolved links come as one line — fine mid-pass, resolved by turn end.
 - **`Stop hook feedback:`** is the only blocking channel: the ERRORs this
   session introduced. ERRORs present at git HEAD never block.
 - **`Stop says: ...`** is the session report for the user, not for you.
-- **`vault validator crashed`**: that write or turn went unchecked — verify
-  by hand before finishing.
+- **`vault validator crashed`**: that write or turn went unchecked; verify by hand.
 
 Edits in a session that never invoked this skill, and subagent writes, are
 not validated in-session; only a CI workflow or the pre-commit hook, where
 turned on, catches them. So: **never modify vault files through Bash**
 (`sed -i`, `tee`, heredocs); **never delegate vault writing to subagents**
 (research may be delegated); **do not evade findings** — moving content to
-`99_inbox`, stub link targets or deleted references show in the report.
+`99_inbox`, stub link targets, deleted references or a `validator-accept`
+the user did not ask for all show in the report.
 
 ## Reference — One Level Deeper
 
