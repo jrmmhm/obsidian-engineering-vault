@@ -265,7 +265,21 @@ FALLBACK_SCHEMA = {
         "test-object": {"type": "list", "item": "object-identifier",
                         "required": False, "code": "test-object-format",
                         "enforced": "schema-driven"},
+        "validator-accept": {"type": "list", "required": False,
+                             "enforced": "declared-only"},
+        "validator-accept-reason": {"type": "text", "required": False,
+                                    "enforced": "declared-only"},
     }},
+    # In the essentials for overview_marker's reason: without it an
+    # unreadable schema would print every accepted finding again behind a
+    # single schema-unreadable WARN - and an ERROR is never accepted either
+    # way, so the fallback cannot hide anything the packaged schema shows.
+    "validator_accept": {"field": "validator-accept",
+                         "reason_field": "validator-accept-reason",
+                         "acceptable_codes": ["length", "structure", "stub",
+                                              "link-budget"]},
+    "consistency_rules": [{"id": "requirement-coverage",
+                           "deferral_status_values": ["Blocked", "Deferred", "TBD"]}],
     # In the essentials for the alias map's reason (issue #66): without it
     # a vault read under this fallback would have no entry point at all,
     # and the ARC reachability rule would switch off behind the single
@@ -367,6 +381,46 @@ def overview_marker(schema):
         if isinstance(field, str) and field and isinstance(value, str) and value:
             return field, value
     return None
+
+
+def accept_spec(schema):
+    """(field, reason field, acceptable codes) of a file's own acceptance.
+
+    Read like overview_marker: from the schema and, failing that, from
+    FALLBACK_SCHEMA. None when neither declares a usable triple, and then
+    nothing is ever accepted.
+    """
+    for src in (schema, FALLBACK_SCHEMA):
+        spec = _dict(src, "validator_accept")
+        field, reason = spec.get("field"), spec.get("reason_field")
+        codes = _strlist(spec, "acceptable_codes")
+        if (isinstance(field, str) and field and isinstance(reason, str)
+                and reason and codes):
+            return field, reason, set(codes)
+    return None
+
+
+def deferral_values(schema):
+    """Allocation status values that defer a requirement (DEC-MTH-054)."""
+    for src in (schema, FALLBACK_SCHEMA):
+        rules = src.get("consistency_rules") if isinstance(src, dict) else None
+        for rule in rules if isinstance(rules, list) else []:
+            if isinstance(rule, dict) and rule.get("id") == "requirement-coverage":
+                values = _strlist(rule, "deferral_status_values")
+                if values:
+                    return values
+    return []
+
+
+def is_deferral(status, values):
+    """A status cell that IS a deferral value, or one followed by a qualifier.
+
+    The exporter's prefix rule for a qualified status: 'Blocked (on #6137)'
+    is Blocked, 'Blockedness' is not.
+    """
+    s = (status or "").strip()
+    return any(s == v or (s.startswith(v) and not s[len(v)].isalnum())
+               for v in values)
 
 
 class Finding:
@@ -583,6 +637,11 @@ class Vault:
         self._overviews = None
         self._analysis = None
         self._analysis_error = None
+        # What the audit did not print and says it did not print: accepted
+        # findings per file, and the requirements deferred in an allocation
+        # row as (requirement, REQ file) (DEC-MTH-054).
+        self.accepted = Counter()
+        self.deferred = []
 
     def schema(self):
         if self._schema is None:
@@ -1437,6 +1496,16 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
     text, encoding_problem = (decode_source(content) if content is not None
                               else read_source(path))
     lines = text.splitlines()
+    accepted, accept_problems = file_acceptance(vault, path, kind, lines)
+
+    def finish(found):
+        # The file's own acceptance, WARNs only - an ERROR is never accepted
+        # (01_methodvault, DEC-MTH-054). Counted on the disk pass alone, so a
+        # HEAD baseline of the same file is not counted twice.
+        kept = [f for f in found if not (f.sev == "WARN" and f.code in accepted)]
+        if content is None and len(kept) < len(found):
+            vault.accepted[str(path)] += len(found) - len(kept)
+        return kept + accept_problems
 
     # Reported once per vault, and never on a git-HEAD baseline pass (whose
     # WARNs are discarded, which would swallow this one silently).
@@ -1467,7 +1536,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         check_links(vault, path, lines, findings, strict_links)
         if content is None:
             check_inb_age(path, findings)
-        return findings
+        return finish(findings)
 
     if kind in ("root", "infra"):
         if kind == "infra":
@@ -1483,7 +1552,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
                 check_undeclared(vault, fm, abbr, path, findings)
         # infra/root files carry placeholder example links - never strict.
         check_links(vault, path, lines, findings, strict=False)
-        return findings
+        return finish(findings)
 
     # ---- full domain-file checks ----
     role = vault.role_of(abbr)
@@ -1527,7 +1596,51 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         findings.append(Finding("WARN", "stub", str(path), None,
                                 f"only {len(body)} content lines - stub file? "
                                 "Fill it or do not create it yet."))
-    return findings
+    return finish(findings)
+
+
+def file_acceptance(vault, path, kind, lines):
+    """-> (WARN codes this file accepts, findings about the acceptance).
+
+    The acceptance is the file's own frontmatter, read from the lines being
+    validated - so a HEAD baseline is read under the acceptance it carried
+    then. A code outside the schema's closed list is never accepted, an
+    ERROR least of all; a template accepts nothing, because its frontmatter
+    is copied into every file made from it; and without a reason nothing is
+    in force. Each of those is said rather than silently ignored.
+    Never raises: malformed frontmatter accepts nothing.
+    """
+    spec = accept_spec(vault.schema())
+    if spec is None:
+        return set(), []
+    field, reason_field, acceptable = spec
+    fm, _, bad = parse_frontmatter(lines)
+    if bad or not fm or field not in fm:
+        return set(), []
+    raw = fm[field]
+    entries = [raw] if isinstance(raw, str) else raw if isinstance(raw, list) else []
+    entries = [e.strip() for e in entries if isinstance(e, str) and e.strip()]
+    problems = []
+    if kind == "infra":
+        problems.append(Finding("WARN", "accept-invalid", str(path), 1,
+                                f"'{field}' in a template is copied into every "
+                                "file made from it - accept a finding in the file "
+                                "that carries it, never here"))
+        return set(), problems
+    refused = [e for e in entries if e not in acceptable]
+    if refused:
+        problems.append(Finding("WARN", "accept-invalid", str(path), 1,
+                                f"{field} names {refused}, which cannot be accepted "
+                                "- an ERROR never is, and of the WARNs only "
+                                f"{', '.join(sorted(acceptable))} (vault_schema.json, "
+                                "validator_accept); remove the entry"))
+    reason = fm.get(reason_field)
+    if not (isinstance(reason, str) and reason.strip()):
+        problems.append(Finding("WARN", "accept-reason-missing", str(path), 1,
+                                f"{field} carries no '{reason_field}' - the "
+                                "acceptance is not in force until it says why"))
+        return set(), problems
+    return {e for e in entries if e in acceptable}, problems
 
 
 def check_frontmatter(vault, fm, abbr, path, findings):
@@ -2515,6 +2628,26 @@ def allocation_index(vault: Vault):
     return {rid: "not-allocated" not in c["gaps"] for rid, c in coverage.items()}
 
 
+def deferred_requirements(vault: Vault):
+    """Requirements every allocation row of which carries a deferral status.
+
+    The deferral the skill prescribes - an allocation row saying the
+    requirement is blocked, plus a DEC saying why - was invisible to
+    req-uncovered, which kept reporting a vault that had done exactly what
+    it was told (01_methodvault, DEC-MTH-054). Every row and not any: one
+    deferred row beside an Approved one leaves the requirement open.
+    Read off the exporter's graph like allocation_index, for its reason.
+    """
+    a = export_analysis(vault)
+    if a is None:
+        return set()
+    values = deferral_values(vault.schema())
+    coverage = a[4]
+    return {rid for rid, c in coverage.items()
+            if c.get("allocations")
+            and all(is_deferral(x.get("status"), values) for x in c["allocations"])}
+
+
 def export_analysis(vault: Vault):
     """(roles, bindings, graph, back, coverage) of this vault, or None.
 
@@ -2657,12 +2790,16 @@ def validate_vault_wide(vault: Vault):
     if idx:
         evidence = evidence_index(vault, corpus)
         allocated = allocation_index(vault)
+        deferred = deferred_requirements(vault) if allocated is not None else set()
         tail = ("coverage is decided on the allocation table and on "
                 "'verifies', never on a mention in prose")
         for rid, (f, i) in idx.items():
             notes = evidence.get(rid)
             alloc = allocated.get(rid) if allocated is not None else None
             if notes and alloc is not False:
+                continue
+            if not notes and rid in deferred:
+                vault.deferred.append((rid, str(f)))
                 continue
             if notes:
                 by = ", ".join(sorted(p.stem for p in notes))
@@ -2791,7 +2928,23 @@ def validate_vault_wide(vault: Vault):
             f"{label}: {', '.join(files)} - the link is ambiguous, and a "
             "path-qualified link does not resolve here either; rename one of "
             "the files"))
-    return findings
+
+    # A file's own acceptance reaches its vault-wide WARNs too. Only files of
+    # this vault's corpus are asked - a finding about the vault root or the
+    # schema has no frontmatter to accept it. The acceptance's own findings
+    # come from the file-local pass, so they are not repeated here.
+    kept = []
+    for f in findings:
+        text = corpus.get(Path(f.path)) if f.sev == "WARN" else None
+        if text is not None:
+            accepted, _ = file_acceptance(vault, Path(f.path),
+                                          vault.classify(Path(f.path))[0],
+                                          text.splitlines())
+            if f.code in accepted:
+                vault.accepted[f.path] += 1
+                continue
+        kept.append(f)
+    return kept
 
 
 def run_full(vault: Vault):
@@ -3265,7 +3418,8 @@ def main(argv):
         if root is None or not is_vault_root(root):
             print(f"ERROR - no vault root found for {path}", file=sys.stderr)
             return 2
-        findings = validate_file(Vault(root), path, strict_links=False)
+        vault = Vault(root)
+        findings = validate_file(vault, path, strict_links=False)
     else:
         if not args.vault_root:
             ap.error("vault_root or --file required")
@@ -3275,7 +3429,8 @@ def main(argv):
             print(f"ERROR - {root} is not a vault root (needs >=3 NN_name_(ABBR) "
                   f"domain folders containing {names} files)", file=sys.stderr)
             return 2
-        findings = run_full(Vault(root))
+        vault = Vault(root)
+        findings = run_full(vault)
 
     errors = [f for f in findings if f.sev == "ERROR"]
     warns = [f for f in findings if f.sev == "WARN"]
@@ -3285,6 +3440,16 @@ def main(argv):
     near = [f for f in findings if f.code in NEAR_MISS_CODES]
     for f in findings:
         print(f.render())
+    # What was not printed above, said once. Before the summary line, which
+    # stays last because tools read the last line, and only when there is
+    # something to say (01_methodvault, DEC-MTH-054).
+    n_acc, n_def = sum(vault.accepted.values()), len(vault.deferred)
+    if n_acc or n_def:
+        files = set(vault.accepted) | {f for _rid, f in vault.deferred}
+        parts = ([f"{n_acc} by validator-accept"] if n_acc else []) + (
+            [f"{n_def} requirement(s) deferred in an allocation row"] if n_def else [])
+        print(f"accepted: {n_acc + n_def} finding(s) in {len(files)} file(s) - "
+              + ", ".join(parts))
     print(f"-- {len(errors)} error(s), {len(warns)} warning(s), "
           f"{len(near)} near miss(es)")
     return 1 if errors else 0
