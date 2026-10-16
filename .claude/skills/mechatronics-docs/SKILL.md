@@ -30,162 +30,6 @@ vault following the Single Source of Truth (SSOT) principle. Every piece of
 information exists exactly once — files link to responsible documents instead
 of copying content.
 
-## Enforcement Layer — How This Skill Is Gated
-
-From this skill's first invocation to the end of the session, two hooks
-enforce the mechanically checkable vault rules (`validate_vault.py`, same
-directory) — never in a session that does not invoke it, nor on subagent
-writes. "Same directory" is the whole point: both hooks resolve their
-script through `CLAUDE_PLUGIN_ROOT`, which Claude Code sets to the skill
-directory it actually loaded, so the copy whose text you are reading is
-the copy that enforces. A project that carries its own vendored copy no
-longer overrides that — the vendored copy serves the CI and the pre-commit
-hook, which have no session to ask (DEC-MTH-045). `--check-install` prints
-the revision of the copy that answers, which is how the two are told apart.
-
-- After every `Edit`/`Write`/`MultiEdit` into a vault, the validator checks
-  the written file and feeds findings back. Fix ERRORs immediately, while
-  the context is fresh. WARNs are advisory — address them or state briefly
-  why they are acceptable. WARNs the file already carried at git HEAD are
-  not repeated, only counted when anything else is shown. Unresolved-link
-  WARNs arrive as one aggregated summary line: forward references are
-  expected mid-pass under the phased creation order, but every target must
-  exist by turn end.
-- At turn end, a stop gate re-checks every vault file touched this session.
-  ERRORs newly introduced this session block completion, once per stop
-  sequence (pre-existing violations in legacy files are reported but never
-  block — ratcheted against the git HEAD state). The non-blocking session
-  report also lists vault-wide findings (uncovered REQs, orphans, ...) as
-  advisory — in full the first time and whenever they change, otherwise
-  as one `vault-wide findings unchanged` line; they never block, and the
-  full audit in step 7 remains the authoritative pass.
-
-The two halves of the gate address two readers, and the transcript shows
-which is which. Everything advisory reaches the user as `Stop says: ...`
-— it lists legacy findings, created files and questions the session owner
-has to answer, and it is not an instruction to you. Its first line names
-the turn it belongs to: `vault validator blocked the turn end` when the
-gate blocked, `vault validator session report:` when it did not — also
-when it released after one demand in this stop sequence, where the report
-opens with `UNRESOLVED vault ERRORs`. What the gate wants from *you*
-arrives as `Stop hook feedback:` and names only the ERRORs this session
-introduced. A hook that could not run says so too: `vault validator crashed`
-means that write or turn went unchecked, so verify by hand before finishing.
-
-A vault carrying two folders for one domain — `03_architecture_(ARC)`
-beside `03_Architektur_(ARC)`, which is what a half-finished translation
-looks like — is reported as `domain-duplicate-folder`. The folder the
-vault reads is the first in sorted order among those holding files of the
-domain, never the one the file system happened to return last, so the
-same vault says the same thing on every machine. WARN and vault-wide: two
-folders for a while are a legitimate transitional state, so it never
-blocks. Finish the translation or delete the folder you no longer write
-to; while both exist, only the chosen one feeds the requirement index,
-the architecture overview and the traceability export.
-
-Which frontmatter fields exist, of what type and with which permitted
-values, is declared in `vault_schema.json` beside the validator — the
-validator reads it rather than knowing the rules by heart. A key that is
-declared neither for its domain nor as an editor field (Obsidian's own
-`tags`, `aliases`, ... and the `excalidraw-*` family) is reported as
-`frontmatter-undeclared`. It is a WARN, because a stray key can be a
-deliberate plugin field — but a mistyped one is the single frontmatter
-defect that fails completely silently, so do not wave it through: either
-fix the spelling or declare the field in the schema.
-
-Which H2 sections a file must carry is derived from that domain's own
-`00_*template*` file. The comparison ignores case and invisible differences
-(umlaut encoding, zero-width characters, collapsed whitespace), so a section
-written `## allgemeine Übersicht` counts as present — it is reported as
-`section-near-miss` (WARN) naming both spellings and the line, because the
-template's spelling is what a reader and a search look for. A title the
-template does not carry is a different matter: `## Ablauf (monatlich)` and
-`## Zuordnung` for a required `## Zuordnung und Verifikation` are
-`section-mismatch` (ERROR) — a differently scoped section is a different
-section, and the heading is the anchor other notes bind to. Keep the
-template's title and put the qualifier in an `###` below it.
-
-A second tool beside the validator reads the same schema for a different
-purpose. `export_traceability.py` walks the declared relations into a
-graph and writes the vault out as a traceability artifact:
-
-```bash
-python3 ${CLAUDE_SKILL_DIR}/export_traceability.py \
-        <VAULT_ROOT> --output-dir <DIR outside the vault>
-```
-
-Claude Code expands `${CLAUDE_SKILL_DIR}` before a session reads this file;
-nothing outside a session does. Typed into a shell or written into a
-workflow, the command takes the path to a copy on disk instead —
-`.claude/skills/mechatronics-docs/` where the project carries the skill,
-`~/.claude/skills/mechatronics-docs/` where it does not.
-
-It produces a self-contained HTML report, two CSV views, a JSON graph,
-`traceability_graph.mmd` — the coverage chain as a Mermaid diagram, for a
-page rather than for a read — and `traceability_index.md`. The index is
-the one written for you: one line
-per object and per requirement — identifier, domain, file, and the first
-sentence of the section the project's own requirements template binds.
-Generate it and read it once instead of searching the vault for its
-structure, and generate it again rather than trusting a copy from an
-earlier session; nothing about it is stored in the vault.
-Every reverse relation in these artifacts is computed, never read from a
-file. Run it when the user asks for a traceability matrix, a coverage overview, or
-something to hand to a reviewer — and read its findings section as you
-would the validator's: an unbound table, an unresolved requirement ID, an
-unknown domain abbreviation or two folders meaning one domain each mean
-the export understood less of the vault than it looks like it did. The exporter never blocks a turn.
-It can block a caller that asks it to: `--fail-on <classes>` exits 1 when
-a requirement carries one of the named coverage gaps. No hook uses it and
-no session does — it exists for a CI job, which sees the whole vault at
-once and costs nobody a working session. The template repository's own
-workflow arms `not-allocated` and `no-evidence-note` on its vault, so a
-missing allocation row or a missing `verifies:` entry there is a red
-check rather than a WARN you scroll past.
-
-Two further tiers apply the same validator outside Claude Code, and
-neither one runs by merely being present. `hooks/pre_commit_vault.sh` is
-installed per checkout — `.git/hooks/` travels with no clone and no pull
-— and the hook's own header carries the symlink command and the
-`MECHDOCS_PRECOMMIT_BLOCK=1` switch that makes it block rather than
-report. `.github/workflows/validate-vault.yml` runs where the repository
-is hosted with Actions enabled, and that file is the only current answer
-to which checks it runs; a project derived from this template gets a
-workflow written for it, and no run of this skill's own test suite is
-among them, because that suite does not travel with the vendored copy.
-Until one of the two is turned on, an edit made in Obsidian, by hand, by a
-subagent or without invoking this skill reaches the vault unchecked.
-
-Which copy of this skill a session is actually running is a separate
-question, and one a global `~/.claude/skills/` entry cannot answer by
-itself — it may be a symlink carrying a path that only one machine can
-follow. `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py --check-install`
-says whether that entry reaches this copy, reaches a different one, or
-reaches nothing at all. Run it when a rule this file describes appears
-not to be enforced. Claude Code substitutes `${CLAUDE_SKILL_DIR}` in this
-file before you read it; nothing outside a session expands it, so a
-command typed into a shell takes the path to a copy on disk instead.
-
-None of that is needed to write vault notes, and neither is
-`ARCHITECTURE.md` beside this file — it maps the validator's checks onto
-the functions that own them, for whoever maintains the tool rather than
-the vault.
-
-Rules that follow from this mechanism:
-
-1. **Never modify vault files through Bash** (`sed -i`, `tee`, heredocs) —
-   the hooks only see `Edit`/`Write`/`MultiEdit`. Bash mutations bypass
-   validation and are forbidden.
-2. **Never delegate vault writing to subagents** — hooks do not fire for
-   subagent tool calls. Research may be delegated; writing stays here.
-3. **Do not evade findings.** Moving content to `99_inbox` to dodge an
-   ERROR, creating stub link targets, or deleting a reference instead of
-   fixing it defeats the purpose and is visible in the session report — so
-   does a `validator-accept` entry the user did not ask for: never add one.
-4. The validator enforces structure, not truth. Everything semantic —
-   correct domain choice, content boundaries, factual accuracy — remains
-   your responsibility under the rules below.
-
 ## Activation Guard — MUST CHECK FIRST
 
 This skill applies ONLY to a vault the validator recognises; folder names may
@@ -206,20 +50,17 @@ names found on disk. Never assume English or German — use what exists.
 
 ## Before Any Action — Read Project Conventions
 
-Read these before creating or modifying documentation; they are authoritative
-and evolve between projects, so never reproduce them from memory:
-
-1. The conventions file in `VAULT_ROOT` (`00_*convention*`/`00_*Konvention*`,
-   where present) — SSOT principle, 4-question rule, role matrix,
-   timelines, file conventions (frontmatter, self-containedness, wikilinks,
-   length, freshness)
-2. The subfolders conventions file (matches `*subfolder*` or `*Unterordner*`)
-3. For each domain you will write in: its `00_[DOMAIN]_README.md` and
-   `00_[DOMAIN]_file_template.md` where present (locate by domain suffix). Do NOT read
-   READMEs/templates of domains you will not touch this pass.
-4. When placing non-markdown artifacts: the documents README (sibling of
-   `VAULT_ROOT`), `50_sources/README.md`, or `30_testdata/README.md` —
-   only the one you actually need.
+They are authoritative and evolve between projects; never reproduce them
+from memory. (1) The conventions file in `VAULT_ROOT`
+(`00_*convention*`/`00_*Konvention*`, where present) — SSOT principle, the
+four questions before creating any file, role matrix, timelines, file
+conventions (frontmatter, headings, self-containedness, wikilinks, paths,
+length, freshness). (2) The subfolders conventions file
+(`*subfolder*`/`*Unterordner*`). (3) For each domain you will write in, and
+only those: its `00_[DOMAIN]_README.md` and `00_[DOMAIN]_file_template.md`
+where present. (4) For non-markdown artifacts, only the README you need: the
+documents README (beside `VAULT_ROOT`), `50_sources/README.md` or
+`30_testdata/README.md`.
 
 ## Domain Reference — The 9 Roles
 
@@ -237,111 +78,14 @@ Each file answers ONE question in ONE timeline, quoted from the conventions file
 | OAU | What do operation and usage look like? | Medium | Repeatable procedure needed |
 | REF | What does the external reference say? | Stable | External document referenced |
 
-Two additional folders are NOT engineering documentation:
-- **ADM** (98_administration): project management — ToDos, blockers, milestones
-- **INB** (99_inbox): temporary unsorted material — sorted within 7 days
+ADM (98_administration: ToDos, blockers, milestones) and INB (99_inbox:
+unsorted material, sorted within 7 days) are NOT engineering documentation.
 
-**The timeline column is the misplacement detector.** Before writing any
-statement, ask: does this statement change at the same rate as the rest of
-this file? A concrete parameter (changes fast) inside an ARC file (changes
-medium) is a leak — when it later changes, the vault holds two truths. This
-is the single most common documentation defect in practice: implementation
-details casually dropped into ARC, CMP, DEC or REQ files. The validator
-catches unit-bearing numbers and pin tokens in ARC (ERROR) and in the
-Context section of a DEC (`impl-leak` WARN); CMP, REQ and every other
-domain are on you.
-
-## The 4-Question Rule — Before Creating ANY File
-
-1. **Right to exist?** Does this file answer ONE clear question not answered
-   elsewhere? If the answer lives in an existing file, link instead.
-2. **Which role?** Exactly ONE domain from the table.
-3. **Timeline consistent?** All content shares one change rate. Content
-   spanning timelines is split into separate files.
-4. **Subfolder needed?** Only if same role AND same change rate AND same
-   core object (3-question rule in the conventions file).
-
-**REQ↔TAE coverage.** Every requirement must be answerable by evidence, and
-the loop closes through two relations, not one: an allocation row in an ARC
-file names the requirement, and a TAE names it in its `verifies:`
-frontmatter. When you create or touch a REQ, write both — create the TAE in
-the same pass, or record a planned/deferred TAE naming the REQ and the
-reason it is still open. Naming the identifier in a paragraph, a heading or
-a list of open points is not coverage and is not counted as any: the
-validator reads the allocation table and the `verifies:` field, never the
-prose around them. An unverified REQ is an incomplete REQ, and the full
-audit reports it as `req-uncovered`, naming which of the two halves is
-missing.
-
-## Creation Order — Dependencies Matter
-
-Create files in this phase order; earlier phases produce the link targets
-later phases reference:
-
-```
-Phase 1: REF (source extracts), REQ (requirements)
-Phase 2: DEC (one decision per file; links REQ, REF)
-Phase 3: CMP individual parts (links REF, DEC)
-Phase 4: IFC contracts, CMP assemblies (link CMP)
-Phase 5: IMP (links IFC, CMP, DEC)
-Phase 6: TAE (verifies REQ), OAU (links REQ, IMP, CMP)
-Phase 7: ARC (orchestrator; links everything)
-Phase 8: system_overview.md (new ARC modules), 00_glossary.md (new terms)
-```
-
-Create files within each phase in parallel. Never skip a phase — missing
-link targets break traceability. Unresolved links are tolerated mid-pass
-(WARN) but block at turn end (ERROR), so finish every pass with all targets
-existing.
-
-**Before writing a new DEC:** read the 3 most recently dated DEC files in
-the vault. Recent decisions are the highest-value context — they prevent
-contradicting or duplicating a live decision.
-
-## Cross-Linking Rules
-
-1. **ARC is the orchestrator.** It links to REQ, DEC, CMP, IFC, IMP, TAE
-   but stores NO data. ARC is a map, not a data sink.
-2. **Link with exact filenames** (`[[CMP_AD7175-2]]`). Aliases are allowed
-   for prose readability, but the target must be the exact filename.
-3. **Link the responsible file once where it matters** — not every mention.
-   The vault traces from architecture down into every detail through few,
-   deliberate links, not through link carpets.
-4. **Use relative project paths** for non-vault files (testdata, source
-   code, CAD, 02_documents, 50_sources). Paths must exist — a dead path
-   is an ERROR in References/Sources sections and a WARN anywhere else
-   in the body. The section is recognised in every template language:
-   `Referenzen`, `Verweise` and `Quelle(n)` open the same strict zone
-   as `References` and `Sources`. Mark intentionally-not-yet-existing
-   paths with pending/planned/TBD on the line or its heading; markers
-   never silence References/Sources sections.
-   Only the relative form is checked. A path that starts at a
-   filesystem root, at `~`, at a host name or at a URL scheme names an
-   artifact on another machine — it is never reported as dead, and for
-   the same reason never verified. So write a project artifact
-   relatively, or you switch its staleness check off, and name the host
-   when the artifact is foreign: the path alone does not say which
-   machine it is true on.
-5. **Never duplicate content across files.** One file owns the information,
-   others link to it.
-
-## Content Boundaries — What Goes Where
-
-The most common misplacements. Follow strictly:
-
-| Information | WRONG Location | CORRECT Location |
-|-------------|---------------|-----------------|
-| Datasheet specifications | IMP | CMP (project-relevant extract) |
-| Concrete parameter values (Kp, gain, voltage) | ARC or CMP | IMP |
-| Design file paths (KiCad, CAD, code) | CMP | IMP References section |
-| Calibration equation (as evidence) | IMP only | TAE Evidence + IMP (link to TAE) |
-| Repeatable test procedure | TAE | OAU (TAE links to it) |
-| Component selection rationale | CMP | DEC |
-| Copy of a file this repository owns | IMP | The file itself (IMP carries the path) |
-| State of, or command against, a foreign host | OAU, when it is a procedure | IMP, in a block naming the machine |
-| External PDF (datasheet, standard) | 02_documents | 50_sources |
-| Project-created PDF (export, report) | 50_sources | 02_documents |
-| Raw test data | 32_processed | 31_raw (IMMUTABLE) |
+**The timeline column is the misplacement detector** — does the statement
+change at the rate of the rest of the file? A parameter (fast) in ARC
+(medium) is a leak, the most common defect: when it changes, the vault holds
+two truths. The validator flags unit-bearing numbers and pin tokens in ARC
+(ERROR) and in a DEC Context (`impl-leak` WARN); every other domain is on you.
 
 ## Detail Ownership — One Fact, One File
 
@@ -396,97 +140,160 @@ The check before you write any concrete value: *if this changes next
 month, how many files in this vault become wrong?* More than one is a
 defect in the documentation, not a property of the system.
 
+## REQ↔TAE Coverage
+
+Every requirement must be answerable by evidence, and the loop closes
+through two relations, not one: an allocation row in an ARC file names the
+requirement, and a TAE names it in its `verifies:` frontmatter. When you
+create or touch a REQ, write both — create the TAE in the same pass, or
+record a planned/deferred TAE naming the REQ and the reason it is still
+open. Naming the identifier in a paragraph, a heading or a list of open
+points is not coverage and is not counted as any: the validator reads the
+allocation table and the `verifies:` field, never the prose around them. An
+unverified REQ is an incomplete REQ, and the full audit reports it as
+`req-uncovered`, naming which of the two halves is missing.
+
+## Creation Order — Dependencies Matter
+
+Earlier phases produce later link targets; never skip one, and work within
+a phase in parallel: 1 REF, REQ → 2 DEC → 3 CMP parts → 4 IFC, CMP
+assemblies → 5 IMP → 6 TAE, OAU → 7 ARC (links everything) → 8 system
+overview (new modules), glossary (new terms). Unresolved links are tolerated
+mid-pass (WARN) but block at turn end (ERROR). **Before writing a new DEC,**
+read the 3 most recently dated DEC files — they prevent contradicting or
+duplicating a live decision.
+
+## Cross-Linking Rules
+
+1. **ARC is the orchestrator** — links REQ, DEC, CMP, IFC, IMP, TAE; NO data.
+2. **Link with exact filenames** (`[[CMP_AD7175-2]]`); aliases only for display.
+3. **Link the responsible file once where it matters** — no link carpets.
+4. **Use relative project paths** for non-vault files — only that form is
+   checked (dead: ERROR under References/Sources in any template language,
+   WARN elsewhere, where a pending/planned/TBD marker on the line or its
+   heading silences it); a path from a filesystem root, `~`, a host or a URL
+   is never checked, so a foreign artifact names its host (conventions file,
+   "Paths and artifacts on other machines").
+5. **Never duplicate content across files** — one file owns it, others link.
+
+## Content Boundaries — What Goes Where
+
+The most common misplacements. Follow strictly:
+
+| Information | WRONG Location | CORRECT Location |
+|-------------|---------------|-----------------|
+| Datasheet specifications | IMP | CMP (project-relevant extract) |
+| Concrete parameter values (Kp, gain, voltage) | ARC or CMP | IMP |
+| Design file paths (KiCad, CAD, code) | CMP | IMP References section |
+| Calibration equation (as evidence) | IMP only | TAE Evidence + IMP (link to TAE) |
+| Repeatable test procedure | TAE | OAU (TAE links to it) |
+| Component selection rationale | CMP | DEC |
+| Copy of a file this repository owns | IMP | The file itself (IMP carries the path) |
+| State of, or command against, a foreign host | OAU, when it is a procedure | IMP, in a block naming the machine |
+| External PDF (datasheet, standard) | 02_documents | 50_sources |
+| Project-created PDF (export, report) | 50_sources | 02_documents |
+| Raw test data | 32_processed | 31_raw (IMMUTABLE) |
+
 ## Rules — Critical Pitfalls
 
-1. **Verify technical claims before documenting.** Any statement about
-   behavior, wiring, protocols or measured values is either (a) taken from
-   an executed output, a measurement or a referenced source, or (b)
-   explicitly marked `(unverified)` in the text. If the user's claim
-   contradicts a datasheet or the code, flag the discrepancy and ask.
-   Roughly a fifth of plausible-sounding generated statements about
-   systems are wrong — evidence beats plausibility.
-2. **One decision per DEC file.** Decisions that change independently get
-   separate files.
-3. **CMP is for things with datasheets.** A project-designed controller or
-   firmware module is IMP (plus its own ARC if complex), not CMP.
-4. **IMP is pointers, not copies — for artifacts this project owns.** If the
-   thing exists as a file in this repository, reference its path and copy
-   nothing: a copy drifts against its original, a path cannot. An artifact
-   that is not a file here — the state of another machine, a command that
-   establishes or verifies one — has no path to point at. It is not a copy
-   but a record of an observation, it stays in IMP, and `last-verified`
-   carries its currency. Blocks up to 15 content lines are single
-   observations and need nothing; a longer block must either give way to a
-   path or name the machine it is true on, in the fence's info string:
-   ```` ```bash host=userver ````. Use the same machine name as in a
-   host-qualified path (rule 4 under Cross-Linking), and name the machine,
-   never `localhost` — this vault is read on other machines than yours.
-   A repeatable multi-step procedure is OAU; a single verification command
-   is not a runbook and does not become one by being moved. Keep IMP short
-   (1–2 pages). In ARC no block is allowed at all — ARC is a map.
-5. **TAE Conclusion introduces no new values** — all numbers appear in
-   Evidence first.
-6. **Both Assembly AND Individual Parts for PCBs.** The board gets a CMP
-   Assembly file; each significant IC gets a CMP Individual Part file.
-7. **Keep every ARC module reachable.** A top-level module goes into the
-   vault's system overview — the root file carrying
-   `vault-role: system-overview`, whatever it is named; a submodule goes
-   into its parent's submodule table instead. `arc-not-in-overview` names
-   what neither reaches.
-8. **Testdata campaigns need metadata.txt** linking back to the TAE file.
-   Raw data in 31_testdata_raw is IMMUTABLE.
-9. **DEC files for discoveries start as Draft.** Never make irreversible
-   design decisions autonomously.
-10. **Frontmatter is part of the file.** Fill `domain`, `status`, `created`,
-    `last-verified` (DEC: no frontmatter `status` is required — the body
-    `Status:` line carries it, beside the reasoning; TAE: `verifies`, and
-    `test-object` when the note was measured on a component, an interface
-    or a module) with real values from the template.
-    Update `last-verified` whenever you confirm a file's content is still
-    true. `status: draft` relaxes nothing.
+1. **Verify technical claims** — behavior, wiring, protocols and values come
+   from an executed output, a measurement or a source, or are marked
+   `(unverified)`. A user claim contradicting datasheet or code: flag, ask.
+2. **One decision per DEC file** — decisions that change independently split.
+3. **CMP is for things with datasheets**; a project-designed controller or
+   firmware module is IMP (plus its own ARC if complex).
+4. **IMP points, never copies, what this project owns** — a copy drifts, a
+   path cannot; records of another machine's state follow the IMP README.
+   A repeatable procedure is OAU; IMP stays 1–2 pages; ARC carries no block.
+5. **TAE Conclusion introduces no new values** — numbers appear in Evidence.
+6. **A PCB gets a CMP Assembly file, each significant IC an Individual Part.**
+7. **Keep every ARC module reachable** — top-level in the system overview
+   (the root file with `vault-role: system-overview`), submodules in the
+   parent's table; `arc-not-in-overview` names what neither reaches.
+8. **Testdata campaigns need metadata.txt** linking back to the TAE file;
+   raw data in 31_testdata_raw is IMMUTABLE.
+9. **Discovery DECs start as Draft** — no irreversible decision on your own.
+10. **Frontmatter is part of the file** — real values in every template
+   field (DEC: the body `Status:` line carries the status; TAE: `verifies`,
+   and `test-object` when measured on a component, interface or module);
+   `last-verified` updated on every confirmation; draft relaxes nothing.
 
 ## Process — Documenting a Feature
 
-1. **Assess scope.** Which domains are affected? Hardware feature: REF,
-   DEC, CMP, IFC, IMP, ARC (+TAE, OAU later). Software feature: DEC, IMP,
-   ARC (+REQ, TAE, OAU). Test campaign: TAE, OAU (+testdata structure).
+1. **Assess scope** — hardware: REF, DEC, CMP, IFC, IMP, ARC (+TAE, OAU
+   later); software: DEC, IMP, ARC (+REQ, TAE, OAU); tests: TAE, OAU.
+2. **Ask for missing information** after checking the vault, as few questions
+   as possible — alternatives (DEC), parameters (IMP), verified REQs (TAE).
+3. **Read the templates, then create files in phase order** — 4-question
+   rule, template structure, frontmatter, links to files already made, TBD
+   for genuinely open points.
+4. **Invalidation sweep — after every change.** Search the vault for the
+   changed artifact (component name, file path, parameter) and revise every
+   note it falsifies in the same pass, in its owning file — never add a
+   contradicting note. Stale documentation is worse than none: it misleads.
+5. **Update the umbrella files** — system overview, parent ARC, glossary.
+6. **Full audit before finishing** — run
+   `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py <VAULT_ROOT>`, resolve
+   every ERROR, triage WARNs (fix, or state in one line why acceptable;
+   `impl-leak`: justify the value's location or move it to IMP/CMP/IFC).
+7. **Report** created/updated files with domain and the question each
+   answers, and every touched REQ with its verifying TAE; flag gaps.
 
-2. **Ask for missing information.** Check the vault first, then ask as few
-   questions as possible — alternatives considered (DEC), concrete
-   parameters (IMP), verified requirements (TAE) — before writing
-   incorrect docs.
+## Enforcement Layer — What the Hooks Tell You
 
-3. **Read the templates** for each affected domain and follow them exactly.
+From this skill's first invocation to the end of the session, two hooks
+enforce the mechanically checkable vault rules (`validate_vault.py`, same
+directory) — never in a session that does not invoke it, nor on subagent
+writes.
 
-4. **Create files in phase order.** For each file: 4-question rule, exact
-   template structure, frontmatter filled, cross-links to already-created
-   files, TBD markers for genuinely open information.
+- **After every `Edit`/`Write`/`MultiEdit`** into a vault, the written
+  file's findings reach you: fix ERRORs now, address WARNs or state why
+  they stand. WARNs the file already carried at git HEAD are not repeated,
+  only counted when anything else is shown. Unresolved links arrive as one
+  line — expected mid-pass, but every target must exist by turn end.
+- **At turn end** a stop gate re-checks every vault file touched this
+  session. ERRORs this session introduced block completion, once per stop
+  sequence; violations already present at git HEAD never block. Vault-wide
+  findings (uncovered REQs, orphans, ...) are advisory — in full the first
+  time and whenever they change, otherwise as one `vault-wide findings
+  unchanged` line; the full audit in step 6 remains the authoritative pass.
 
-5. **Invalidation sweep — after every change.** The change you just
-   documented may falsify existing notes. Search the vault for references
-   to the changed artifact or topic (grep for the component name, file
-   path, parameter). Update affected notes in the same pass — revise the
-   owning file rather than adding a contradicting note elsewhere. Stale
-   documentation is worse than none: it actively misleads.
+Two readers, two channels. Everything advisory reaches the user as
+`Stop says: ...` — legacy findings, created files, questions for the
+session owner — and is not an instruction to you. Its first line is
+`vault validator blocked the turn end` when the gate blocked and
+`vault validator session report:` when it did not — also when it released
+after one demand in this stop sequence, where the report opens with
+`UNRESOLVED vault ERRORs`. What the gate wants from *you* arrives as
+`Stop hook feedback:` and names only the ERRORs this session introduced.
+`vault validator crashed` means that write or turn went unchecked: verify
+by hand before finishing.
 
-6. **Update the umbrella files.** system_overview.md (new ARC modules),
-   parent ARC allocation tables, 00_glossary.md (new terms).
+Until the pre-commit hook or a CI workflow is turned on (`REFERENCE.md`), an
+edit made in Obsidian, by hand, by a subagent or without invoking this skill
+reaches the vault unchecked. So: **never modify vault files through Bash**
+(`sed -i`, `tee`, heredocs) — the hooks only see `Edit`/`Write`/`MultiEdit`;
+**never delegate vault writing to subagents** (research may be delegated);
+**do not evade findings** — moving content to `99_inbox`, stub link targets,
+a deleted reference or a `validator-accept` entry the user did not ask for
+all show in the session report: never add one. The validator enforces
+structure, not truth; domain choice, content boundaries and factual accuracy
+remain yours.
 
-7. **Full audit before finishing.** Run
-   `python3 ${CLAUDE_SKILL_DIR}/validate_vault.py <VAULT_ROOT>`
-   and resolve every ERROR; triage WARNs (fix, or state in one line why
-   acceptable — especially `impl-leak` flags: justify the value's location
-   or move it to IMP/CMP/IFC).
+## Reference — One Level Deeper
 
-8. **Report.** List created/updated files with domain and the question each
-   answers; list every touched REQ with its verifying TAE and flag gaps.
+`REFERENCE.md` beside this file is read on demand: the traceability export
+(run it when the user asks for a traceability matrix, a coverage overview or
+something for a reviewer; before a larger pass, generate
+`traceability_index.md` and read it once instead of searching the vault),
+which copy of this skill enforces (check when a rule this file describes
+appears not to be enforced), and the tiers outside a session.
+`ARCHITECTURE.md` maps checks to functions, for whoever maintains the tool.
 
 ## Closing Checklist — Answer Each with Yes Before Finishing
 
-1. Every created file passed the 4-question rule (one question, one role,
-   one timeline)?
-2. Frontmatter complete and true in every touched file (`last-verified`
-   updated)?
+1. Every created file passed the 4-question rule (one question, role, timeline)?
+2. Frontmatter complete and true in every touched file, `last-verified` updated?
 3. Every behavioral claim evidenced or marked `(unverified)`?
 4. No concrete implementation values outside IMP/CMP/IFC/TAE/REQ tables,
    and every volatile fact you wrote owned by exactly one file — no path,
