@@ -107,6 +107,12 @@ names its host; the conventions file states the rule.
   under a mutant before it passed.
 - [[DEC_Safety_Standard_Correspondence_Is_Structural]] writes its StrictDoc
   commit as `strictdoc@5a9b679`, declared on its Migrated line.
+- `SKILL.md` names the three codes in its description of the stop report,
+  with the clear action for `pointer-drift`. Its invalidation-sweep step
+  keeps its full text rather than shrinking to a pointer at this report:
+  an A/B comparison of a slimmed SKILL.md (2026-10-16) rejected cutting
+  its explanatory prose, and the report covers only the pointers git can
+  see, not the sweep's search for every note a change falsifies.
 - Residual: a rebase that rewrites a file's commit date while the note was
   re-verified in a separate commit reads as drift until `last-verified` is
   bumped again. A clone nested deeper than one level below a clone parent
