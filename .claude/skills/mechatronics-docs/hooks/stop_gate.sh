@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Stop hook while mechatronics-docs is active. Blocks the turn end (max 2x
-# per session, then fail-open with a visible report) while vault files
+# Stop hook while mechatronics-docs is active. Blocks the turn end (once per
+# stop sequence, then releases with a visible report) while vault files
 # touched this session carry ERRORs that were introduced this session
 # (ratcheted against the git HEAD baseline). Fails open on crash.
 SKILL_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
