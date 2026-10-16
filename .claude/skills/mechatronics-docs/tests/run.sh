@@ -6811,6 +6811,86 @@ PY
 then ok x; else
   fail "a per-file check decides a domain role by folder abbreviation - see the allowlist above"; fi
 
+# ==========================================================================
+# BEGIN the validator noise cut (DEC-MTH-053, DEC-MTH-054, DEC-MTH-055)
+# ==========================================================================
+# Every finding the cut removes was measured as noise on six real vaults;
+# every assertion here pins that a defect the old rule caught still is.
+# Cleaned up with an explicit rm, not a trap: traps in this file overwrite.
+NC_TMP=$(mktemp -d)
+
+ngit() { # git, independent of this machine's config and of the caller's env
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+      GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
+      GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t git "$@"
+}
+
+nc_note() { # nc_note <path> <domain> <body line>
+  mkdir -p "$(dirname "$1")"
+  {
+    printf -- '---\ndomain: %s\nstatus: active\ncreated: 2026-10-16\nlast-verified: 2026-10-16\n---\n' "$2"
+    printf '## Context\nA note of the noise-cut fixture. It is otherwise correct, so\n'
+    printf 'that the one finding under test is the only one it can produce.\n'
+    printf 'It says nothing else of interest and carries no value of its own.\n'
+    printf '%s\n' "$3"
+  } > "$1"
+}
+
+nc_vault() { # nc_vault <vault root> - three domains with templates
+  mkdir -p "$1/01_requirements_(REQ)" "$1/03_architecture_(ARC)" \
+           "$1/07_testing_and_evidence_(TAE)"
+  printf '## Context\n' > "$1/01_requirements_(REQ)/00_REQ_file_template.md"
+  printf '## Context\n' > "$1/03_architecture_(ARC)/00_ARC_file_template.md"
+  printf '## Context\n' > "$1/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+}
+
+# --- Unit 1: the name index lists the repository outside the vault --------
+# The vault is walked on disk, so a note written this session and a
+# gitignored note both resolve. Outside the vault only what the repository
+# counts is indexed: a gitignored scratch folder carrying a same-stem note is
+# not a second ARC_Sensor, while an untracked document and a nested
+# repository are part of the project.
+NI="$NC_TMP/Idx"
+NIV="$NI/00_documentation/01_projectvault"
+nc_vault "$NIV"
+nc_note "$NIV/03_architecture_(ARC)/ARC_Sensor.md" ARC \
+  "It links [[REF_Datasheet]], [[REF_Nested]] and [[ARC_Ignored]]."
+nc_note "$NIV/03_architecture_(ARC)/ARC_Probe.md" ARC "Its parent is [[ARC_Sensor]]."
+nc_note "$NIV/03_architecture_(ARC)/ARC_Ignored.md" ARC "Gitignored, and linked."
+nc_note "$NI/00_documentation/scratch/ARC_Sensor.md" ARC "A gitignored twin."
+mkdir -p "$NI/00_documentation/02_documents/nested"
+printf '# untracked, not ignored\n' > "$NI/00_documentation/02_documents/REF_Datasheet.md"
+printf '# inside a nested repository\n' > "$NI/00_documentation/02_documents/nested/REF_Nested.md"
+printf '00_documentation/scratch/\nARC_Ignored.md\n' > "$NI/.gitignore"
+cp -a "$NI" "$NC_TMP/IdxNoGit"
+ngit init -q "$NI"
+ngit init -q "$NI/00_documentation/02_documents/nested"
+ni_out=$(python3 "$VALIDATOR" "$NIV" 2>&1); ni_rc=$?
+TESTS=$((TESTS + 1))
+if [ $ni_rc -ne 2 ] && ! contains "$ni_out" "duplicate-basename"; then ok x; else
+  fail "a gitignored folder outside the vault must not enter the name index:"
+  printf '%s\n' "$ni_out" | sed 's/^/    /'
+fi
+TESTS=$((TESTS + 1))
+if ! contains "$ni_out" "link-unresolved"; then ok x; else
+  fail "untracked documents, nested repositories and gitignored vault notes must resolve:"
+  printf '%s\n' "$ni_out" | grep link-unresolved | sed 's/^/    /'
+fi
+# Without a repository nothing is known to be ignored: the twin is indexed
+# and the collision of a linked name is reported, exactly as before.
+ng_out=$(python3 "$VALIDATOR" "$NC_TMP/IdxNoGit/00_documentation/01_projectvault" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$ng_out" "duplicate-basename.*ARC_Sensor"; then ok x; else
+  fail "outside version control the whole documentation root stays indexed:"
+  printf '%s\n' "$ng_out" | sed 's/^/    /'
+fi
+
+rm -rf "$NC_TMP"
+# ==========================================================================
+# END the validator noise cut
+# ==========================================================================
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
