@@ -243,8 +243,7 @@ The most common misplacements. Follow strictly:
 
 From this skill's first invocation to the end of the session, two hooks
 enforce the mechanically checkable vault rules (`validate_vault.py`, same
-directory) — never in a session that does not invoke it, nor on subagent
-writes.
+directory) — never in a session that does not invoke it, nor on subagent writes.
 
 - **After every `Edit`/`Write`/`MultiEdit`** into a vault, the written
   file's findings reach you: fix ERRORs now, address WARNs or state why
