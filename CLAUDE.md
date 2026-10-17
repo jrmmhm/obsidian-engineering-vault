@@ -56,7 +56,11 @@ is recorded there, not as an amendment to a log file.
 
 7. Mark an allocation row `Verified` only once a TAE link exists and its
    evidence is written down. `Draft` and `Approved` are the honest states until
-   then.
+   then. Write each acceptance criterion from what its requirement demands, not
+   from the evidence at hand: while the evidence covers only part of it, the
+   row stays `Draft` or `Approved`, and a clause is changed or split off only as
+   a requirement change with its own recorded reason — never dropped or
+   softened so the row can be marked `Verified`.
 
 8. Update `last-verified` when you confirm a file still holds. When you find it
    wrong, correct it or mark it superseded in the same session — a stale file

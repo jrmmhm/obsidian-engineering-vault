@@ -230,7 +230,11 @@ apply to it as to any note:
   with a fresh date is worse than no file at all.
 - **An allocation row reaches `Verified` only once a TAE link exists** and its
   evidence is written down. `Draft` and `Approved` are the honest states until
-  then.
+  then. Write each acceptance criterion from what its requirement demands, not
+  from the evidence at hand: while the evidence covers only part of it, the row
+  stays `Draft` or `Approved`, and a clause is changed or split off only as a
+  requirement change with its own recorded reason — never dropped or softened
+  so the row can be marked `Verified`.
 - **Edit vault files with an editor, not a stream.** The validation hooks
   observe `Edit`, `Write` and `MultiEdit` and nothing else — a `sed -i` or a
   heredoc writes an unvalidated file that looks identical in review.
