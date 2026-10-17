@@ -27,7 +27,7 @@ session wrote both itself. The report records:
 
 - 7 of 12 sessions set the row `Verified` (6 of 12 in the reading that
   replaces one session, t6, by its rerun t6b) - 5 of 6 in the treatment
-  arm, 2 of 6 in control. Every one of them wrote a criterion made of the
+  arm (4 of 6 with t6b), 2 of 6 in control. Every one of them wrote a criterion made of the
   unit tests alone.
 - Every session that wrote the device check into the criterion (c1, c3, c4,
   t6b) left the row `Approved`.
@@ -45,11 +45,11 @@ perceptible delay, graded by the owner" into the criterion and kept the row
 device clause".
 
 What the comparison does not show: this was not a rubric letter, the judge
-preferred the tests-only `Verified` arm in two of six pairs, and n = 6 per
-arm cannot separate the arm difference from noise; AB-S1 saw 4 of 6
-`Verified` in each arm. The arm-independent count is what this record rests
-on: more than half of all sessions wrote the criterion to the evidence they
-held and then reported it met.
+preferred the tests-only `Verified` arm in two of six pairs (one of six with
+t6b), and n = 6 per arm cannot separate the arm difference from noise; AB-S1
+saw 4 of 6 `Verified` in each arm. The arm-independent count is what this
+record rests on: half or more of all sessions wrote the criterion to the
+evidence they held and then reported it met.
 
 ## Options
 
@@ -59,7 +59,7 @@ held and then reported it met.
   missing is by definition not in the file.
 - **B - Leave it to the existing wording.** Rejected: "its evidence is
   written down" is met by evidence for whatever criterion was written, which
-  is exactly what the seven sessions did.
+  is exactly what the sessions that set `Verified` did.
 - **C - One sentence wherever the `Verified` rule is stated (chosen)**,
   aimed at the moment the criterion is written, not only at the moment the
   status is set.
@@ -80,18 +80,21 @@ which owns the status rule, and
 at the end of the REQ-TAE coverage section of `SKILL.md`, which names that
 README as the owner.
 
-`Blocked` is not named in the sentence. The ARC README defines it as "not
-verifiable/implementable (dependency missing)", which is the honest state
-when the missing evidence cannot be produced at all for now - a device that
+`Blocked` is not named in the sentence, and a row with part of its evidence
+in hand does not move to it. The ARC README keeps `Blocked` for an
+allocation that is "not verifiable/implementable (dependency missing)" -
+one whose verification cannot start at all for now, such as a device that
 does not exist yet. It is also a deferral status: a requirement whose every
 row carries it leaves the printed `req-uncovered` findings for the audit's
-accepted line ([[DEC_A_Known_Finding_Is_Counted_Not_Repeated]]). Pending
-evidence that only waits for somebody to run it is `Approved`.
+accepted line ([[DEC_A_Known_Finding_Is_Counted_Not_Repeated]]), so using it
+for a row whose evidence is merely incomplete would hide the open clause.
+Evidence that waits for somebody to run a check - the owner's device check
+above - keeps the row `Approved`.
 
 ## Justification
 
 - The defect sits in the writing of the criterion, so a rule that only
-  speaks about the status would have passed all seven sessions: each had
+  speaks about the status would have passed every session that set `Verified`: each had
   evidence for every clause it wrote.
 - A changed criterion is a changed requirement. The REQ file has a column
   for the reason, and a verification pass is not one; recording the change
