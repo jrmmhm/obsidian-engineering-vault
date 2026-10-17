@@ -3061,9 +3061,10 @@ def id_units(lines, fm_end, mask):
             starts.append((len(text), i))
             text += line.strip() + " "
         for m in SENTENCE_RE.finditer(text):
+            begin = m.end() - len(m.group(0).lstrip())
             covered = {i for k, (off, i) in enumerate(starts)
                        if off < m.end() and (k + 1 == len(starts)
-                                             or starts[k + 1][0] > m.start())}
+                                             or starts[k + 1][0] > begin)}
             units.append((m.group(0), covered))
         para.clear()
 
