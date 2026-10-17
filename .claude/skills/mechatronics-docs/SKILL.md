@@ -96,7 +96,13 @@ is named and linked, never restated.
 
 A volatile fact is anything that changes without the surrounding document
 changing: a filesystem path, a version, a CLI flag, a value with a unit, a
-unit or service name, a function or file name, a port, a hostname.
+unit or service name, a function or file name, a port, a hostname — and
+lifecycle state, the status an item takes after the work is done, as the
+conventions file defines it under *Lifecycle state*. Lifecycle state goes
+stale fastest of all, because the event that changes it touches no file
+but the one somebody remembers. A TAE's Test Conditions — whatever title
+the vault's TAE template gives that section — are exempt: a version or
+setting recorded there is an observation of that run, not an owned fact.
 
 Why this is a rule and not a preference. Documentation goes stale
 silently — no build breaks, no test fails — and the content that goes
@@ -115,8 +121,11 @@ The rules:
 
 1. **Name the owner, then link.** Every volatile fact has exactly one
    owning file — normally IMP for a project artifact, CMP for a datasheet
-   value, IFC for a contract, TAE for a measurement. Other notes write the
-   link (`[[IMP_...]]`) and the *role* the fact plays, never the fact.
+   value, IFC for a contract, TAE for a measurement, and the row of the ADM
+   tracker that tracks the item for its lifecycle state (`00_ADM_README`).
+   Other notes write the link (`[[IMP_...]]`) and the *role* the fact
+   plays, never the fact — a TAE says what was tested and links the
+   tracker for what happened next.
    Google's own style guide states the general form: "Do not write your own
    guide to a common Google technology or process. Link to it instead."
 2. **The higher the abstraction, the shorter the mention.** arc42 on the
@@ -300,7 +309,8 @@ appears not to be enforced), and the tiers outside a session.
 3. Every behavioral claim evidenced or marked `(unverified)`?
 4. No concrete implementation values outside IMP/CMP/IFC/TAE/REQ tables,
    and every volatile fact you wrote owned by exactly one file — no path,
-   version, flag, value or unit name restated in a second note?
+   version, flag, value, unit name or lifecycle state restated in a second
+   note?
 5. All wikilinks resolve; all referenced artifact paths exist?
 6. Invalidation sweep done — no existing note contradicts the new state?
 7. Every touched REQ has a verifying TAE (or a recorded deferred one)?
