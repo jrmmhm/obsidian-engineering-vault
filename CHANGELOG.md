@@ -33,6 +33,35 @@ decision.
 
 ### Added
 
+- **Lifecycle state has one owner, and an ADM tracker stays short** — a
+  status that changes after the work is done (sent, merged, published, a
+  phase state) is now a volatile fact like a path or a version: it is
+  written in one row of an ADM tracker, and every other note links the
+  tracker instead of restating it. Measured in two working vaults, 17 of 30
+  false load-bearing claims were such a status, restated in several notes
+  and updated in one. The tracker row holds the current state, its date,
+  the facts the next step needs (who acked, who is addressed next, the
+  current version), a one-sentence next step and a link; history that
+  outgrows a cell moves to its owning TAE, DEC or IMP or into a commit
+  message and is never dropped; a finished row moves to a sibling
+  `<Tracker>_Closed` note; the ADM README teaches the shape, and ADM still
+  has no file template. Two WARNs back it: `length` also fires on a file
+  under the line limit whose words pass `size_limits.length_warn_words`
+  (2500), and the new `adm-cell-long` names an ADM table cell longer than
+  `size_limits.adm_cell_max_chars` (600). A TAE's Test Conditions are exempt
+  from detail ownership. **What an existing project may see: `length` on
+  dense notes and `adm-cell-long` on trackers that keep their history in
+  cells** — grep for both before updating; an acceptance of `length` covers
+  the word measure too, `adm-cell-long` cannot be accepted. **MAJOR** by the
+  table in
+  [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
+  — a rule is newly introduced — recorded as MINOR as its section "While the
+  repository is at 0.x" prescribes. `schema_version` moves to `0.7`. The
+  reasoning is
+  [`DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row.md)
+  and
+  [`DEC_A_Tracker_Row_Holds_Current_State_Only`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Tracker_Row_Holds_Current_State_Only.md).
+
 - **The validator says what can be acted on, and counts what it knows** —
   on six real vaults it printed 94 WARN lines of which four were actionable;
   it now prints 17, and catches the same 16 of 18 seeded defects with the
