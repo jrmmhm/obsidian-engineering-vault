@@ -7518,6 +7518,10 @@ ga_git 2026-01-04 -C "$GD" checkout -q main
 ga_git 2026-01-10 -C "$GD" merge -q --no-ff --no-edit side >/dev/null 2>&1
 printf 'two\n' >> "$GD/20_software/tool.py"
 ga_commit "$GD" 2026-02-01 "tool changed"
+# Re-checked on the day of the change: a text change after it, and a
+# last-verified on that same day, clear it - the date comparison is strict.
+printf 'Checked against the tool change.\n' >> "$IMPD/IMP_Same_Day.md"
+ga_commit "$GD" 2026-02-01 "same-day note re-checked"
 printf 'two\n' >> "$GD/20_software/other.py"
 printf 'Re-verified with the other tool.\n' >> "$IMPD/IMP_Together.md"
 ga_commit "$GD" 2026-02-10 "other tool and its note together"
@@ -7533,7 +7537,7 @@ ga_commit "$GD/20_software/clone" 2026-03-01 "clone history"
 gd_out=$(python3 "$VALIDATOR" "$GDV" 2>&1); gd_rc=$?
 TESTS=$((TESTS + 1))
 if [ $gd_rc -ne 2 ] && contains "$gd_out" \
-  "^WARN .*IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, after this note's last-verified 2026-01-05 - re-verify the note against it and bump last-verified"; then ok x; else
+  "^WARN .*IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, after this note's last-verified 2026-01-05 - check what the note says against that change and fix it, or record in the note that it still holds (conventions file, pointer-drift); bump last-verified only after that, the date alone does not clear this$"; then ok x; else
   fail "a file changed after its note's last-verified must be reported as pointer-drift:"
   printf '%s\n' "$gd_out" | grep -E 'pointer-drift|crash' | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
@@ -7546,7 +7550,8 @@ for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool I
     fail "$quiet must not be reported as pointer-drift:"
     printf '%s\n' "$gd_out" | grep "$quiet" | sed 's/^/    /'; fi
 done
-# Bumping last-verified is the clear action.
+# Bumping last-verified alone is not the clear action (DEC-MTH-060): the
+# docs-2 A/B saw an agent credit the bare bump with the repair.
 python3 - "$IMPD/IMP_Tool.md" <<'PY'
 import sys, pathlib
 p = pathlib.Path(sys.argv[1])
@@ -7554,9 +7559,9 @@ p.write_text(p.read_text().replace("last-verified: 2026-01-05", "last-verified: 
 PY
 gd_out2=$(python3 "$VALIDATOR" "$GDV" 2>&1)
 TESTS=$((TESTS + 1))
-if ! contains "$gd_out2" "IMP_Tool\.md:[0-9]* \[pointer-drift\]" \
+if contains "$gd_out2" "IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, and the note's text has not changed since, only its last-verified (2026-02-01) - .*the date alone does not clear this$" \
    && contains "$gd_out2" "IMP_Merge\.md:[0-9]* \[pointer-drift\]"; then ok x; else
-  fail "bumping last-verified must clear that note's pointer-drift and no other:"
+  fail "bumping last-verified alone must not clear pointer-drift:"
   printf '%s\n' "$gd_out2" | grep pointer-drift | sed 's/^/    /'; fi
 gn_out=$(python3 "$VALIDATOR" "$GA_TMP/DriftNoGit/00_documentation/01_projectvault" 2>&1); gn_rc=$?
 TESTS=$((TESTS + 1))

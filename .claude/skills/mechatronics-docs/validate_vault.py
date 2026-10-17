@@ -35,7 +35,6 @@ import sys
 import time
 import unicodedata
 from collections import Counter
-from datetime import date, timedelta
 from pathlib import Path
 
 STATE_DIR = Path("/tmp/claude-mechdocs")
@@ -2959,6 +2958,13 @@ def check_pointer_drift(vault, notes, spec, findings):
     drift - the note was written against that change. TAE and DEC record a
     point in time and are not asked (drift_exempt_roles). Nothing is said
     without a repository, in a shallow one, or when git cannot answer.
+
+    A date alone does not clear it (DEC-MTH-060): with last-verified on or
+    after the change, the note is still reported while its text, its
+    last-verified line aside, is what it was at that commit - the docs-2
+    A/B saw an agent credit the bare bump with the repair. A note that did
+    not exist yet at the change was written against it; one whose text at
+    the change git cannot hand out (a partial clone) is not asked.
     """
     repo = vault.git_root()
     if repo is None:
@@ -2989,29 +2995,22 @@ def check_pointer_drift(vault, notes, spec, findings):
                         break
         note = repo_file(repo, p)
         if refs and note:
-            cited.append((p, lv, refs, note))
+            cited.append((p, lv, refs, note, lines))
     if not cited:
         return
-    paths = sorted({r for _p, _lv, refs, _n in cited for r in refs}
-                   | {n for *_rest, n in cited})
-    args = ["--literal-pathspecs", "log", "--first-parent",
-            "--diff-merges=first-parent", "--no-renames", "--no-show-signature",
-            "-z", "--format=%x01%h %cs", "--name-only"]
-    dates = []
-    for _p, lv, _r, _n in cited:
-        try:
-            dates.append(date.fromisoformat(lv))
-        except ValueError:
-            pass
-    if dates:
-        # Two days of slack: --since compares timestamps, %cs is the
-        # committer's local date, and a stop at the bound only shortens
-        # the walk - the comparison below is on %cs alone.
-        args.append(f"--since={(min(dates) - timedelta(days=2)).isoformat()}")
-    out = git_read(repo, args + ["--", *paths])
+    paths = sorted({r for _p, _lv, refs, *_rest in cited for r in refs}
+                   | {c[3] for c in cited})
+    # No --since: a bare bump moves last-verified past the change, and the
+    # change must still be found to be asked about.
+    out = git_read(repo, ["--literal-pathspecs", "log", "--first-parent",
+                          "--diff-merges=first-parent", "--no-renames",
+                          "--no-show-signature", "-z", "--format=%x01%H %h %cs",
+                          "--name-only", "--", *paths])
     if out is None:
         return
-    last, commit = {}, None
+    # Newest first: last[name] is the change that counts, oldest[name] the
+    # walk position of the earliest commit that touched name.
+    last, oldest, commit = {}, {}, None
     for chunk in out.split(b"\0"):
         chunk = chunk.strip(b"\n")
         if not chunk:
@@ -3019,30 +3018,67 @@ def check_pointer_drift(vault, notes, spec, findings):
         if chunk.startswith(b"\x01"):
             head, _, chunk = chunk[1:].partition(b"\n")
             parts = head.decode("ascii", "replace").split()
-            if len(parts) != 2:
+            if len(parts) != 3:
                 return
-            commit = (parts[0], parts[1], set())
+            commit = (*parts, set(), (commit[4] + 1) if commit else 0)
         if commit is None or not chunk:
             continue
         name = os.fsdecode(chunk)
-        commit[2].add(name)
+        commit[3].add(name)
         last.setdefault(name, commit)
-    for p, lv, refs, note in cited:
-        hits = []
+        oldest[name] = commit[4]
+    hits, ask = {}, {}
+    for p, lv, refs, note, lines in cited:
         for rel, line in refs.items():
             got = last.get(rel)
-            if got and got[1] > lv and note not in got[2]:
-                hits.append((line, rel, got[0], got[1]))
-        if not hits:
+            if not got or note in got[3]:
+                continue
+            if got[2] > lv:
+                hits.setdefault(p, []).append((line, rel, got[1], got[2], "date"))
+            elif oldest.get(note, -1) > got[4]:
+                ask.setdefault((got[0], note), []).append((p, line, rel, got[1], got[2]))
+    if ask:
+        keys = sorted(ask)
+        out = git_read(repo, ["cat-file", "--batch"],
+                       stdin="".join(f"{h}:{n}\n" for h, n in keys).encode())
+        if out is None:
+            return
+        texts = {p: lines for p, _lv, _r, _n, lines in cited}
+        pos = 0
+        for key in keys:
+            end = out.find(b"\n", pos)
+            if end < 0:
+                return
+            head = out[pos:end].split()
+            pos = end + 1
+            if len(head) != 3:
+                continue
+            size = int(head[2])
+            then = out[pos:pos + size].decode("utf-8", "replace").splitlines()
+            pos += size + 1
+            for p, line, rel, h, day in ask[key]:
+                if unverified_text(then) == unverified_text(texts[p]):
+                    hits.setdefault(p, []).append((line, rel, h, day, "bump"))
+    for p, lv, _refs, _note, _lines in cited:
+        if p not in hits:
             continue
-        hits.sort()
-        line, rel, h, day = hits[0]
-        more = f" (+{len(hits) - 1} more)" if len(hits) > 1 else ""
+        found = sorted(hits[p])
+        line, rel, h, day, kind = found[0]
+        more = f" (+{len(found) - 1} more)" if len(found) > 1 else ""
+        said = (f"after this note's last-verified {lv}" if kind == "date" else
+                f"and the note's text has not changed since, only its "
+                f"last-verified ({lv})")
         findings.append(Finding(
             "WARN", "pointer-drift", str(p), line,
-            f"{rel} changed in {h} on {day}, after this note's last-verified "
-            f"{lv}{more} - re-verify the note against it and bump "
-            "last-verified, or fix what it says"))
+            f"{rel} changed in {h} on {day}, {said}{more} - check what the "
+            "note says against that change and fix it, or record in the note "
+            "that it still holds (conventions file, pointer-drift); bump "
+            "last-verified only after that, the date alone does not clear this"))
+
+
+def unverified_text(lines):
+    """A note's lines without its last-verified line - what a bare bump leaves unchanged."""
+    return [line.rstrip() for line in lines if not line.startswith("last-verified:")]
 
 
 def id_units(lines, fm_end, mask):
