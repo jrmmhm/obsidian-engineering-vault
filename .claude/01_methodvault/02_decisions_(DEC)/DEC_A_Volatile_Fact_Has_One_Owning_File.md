@@ -6,6 +6,7 @@ last-verified: 2026-08-20
 ---
 Date: 2026-08-20
 Status: Accepted
+Corrected by: [[DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row]] – the volatile-fact list omitted lifecycle state, the largest measured failure class; [[DEC_A_Tracker_Row_Holds_Current_State_Only]] – a measured size budget for one domain answers Option B rather than repeating it.
 
 ## Context
 

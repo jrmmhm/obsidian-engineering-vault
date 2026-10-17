@@ -298,7 +298,12 @@ yours. In ARC no block is permitted at all, declared or not.
 A file answers ONE question. Above ~150 lines, re-apply the 4-question
 rule: can the filename still fully describe the content? If not, split.
 Above 400 lines the validator blocks — that size is a structural SSOT
-violation, not a formatting issue. Length is not the only shape the
+violation, not a formatting issue. Lines are not the only measure: a
+file under the line limit whose lines have grown long — a table cell that
+became a log — is reported as `length` too once its words pass the limit
+the validator's schema sets. In ADM a single table cell past its own limit
+is reported as `adm-cell-long`, because a tracker cell holds a state and a
+sentence, not a history ([[00_ADM_README]]). Length is not the only shape the
 validator reads: a long file without a single subheading is reported as
 `structure`, a very short one as `stub` — both in the quick reference at
 the end of this file. A file that is long on purpose may accept the
@@ -314,6 +319,24 @@ update `last-verified`. When content becomes wrong, fix it or mark it
 superseded/deprecated in the same work session — never leave a stale
 claim standing. After changing an artifact (code, schematic, parameter),
 search the vault for files referencing it and update them.
+
+### Lifecycle state
+A status that changes after the work is done — sent, pushed, merged,
+published, approved, a phase or round state — goes stale faster than any
+path or version, because the event that changes it touches no file but
+the one somebody remembers to update. It is written in exactly one place:
+the row of the ADM tracker that tracks the item. Every other note links
+that tracker and says what role the state plays, never the state itself.
+A note's own status — its frontmatter `status`, a DEC's `Status:` line,
+the status column of an allocation row, the follow-ups a DEC lists in its
+own Consequences — is the note's, not an external action's, and stays
+where it is. Keeping a row short never deletes anything: its history moves
+to the note that owns it — the TAE of the test, the DEC of the decision,
+the IMP of the change — or into the commit message that records it, and
+the row links that note; the facts the next step needs (who acked, who is
+addressed next, the current version) stay in the row. How a tracker row
+is shaped, and the `_Closed` sibling a finished row moves to, is in
+[[00_ADM_README]].
 
 ### Validator-enforced rules (quick reference)
 
