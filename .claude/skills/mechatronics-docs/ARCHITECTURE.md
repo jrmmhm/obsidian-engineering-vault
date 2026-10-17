@@ -46,7 +46,11 @@ revision line is how a disagreement between the two becomes visible.
 HEAD baseline is captured with `strict_links=True`, the live pass runs with
 `strict_links=False`. That asymmetry is deliberate: the baseline has to be
 counted under the same rule the stop gate will later apply, or the
-`link-unresolved` counts on the two sides are not comparable.
+`link-unresolved` counts on the two sides are not comparable. The one value
+both calls share on purpose is `size_measures=False`: the word count of
+`length` and `adm-cell-long` wait for the full audit, `--file` and the stop
+report (DEC-MTH-065), and leaving them out of the baseline as well keeps the
+WARN comparison like with like. Do not harmonise it with `strict_links`.
 
 Exit codes: `0` no ERROR, `1` at least one ERROR, `2` crash. Both hooks fail
 **open** on `2` — a validator that cannot run must not wedge a session, which
@@ -97,7 +101,7 @@ The domain chain, in the order it executes:
 | 3a | `check_field_value` | the schema-declared codes | the code comes from the field descriptor, not from Python |
 | 3b | `check_undeclared` | `frontmatter-undeclared` | WARN, one grouped finding per file |
 | 4 | `check_sections` | `template-sections`, `section-mismatch`, `section-near-miss` | ERROR, ERROR, WARN |
-| 5 | `check_length` | `length`, `structure` | `length` is ERROR above the hard line limit, WARN above the soft one, and WARN when a file at or under the soft line limit exceeds `size_limits.length_warn_words` words |
+| 5 | `check_length` | `length`, `structure` | `length` is ERROR above the hard line limit, WARN above the soft one, and WARN when a file at or under the soft line limit exceeds `size_limits.length_warn_words` words; the word count is not taken in the post hook |
 | 6 | `check_links` | `link-unresolved`, `link-budget` | `link-unresolved` is ERROR when `strict_links`, WARN otherwise; the budget counts prose links only — no table row, no link to the file itself |
 | 7 | `check_leaks` | `impl-leak` | ERROR in ARC, WARN in a DEC Context section; no other domain is scanned, and a References/Sources section (`REF_SECTION_TOKENS`, English and German spellings) is exempt |
 | 7a | `check_fence` | `code-fence`, `fence-host`, `fence-record` | only in the banned domains; a declared over-long block is WARN, an undeclared one ERROR |
@@ -106,7 +110,7 @@ The domain chain, in the order it executes:
 | 9a | `check_req_table_silence` | `req-table-unrecognized` | WARN |
 | 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered on the **evidence role** |
 | 11 | `check_dec_status` | `dec-status`, `dec-superseded` | ERROR; triggered on the **decisions role** |
-| 11a | `check_adm_cells` | `adm-cell-long` | WARN, one per file; triggered on the **administration role** |
+| 11a | `check_adm_cells` | `adm-cell-long` | WARN, one per file; triggered on the **administration role**; not run in the post hook |
 | 12 | `validate_file` | `stub` | WARN |
 
 Every kind ends in the same filter: `file_acceptance` reads the file's own

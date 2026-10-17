@@ -262,7 +262,13 @@ directory) — never in a session that does not invoke it, nor on subagent write
   file's findings reach you: fix ERRORs now, address WARNs or state why
   they stand. WARNs the file already carried at git HEAD are not repeated,
   only counted when anything else is shown. Unresolved links arrive as one
-  line — expected mid-pass, but every target must exist by turn end.
+  line — expected mid-pass, but every target must exist by turn end. Two
+  size measures do not arrive here: `length` by words and `adm-cell-long`
+  wait for the full audit (step 6). When it shows them in a task pass,
+  name each one in your report as open; move a row's history to the note
+  that owns it (`00_ADM_README`) only when that move is part of the task;
+  never shorten text to clear one — a shortened row loses the history the
+  next step needs, which is what the measures exist to protect.
 - **At turn end** a stop gate re-checks every vault file touched this
   session. ERRORs this session introduced block completion, once per stop
   sequence; violations already present at git HEAD never block. Vault-wide
