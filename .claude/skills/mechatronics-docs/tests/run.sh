@@ -7504,7 +7504,8 @@ ga_note "$IMPD/IMP_Bad_Date.md" IMP 2026-02-30 active "The tool is \`20_software
 # Linked to each other so that no orphan WARN pushes the drift lines out
 # of the stop report's cut below.
 ga_note "$IMPD/IMP_Committed_Bump.md" IMP 2026-01-05 active \
-  "The tool is \`20_software/tool.py\`, see [[IMP_Confirm]] and [[IMP_Born_Later]]."
+  "The tool is \`20_software/tool.py\`, see [[IMP_Confirm]], [[IMP_Born_Later]] and [[IMP_Foreign_Edit]]."
+ga_note "$IMPD/IMP_Foreign_Edit.md" IMP 2026-02-03 active "The tool is \`20_software/tool.py\`."
 ga_note "$IMPD/IMP_Confirm.md" IMP 2026-01-05 active \
   "The tool is \`20_software/tool.py\`, see [[IMP_Committed_Bump]]."
 ga_note "$GDV/02_decisions_(DEC)/DEC_Tool.md" DEC 2026-01-05 active "Chose \`20_software/tool.py\`."
@@ -7535,7 +7536,9 @@ p = pathlib.Path(sys.argv[1])
 p.write_text(p.read_text().replace("last-verified: 2026-01-05", "last-verified: 2026-02-05"))
 PY
 ga_note "$IMPD/IMP_Born_Later.md" IMP 2026-02-05 active "The tool is \`20_software/tool.py\`."
-ga_commit "$GD" 2026-02-05 "bump one note, write another"
+# An edit for another reason after the change, its date untouched.
+printf 'A second paragraph about something else.\n' >> "$IMPD/IMP_Foreign_Edit.md"
+ga_commit "$GD" 2026-02-05 "bump one note, write another, edit a third"
 printf 'two\n' >> "$GD/20_software/other.py"
 printf 'Re-verified with the other tool.\n' >> "$IMPD/IMP_Together.md"
 ga_commit "$GD" 2026-02-10 "other tool and its note together"
@@ -7562,7 +7565,8 @@ TESTS=$((TESTS + 1))
 if contains "$gd_out" "IMP_Committed_Bump\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, and the note's text has not changed since, only its last-verified (2026-02-05)"; then ok x; else
   fail "a bare last-verified bump committed after the change must not clear pointer-drift:"
   printf '%s\n' "$gd_out" | grep -E 'IMP_Committed_Bump|crash' | sed 's/^/    /'; fi
-for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool IMP_Hosted IMP_Born_Later; do
+for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool IMP_Hosted IMP_Born_Later \
+             IMP_Foreign_Edit; do
   TESTS=$((TESTS + 1))
   if ! contains "$gd_out" "$quiet\.md:[0-9]* \[pointer-drift\]"; then ok x; else
     fail "$quiet must not be reported as pointer-drift:"
@@ -7594,7 +7598,18 @@ t = p.read_text().replace("last-verified: 2026-01-05", "last-verified: 2026-02-0
 p.write_text(t + f"Re-checked against `{sys.argv[2]}` (2026-02-02): still holds.\n")
 PY
 printf 'The merged tool now appends a second line.\n' >> "$IMPD/IMP_Merge.md"
+# The docs-2 A/B target note: edited for another reason after the change,
+# then bumped with no change of its text - the newest date change counts.
+python3 - "$IMPD/IMP_Foreign_Edit.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace("last-verified: 2026-02-03", "last-verified: 2026-02-06"))
+PY
 gd_out3=$(python3 "$VALIDATOR" "$GDV" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gd_out3" "IMP_Foreign_Edit\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, and the newest change of this note's last-verified (2026-02-06) came without a change of its text"; then ok x; else
+  fail "a bare bump after an edit for another reason must not clear pointer-drift:"
+  printf '%s\n' "$gd_out3" | grep -E 'IMP_Foreign_Edit|crash' | sed 's/^/    /'; fi
 for quiet in IMP_Tool IMP_Confirm; do
   TESTS=$((TESTS + 1))
   if ! contains "$gd_out3" "$quiet\.md:[0-9]* \[pointer-drift\]"; then ok x; else
