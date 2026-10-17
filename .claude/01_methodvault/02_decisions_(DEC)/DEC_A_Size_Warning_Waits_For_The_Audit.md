@@ -34,9 +34,9 @@ streams found:
 - The repair was a cut, not a move. All three arms deleted a dated
   patchwork status that stood in the open row at HEAD — the repair
   DEC-MTH-058 calls wrong — though the message named moving as the repair.
-- The stop report did not carry the WARNs either: its advisory section
-  holds 15 lines, ERRORs first, and the kernel vault's legacy unresolved
-  links filled it (17 ERROR lines, no WARN line, in each arm).
+- The stop report did not carry the WARNs either: its advisory section is
+  capped, ERRORs first, and the kernel vault's legacy unresolved links
+  filled it (17 ERROR lines, no WARN line, in each arm).
 
 ## Options
 
@@ -94,5 +94,5 @@ when that move is part of the task; it never shortens text to clear one.
 - Pending: whether agents still trim when the full audit shows the WARNs
   is measured by the next A/B of this change (trimming calls after a size
   WARN); if they do, this record is revisited.
-- No `schema_version` change of its own and no new code: the change ships
-  with the two measures it delivers, in the same release.
+- No `schema_version` change of its own and no new finding code: the
+  change ships with the two measures it delivers, in the same release.
