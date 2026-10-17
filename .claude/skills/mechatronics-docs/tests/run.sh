@@ -452,6 +452,44 @@ readlink -f /srv/backup/adc/latest
 ```
 EOF
 
+# An ADM tracker in the shape 00_ADM_README teaches (DEC-MTH-058), with its
+# closed sibling: short cells, an escaped alias pipe, one row per item. The
+# cell and word measures must stay silent on it.
+mkdir -p "$V/98_administration_(ADM)"
+cat > "$V/98_administration_(ADM)/ADM_Contribution_Tracker.md" <<'EOF'
+---
+domain: ADM
+status: active
+created: 2026-01-12
+last-verified: 2026-07-01
+---
+## Context
+The state of every contribution of the measurement chain that leaves the
+project, one row per item. Finished items move to
+[[ADM_Contribution_Tracker_Closed]].
+
+## Contributions
+| Item | State | Since | Next step | Detail |
+| --- | --- | --- | --- | --- |
+| ADC driver patch | sent | 2026-07-01 | Answer review comments inline. | [[TAE_ADC_Linearity\|linearity proof]] |
+EOF
+cat > "$V/98_administration_(ADM)/ADM_Contribution_Tracker_Closed.md" <<'EOF'
+---
+domain: ADM
+status: active
+created: 2026-03-02
+last-verified: 2026-07-01
+---
+## Context
+How each finished contribution of the measurement chain ended, moved here
+from [[ADM_Contribution_Tracker]] in the session that finished it.
+
+## Contributions
+| Item | State | Since | Detail |
+| --- | --- | --- | --- |
+| Board bring-up notes | merged | 2026-03-02 | [[IMP_MainBoard_ADC]] |
+EOF
+
 out=$(python3 "$VALIDATOR" "$V" 2>&1); rc=$?
 check "precision vault exits 0" $rc
 n=$(printf '%s' "$out" | grep -c '^\(ERROR\|WARN\)') || true
@@ -7439,6 +7477,183 @@ for gd_abbr in REQ DEC ARC CMP IFC IMP TAE OAU REF; do
   if [ "$gd_line" = "$gd_abbr ok" ]; then ok x; else
     fail "SKILL.md role row $gd_abbr differs from the conventions file: ${gd_line:-no row}"; fi
 done
+
+# ==========================================================================
+# BEGIN size by words and the ADM cell (DEC-MTH-058)
+# ==========================================================================
+# A note that grows in its cells and lines rather than in its line count
+# passed the length check. Two measures see it: `length` also counts words,
+# and `adm-cell-long` names an ADM table cell holding a narrative.
+SZ_TMP=$(mktemp -d)
+SZ="$SZ_TMP/Size/00_documentation/01_projectvault"
+mkdir -p "$SZ/01_requirements_(REQ)" "$SZ/03_architecture_(ARC)" \
+         "$SZ/07_testing_and_evidence_(TAE)" "$SZ/98_administration_(ADM)"
+printf '## Context\n' > "$SZ/01_requirements_(REQ)/00_REQ_file_template.md"
+printf '## Context\n' > "$SZ/03_architecture_(ARC)/00_ARC_file_template.md"
+printf '## Context\n' > "$SZ/07_testing_and_evidence_(TAE)/00_TAE_file_template.md"
+python3 - "$SZ" <<'PY'
+import sys, pathlib
+v = pathlib.Path(sys.argv[1])
+def note(rel, dom, body, extra=""):
+    p = v / rel
+    p.write_text(f"---\ndomain: {dom}\nstatus: active\ncreated: 2026-10-16\n"
+                 f"last-verified: 2026-10-16\n{extra}---\n## Context\n"
+                 "A note of the size fixture. It is otherwise correct, so that\n"
+                 "the finding under test is the one it is built to produce.\n"
+                 "It says nothing else and carries no value of its own.\n"
+                 + body)
+words = lambda n: " ".join(["word"] * n)
+dense = "".join(words(130) + "\n" for _ in range(20))          # 2600 words, < 150 lines
+note("03_architecture_(ARC)/ARC_Dense.md", "ARC", dense)
+note("03_architecture_(ARC)/ARC_Dense_Accepted.md", "ARC", dense,
+     "validator-accept: [length]\nvalidator-accept-reason: kept whole on purpose\n")
+note("03_architecture_(ARC)/ARC_Sparse.md", "ARC",
+     "".join(words(10) + "\n" for _ in range(100)))           # 1000 words
+note("03_architecture_(ARC)/ARC_Long_Dense.md", "ARC",
+     "".join(words(20) + "\n" for _ in range(160)))           # > 150 lines and > 2500 words
+note("03_architecture_(ARC)/ARC_Very_Long_Dense.md", "ARC",
+     "".join(words(20) + "\n" for _ in range(420)))           # > 400 lines
+x = lambda n: "x" * n
+table = "\n## Rows\n| Item | State | Next step |\n| --- | --- | --- |\n"
+note("98_administration_(ADM)/ADM_Cell_601.md", "ADM", table + f"| a | sent | {x(601)} |\n")
+note("98_administration_(ADM)/ADM_Cell_600.md", "ADM", table + f"| a | sent | {x(600)} |\n")
+note("98_administration_(ADM)/ADM_Two_Cells.md", "ADM",
+     table + f"| a | sent | ok |\n| b | {x(700)} | {x(650)} |\n")
+# Over 600 characters as one cell, under 600 on either side of the escaped
+# pipe: a splitter that divides at it would see two short cells.
+note("98_administration_(ADM)/ADM_Escaped_Pipe.md", "ADM",
+     table + f"| a | sent | [[TAE_Gone_{x(300)}\\|{x(150)}]] {x(140)} |\n")
+note("98_administration_(ADM)/ADM_Prose.md", "ADM", x(700) + "\n")
+note("98_administration_(ADM)/ADM_Fenced.md", "ADM",
+     "```\n" + table.strip("\n").split("\n", 1)[1] + f"\n| a | sent | {x(700)} |\n```\n")
+note("98_administration_(ADM)/ADM_Open_Fence.md", "ADM",
+     "```\nan example nobody closed\n" + table + f"| a | sent | {x(700)} |\n")
+note("03_architecture_(ARC)/ARC_Long_Cell.md", "ARC", table + f"| a | sent | {x(700)} |\n")
+note("98_administration_(ADM)/ADM_Accept_Cell.md", "ADM", table + f"| a | sent | {x(700)} |\n",
+     "validator-accept: [adm-cell-long]\nvalidator-accept-reason: tries to keep its log\n")
+# Exactly at and one past the word limit: the frontmatter and the Context
+# count too, so the body is padded to the total.
+for name, total in (("ARC_Words_2500", 2500), ("ARC_Words_2501", 2501)):
+    note(f"03_architecture_(ARC)/{name}.md", "ARC", "")
+    p = v / f"03_architecture_(ARC)/{name}.md"
+    have = len(p.read_text().split())
+    p.write_text(p.read_text() + "".join(words(100) + "\n" for _ in range((total - have) // 100))
+                 + words((total - have) % 100) + "\n")
+    assert len(p.read_text().split()) == total, name
+PY
+sz_out=$(python3 "$VALIDATOR" "$SZ" 2>&1)
+sz_has() { contains "$sz_out" "$1"; }
+sz_count() { printf '%s\n' "$sz_out" | grep -c "$1"; }
+TESTS=$((TESTS + 1))
+if sz_has "ARC_Dense\.md \[length\] 26[0-9][0-9] words > 2500 in [0-9]* lines"; then ok x; else
+  fail "a dense note under the line limit must be reported by its word count:"
+  printf '%s\n' "$sz_out" | grep ARC_Dense | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! sz_has "ARC_Dense_Accepted\.md \[length\]" && ! sz_has "ARC_Sparse\.md \[length\]"; then ok x; else
+  fail "an accepted length and a note under both limits must stay silent:"
+  printf '%s\n' "$sz_out" | grep -E "ARC_Dense_Accepted|ARC_Sparse" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ "$(sz_count 'ARC_Long_Dense\.md \[length\]')" -eq 1 ] \
+   && sz_has "ARC_Long_Dense\.md \[length\] 1[0-9][0-9] lines > 150" \
+   && [ "$(sz_count 'ARC_Very_Long_Dense\.md \[length\]')" -eq 1 ] \
+   && sz_has "^ERROR .*ARC_Very_Long_Dense\.md \[length\] 4[0-9][0-9] lines > 400"; then ok x; else
+  fail "a note over the line limit must get the line finding alone, never a second word finding:"
+  printf '%s\n' "$sz_out" | grep -E "Long_Dense" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "ADM_Cell_601\.md:1[0-9] \[adm-cell-long\] 1 table cell(s) longer than 600 characters" \
+   && ! sz_has "ADM_Cell_600\.md.*adm-cell-long"; then ok x; else
+  fail "an ADM cell over 600 characters must be named, one at 600 must not:"
+  printf '%s\n' "$sz_out" | grep -E "ADM_Cell_60" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ "$(sz_count 'ADM_Two_Cells\.md.*\[adm-cell-long\]')" -eq 1 ] \
+   && sz_has "ADM_Two_Cells\.md:1[0-9] \[adm-cell-long\] 2 table cell(s)"; then ok x; else
+  fail "overlong cells must be counted in one finding per file:"
+  printf '%s\n' "$sz_out" | grep ADM_Two_Cells | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "ADM_Escaped_Pipe\.md:1[0-9] \[adm-cell-long\]" \
+   && sz_has "ADM_Open_Fence\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
+  fail "an escaped pipe must not divide a cell, and an unclosed fence must not hide a table:"
+  printf '%s\n' "$sz_out" | grep -E "ADM_Escaped_Pipe|ADM_Open_Fence" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if ! sz_has "ADM_Prose\.md.*adm-cell-long" && ! sz_has "ADM_Fenced\.md.*adm-cell-long" \
+   && ! sz_has "ARC_Long_Cell\.md.*adm-cell-long"; then ok x; else
+  fail "prose, a fenced example and a table outside ADM must not be read as an ADM cell:"
+  printf '%s\n' "$sz_out" | grep -E "ADM_Prose|ADM_Fenced|ARC_Long_Cell" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "^WARN .*ARC_Dense\.md \[length\] 26[0-9][0-9] words" \
+   && sz_has "^WARN .*ADM_Cell_601\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
+  fail "both size measures must stay advisory (WARN):"
+  printf '%s\n' "$sz_out" | grep -E "ARC_Dense\.md|ADM_Cell_601" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "ARC_Words_2501\.md \[length\] 2501 words > 2500" \
+   && ! sz_has "ARC_Words_2500\.md \[length\]"; then ok x; else
+  fail "the word limit must hold at 2500 and fire at 2501:"
+  printf '%s\n' "$sz_out" | grep -E "ARC_Words_250" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "ADM_Accept_Cell\.md:1 \[accept-invalid\] validator-accept names \['adm-cell-long'\]" \
+   && sz_has "ADM_Accept_Cell\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
+  fail "adm-cell-long must not be acceptable in a file's frontmatter:"
+  printf '%s\n' "$sz_out" | grep ADM_Accept_Cell | sed 's/^/    /'; fi
+# The repair is a move, never a cut: agents told only to shorten dropped
+# the acker's name and the Cc list of an open row (A/B, DEC-MTH-058).
+TESTS=$((TESTS + 1))
+if sz_has "adm-cell-long\] .* move the history to the owning TAE, DEC or IMP (or the commit message of the change) and link it; keep the next-step facts (acks, recipients, current version) in the row" \
+   && ! sz_has "adm-cell-long\].*shorten"; then ok x; else
+  fail "the cell finding must name moving the history and keeping the next-step facts:"
+  printf '%s\n' "$sz_out" | grep adm-cell-long | head -n 1 | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if sz_has "adm-cell-long\].*_Closed sibling"; then ok x; else
+  fail "the cell finding must name the repair:"; printf '%s\n' "$sz_out" | grep adm-cell-long | sed 's/^/    /'; fi
+
+# The two limits are the project's to tune, and junk falls back rather than
+# switching the check off or crashing the hook.
+szschema() { # szschema <dir> <python assignment on s["size_limits"]>
+  mkdir -p "$1"
+  cp "$VALIDATOR" "$SKILL_DIR/export_traceability.py" "$1/"
+  python3 - "$SKILL_DIR/vault_schema.json" "$1/vault_schema.json" "$2" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+lim = s["size_limits"]
+exec(sys.argv[3])
+json.dump(s, open(sys.argv[2], "w"))
+PY
+}
+szschema "$SZ_TMP/tuned" 'lim["length_warn_words"] = 100000; lim["adm_cell_max_chars"] = 650'
+tu_out=$(python3 "$SZ_TMP/tuned/validate_vault.py" "$SZ" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$tu_out" "ARC_Dense\.md \[length\]" && ! contains "$tu_out" "ADM_Cell_601\.md.*adm-cell-long" \
+   && contains "$tu_out" "ADM_Two_Cells\.md:1[0-9] \[adm-cell-long\] 1 table cell(s) longer than 650"; then
+  ok x; else fail "the limits must be read from vault_schema.json:"
+  printf '%s\n' "$tu_out" | grep -E "ARC_Dense|adm-cell-long" | sed 's/^/    /'; fi
+szschema "$SZ_TMP/junk" 'lim["length_warn_words"] = "2500"; lim["adm_cell_max_chars"] = True'
+ju_out=$(python3 "$SZ_TMP/junk/validate_vault.py" "$SZ" 2>&1); ju_rc=$?
+szschema "$SZ_TMP/zero" 'lim["length_warn_words"] = 0; lim["adm_cell_max_chars"] = -5'
+ze_out=$(python3 "$SZ_TMP/zero/validate_vault.py" "$SZ" 2>&1); ze_rc=$?
+TESTS=$((TESTS + 1))
+if [ $ju_rc -ne 2 ] && [ $ze_rc -ne 2 ] \
+   && contains "$ju_out" "ARC_Dense\.md \[length\] 26[0-9][0-9] words > 2500" \
+   && contains "$ju_out" "ADM_Cell_601\.md:1[0-9] \[adm-cell-long\]" \
+   && contains "$ze_out" "ARC_Dense\.md \[length\] 26[0-9][0-9] words > 2500" \
+   && contains "$ze_out" "ADM_Cell_601\.md:1[0-9] \[adm-cell-long\]"; then ok x; else
+  fail "a limit that is not a positive integer must fall back to FALLBACK_SCHEMA:"
+  printf '%s\n%s\n' "$ju_out" "$ze_out" | grep -E "ARC_Dense|ADM_Cell_601|Traceback" | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if python3 - "$SKILL_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import validate_vault as vv
+from pathlib import Path
+real, err = vv.load_schema(Path(sys.argv[1]) / "vault_schema.json")
+assert err is None, err
+for key in ("length_warn_words", "adm_cell_max_chars"):
+    assert vv.size_limit(real, key) == vv.size_limit({}, key), f"{key} drift"
+    assert vv.size_limit({}, key), f"{key} missing from FALLBACK_SCHEMA"
+PY
+then ok x; else fail "FALLBACK_SCHEMA and vault_schema.json disagree about size_limits"; fi
+rm -rf "$SZ_TMP"
+# ==========================================================================
+# END size by words and the ADM cell
+# ==========================================================================
 
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
