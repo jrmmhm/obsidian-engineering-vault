@@ -7501,6 +7501,12 @@ ga_note "$IMPD/IMP_Retired.md" IMP 2026-01-05 superseded "The tool is \`20_softw
 ga_note "$IMPD/IMP_Merge.md" IMP 2026-01-05 active "The merged tool is \`20_software/merged.py\`."
 ga_note "$IMPD/IMP_Clone.md" IMP 2026-01-05 active "The library is \`20_software/clone/lib.py\`."
 ga_note "$IMPD/IMP_Bad_Date.md" IMP 2026-02-30 active "The tool is \`20_software/tool.py\`."
+# Linked to each other so that no orphan WARN pushes the drift lines out
+# of the stop report's cut below.
+ga_note "$IMPD/IMP_Committed_Bump.md" IMP 2026-01-05 active \
+  "The tool is \`20_software/tool.py\`, see [[IMP_Confirm]] and [[IMP_Born_Later]]."
+ga_note "$IMPD/IMP_Confirm.md" IMP 2026-01-05 active \
+  "The tool is \`20_software/tool.py\`, see [[IMP_Committed_Bump]]."
 ga_note "$GDV/02_decisions_(DEC)/DEC_Tool.md" DEC 2026-01-05 active "Chose \`20_software/tool.py\`."
 ga_note "$GDV/07_testing_and_evidence_(TAE)/TAE_Tool.md" TAE 2026-01-05 active "Ran \`20_software/tool.py\`."
 # A block declaring the machine it is true on names that machine's paths.
@@ -7522,6 +7528,14 @@ ga_commit "$GD" 2026-02-01 "tool changed"
 # last-verified on that same day, clear it - the date comparison is strict.
 printf 'Checked against the tool change.\n' >> "$IMPD/IMP_Same_Day.md"
 ga_commit "$GD" 2026-02-01 "same-day note re-checked"
+# A bare bump committed after the change, and a note written after it.
+python3 - "$IMPD/IMP_Committed_Bump.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace("last-verified: 2026-01-05", "last-verified: 2026-02-05"))
+PY
+ga_note "$IMPD/IMP_Born_Later.md" IMP 2026-02-05 active "The tool is \`20_software/tool.py\`."
+ga_commit "$GD" 2026-02-05 "bump one note, write another"
 printf 'two\n' >> "$GD/20_software/other.py"
 printf 'Re-verified with the other tool.\n' >> "$IMPD/IMP_Together.md"
 ga_commit "$GD" 2026-02-10 "other tool and its note together"
@@ -7544,7 +7558,11 @@ TESTS=$((TESTS + 1))
 if contains "$gd_out" "IMP_Merge\.md:11 \[pointer-drift\] 20_software/merged\.py changed in [0-9a-f]* on 2026-01-10"; then ok x; else
   fail "a change merged after last-verified must be dated at the merge (first parent):"
   printf '%s\n' "$gd_out" | grep pointer-drift | sed 's/^/    /'; fi
-for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool IMP_Hosted; do
+TESTS=$((TESTS + 1))
+if contains "$gd_out" "IMP_Committed_Bump\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, and the note's text has not changed since, only its last-verified (2026-02-05)"; then ok x; else
+  fail "a bare last-verified bump committed after the change must not clear pointer-drift:"
+  printf '%s\n' "$gd_out" | grep -E 'IMP_Committed_Bump|crash' | sed 's/^/    /'; fi
+for quiet in IMP_Same_Day IMP_Together IMP_Retired IMP_Clone DEC_Tool TAE_Tool IMP_Hosted IMP_Born_Later; do
   TESTS=$((TESTS + 1))
   if ! contains "$gd_out" "$quiet\.md:[0-9]* \[pointer-drift\]"; then ok x; else
     fail "$quiet must not be reported as pointer-drift:"
@@ -7563,6 +7581,31 @@ if contains "$gd_out2" "IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py c
    && contains "$gd_out2" "IMP_Merge\.md:[0-9]* \[pointer-drift\]"; then ok x; else
   fail "bumping last-verified alone must not clear pointer-drift:"
   printf '%s\n' "$gd_out2" | grep pointer-drift | sed 's/^/    /'; fi
+# What clears it: the note's text changed against the change - a fix, or a
+# recorded confirmation - with last-verified on or after it. Uncommitted
+# edits count, so the check answers in the session that made them. A fix
+# without the date stays reported.
+gd_h=$(ga_git 2026-02-01 -C "$GD" log -1 --format=%h -- 20_software/tool.py)
+printf 'The tool now appends a second line.\n' >> "$IMPD/IMP_Tool.md"
+python3 - "$IMPD/IMP_Confirm.md" "$gd_h" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+t = p.read_text().replace("last-verified: 2026-01-05", "last-verified: 2026-02-02")
+p.write_text(t + f"Re-checked against `{sys.argv[2]}` (2026-02-02): still holds.\n")
+PY
+printf 'The merged tool now appends a second line.\n' >> "$IMPD/IMP_Merge.md"
+gd_out3=$(python3 "$VALIDATOR" "$GDV" 2>&1)
+for quiet in IMP_Tool IMP_Confirm; do
+  TESTS=$((TESTS + 1))
+  if ! contains "$gd_out3" "$quiet\.md:[0-9]* \[pointer-drift\]"; then ok x; else
+    fail "$quiet: a text change against the change with a current last-verified must clear pointer-drift:"
+    printf '%s\n' "$gd_out3" | grep "$quiet" | sed 's/^/    /'; fi
+done
+TESTS=$((TESTS + 1))
+if contains "$gd_out3" "IMP_Merge\.md:11 \[pointer-drift\] 20_software/merged\.py changed in [0-9a-f]* on 2026-01-10, after this note's last-verified 2026-01-05"; then ok x; else
+  fail "a fix without a current last-verified must stay reported:"
+  printf '%s\n' "$gd_out3" | grep IMP_Merge | sed 's/^/    /'; fi
+ga_git 2026-03-02 -C "$GD" checkout -q -- "$IMPD"
 gn_out=$(python3 "$VALIDATOR" "$GA_TMP/DriftNoGit/00_documentation/01_projectvault" 2>&1); gn_rc=$?
 TESTS=$((TESTS + 1))
 if [ $gn_rc -ne 2 ] && ! contains "$gn_out" "pointer-drift"; then ok x; else
