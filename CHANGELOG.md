@@ -35,15 +35,18 @@ decision.
 
 - **The validator says which notes git says to re-verify** — three
   vault-wide WARNs that never block. `pointer-drift`: a project file a note
-  names changed after the note's `last-verified` (TAE and DEC exempt; bumping
-  `last-verified` clears it). `ref-unresolved`: a commit id an IMP, TAE or
-  DEC note cites resolves in no local repository; an id of a foreign
-  repository is written `repo@id`. `pending-stale`: a pending/planned marker
-  sits right after a path that exists. No git query fetches anything, and a
-  shallow clone or a vault without a repository gets no finding from the
-  first two. Measured on the two working vaults: 1 and 10 new WARNs, two of
-  them ids of repositories the project does not hold, which the `repo@id`
-  form silences. **MINOR** by the table in
+  names changed after the note was last checked (TAE and DEC exempt); a
+  bumped `last-verified` alone does not clear it — the note's text must
+  change too, a fix or a recorded confirmation. `ref-unresolved`: a commit
+  id an IMP, TAE or DEC note cites resolves in no local repository; an id
+  of a foreign repository is written `repo@id`, a rewritten id may stay
+  marked beside its successor, and while a clone the vault points into is
+  absent the dead ids are counted in one line. `pending-stale`: a
+  pending/planned marker sits right after a path that exists. No git query
+  fetches anything, and a shallow clone or a vault without a repository
+  gets no finding from the first two. Measured on the kernel vault: 7 new
+  WARNs; on the opensource vault none. The forms and repairs are in the
+  conventions file's quick reference. **MINOR** by the table in
   [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
   — new WARNs. `schema_version` moves to `0.7` for the `git_advisories`
   block. The reasoning is
