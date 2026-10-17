@@ -154,7 +154,8 @@ unverified REQ is an incomplete REQ, and the full audit reports it as
 `req-uncovered`, naming which of the two halves is missing. Write the
 acceptance criterion from what the requirement demands, not from the evidence
 at hand; a clause without evidence keeps the row `Draft` or `Approved`
-(Column 4 rule, ARC README) — weakening it is a REQ change.
+(Column 4 rule, ARC README) — weakening it is a REQ change with its own
+reason, never a step toward `Verified`.
 
 ## Creation Order — Dependencies Matter
 

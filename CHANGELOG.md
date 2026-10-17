@@ -120,7 +120,7 @@ decision.
   criterion is written from what its requirement demands, not from the
   evidence at hand, a row whose evidence covers only part of it stays `Draft`
   or `Approved`, and a clause changes only as a requirement change with its
-  own reason. In an A/B comparison more than half of the documentation
+  own reason. In an A/B comparison half or more of the documentation
   sessions wrote the criterion from the unit tests they held, left out the
   pending device check and set `Verified`. The sentence stands in `CLAUDE.md` rule 7, its copy in
   `CONTRIBUTING.md`, the Column 4 rule of the ARC README and the coverage
