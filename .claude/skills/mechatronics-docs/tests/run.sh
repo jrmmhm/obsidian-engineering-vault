@@ -7655,6 +7655,96 @@ rm -rf "$SZ_TMP"
 # END size by words and the ADM cell
 # ==========================================================================
 
+# ==========================================================================
+# BEGIN the size measures wait for the audit (DEC-MTH-065)
+# ==========================================================================
+# Reported by the post hook right after the edit that crossed them, the
+# word measure and adm-cell-long cost an agent one late turn each, spent
+# shortening the history they exist to protect (A/B T1, round 2). The post
+# hook leaves both to the full audit and --file; the line measure stays.
+# Each hook test also asserts a new frontmatter-undeclared from the same
+# write, so a hook that returned early would not pass as silence.
+SW_TMP=$(mktemp -d)
+SW="$SW_TMP/SizeWait/00_documentation/01_projectvault"
+nc_vault "$SW"
+mkdir -p "$SW/98_administration_(ADM)"
+python3 - "$SW" <<'PY'
+import sys, pathlib
+v = pathlib.Path(sys.argv[1])
+fm = ("---\ndomain: {}\nstatus: active\ncreated: 2026-10-17\nlast-verified: 2026-10-17\n"
+      "---\n## Context\nA note of the size-wait fixture, under every limit at HEAD.\n")
+words = lambda n: " ".join(["word"] * n)
+(v / "98_administration_(ADM)/ADM_Tracker.md").write_text(
+    fm.format("ADM") + "\n## Rows\n| Item | State | Next step |\n| --- | --- | --- |\n"
+    + "| a | sent | " + "x" * 590 + " |\n")
+(v / "03_architecture_(ARC)/ARC_Plan.md").write_text(
+    fm.format("ARC") + "".join(words(100) + "\n" for _ in range(24)))
+(v / "03_architecture_(ARC)/ARC_Lines.md").write_text(
+    fm.format("ARC") + "".join("line\n" for _ in range(140)))
+PY
+ngit init -q "$SW_TMP/SizeWait"
+ngit -C "$SW_TMP/SizeWait" add -A >/dev/null 2>&1
+ngit -C "$SW_TMP/SizeWait" commit -q --no-verify --no-gpg-sign -m "size-wait fixture" >/dev/null 2>&1
+# Each write crosses its limit and adds one undeclared frontmatter field.
+python3 - "$SW" <<'PY'
+import sys, pathlib
+v = pathlib.Path(sys.argv[1])
+def edit(rel, old, new):
+    p = v / rel
+    t = p.read_text().replace("created:", "crated: 2026-10-17\ncreated:", 1)
+    p.write_text(t.replace(old, new, 1))
+edit("98_administration_(ADM)/ADM_Tracker.md", "x" * 590, "x" * 700)
+edit("03_architecture_(ARC)/ARC_Plan.md", "## Context\n", "## Context\n" + " ".join(["word"] * 200) + "\n")
+edit("03_architecture_(ARC)/ARC_Lines.md", "## Context\n", "## Context\n" + "line\n" * 10)
+PY
+SIDS="testsession-sizewait-$$"
+rm -f "/tmp/claude-mechdocs/touched-$SIDS" "/tmp/claude-mechdocs/baseline-$SIDS" \
+      "/tmp/claude-mechdocs/widehash-$SIDS"
+swpost() { printf '{"session_id":"%s","tool_input":{"file_path":"%s"}}' "$SIDS" "$1" \
+  | python3 "$VALIDATOR" --hook post 2>&1; }
+sw_adm=$(swpost "$SW/98_administration_(ADM)/ADM_Tracker.md")
+TESTS=$((TESTS + 1))
+if contains "$sw_adm" "ADM_Tracker\.md.*frontmatter-undeclared" && ! contains "$sw_adm" "adm-cell-long"; then
+  ok x; else
+  fail "the post hook must leave adm-cell-long to the audit and still report the write:"
+  printf '%s\n' "$sw_adm" | sed 's/^/    /'; fi
+sw_plan=$(swpost "$SW/03_architecture_(ARC)/ARC_Plan.md")
+TESTS=$((TESTS + 1))
+if contains "$sw_plan" "ARC_Plan\.md.*frontmatter-undeclared" && ! contains "$sw_plan" "words >"; then
+  ok x; else
+  fail "the post hook must leave the word measure to the audit and still report the write:"
+  printf '%s\n' "$sw_plan" | sed 's/^/    /'; fi
+sw_lines=$(swpost "$SW/03_architecture_(ARC)/ARC_Lines.md")
+TESTS=$((TESTS + 1))
+if contains "$sw_lines" "ARC_Lines\.md \[length\] 1[0-9][0-9] lines > 150"; then ok x; else
+  fail "the post hook must keep reporting the line measure:"
+  printf '%s\n' "$sw_lines" | sed 's/^/    /'; fi
+sw_file=$(python3 "$VALIDATOR" --file "$SW/98_administration_(ADM)/ADM_Tracker.md" 2>&1; \
+          python3 "$VALIDATOR" --file "$SW/03_architecture_(ARC)/ARC_Plan.md" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$sw_file" "ADM_Tracker\.md:[0-9]* \[adm-cell-long\]" \
+   && contains "$sw_file" "ARC_Plan\.md \[length\] 2[0-9]* words > 2500"; then ok x; else
+  fail "--file must keep both size measures:"
+  printf '%s\n' "$sw_file" | sed 's/^/    /'; fi
+sw_full=$(python3 "$VALIDATOR" "$SW" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$sw_full" "ADM_Tracker\.md:[0-9]* \[adm-cell-long\]" \
+   && contains "$sw_full" "ARC_Plan\.md \[length\] 2[0-9]* words > 2500"; then ok x; else
+  fail "the full audit must keep both size measures:"
+  printf '%s\n' "$sw_full" | grep -E "adm-cell-long|length" | sed 's/^/    /'; fi
+sw_stop=$(field systemMessage "$(printf '{"session_id":"%s"}' "$SIDS" \
+  | python3 "$VALIDATOR" --hook stop 2>&1)")
+TESTS=$((TESTS + 1))
+if contains "$sw_stop" "adm-cell-long" && contains "$sw_stop" "words > 2500"; then ok x; else
+  fail "the stop report must keep both size measures among its advisory findings:"
+  printf '%s\n' "$sw_stop" | sed 's/^/    /'; fi
+rm -f "/tmp/claude-mechdocs/touched-$SIDS" "/tmp/claude-mechdocs/baseline-$SIDS" \
+      "/tmp/claude-mechdocs/widehash-$SIDS"
+rm -rf "$SW_TMP"
+# ==========================================================================
+# END the size measures wait for the audit
+# ==========================================================================
+
 echo "$TESTS tests, $FAILURES failure(s)"
 if [ "$FAILURES" -eq 0 ]; then
   echo "ALL TESTS PASSED"
