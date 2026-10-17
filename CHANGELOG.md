@@ -52,15 +52,20 @@ decision.
   from detail ownership. **What an existing project may see: `length` on
   dense notes and `adm-cell-long` on trackers that keep their history in
   cells** — grep for both before updating; an acceptance of `length` covers
-  the word measure too, `adm-cell-long` cannot be accepted. **MAJOR** by the
+  the word measure too, `adm-cell-long` cannot be accepted. Neither measure
+  reaches the agent after a write: the post hook leaves both to the full
+  audit, `--file`, CI and the stop report, because shown mid-task each cost
+  a late turn spent cutting a row's history; the line measure stays in the
+  post hook. **MAJOR** by the
   table in
   [CONTRIBUTING.md](CONTRIBUTING.md#versioning-what-a-breaking-change-means-here)
   — a rule is newly introduced — recorded as MINOR as its section "While the
   repository is at 0.x" prescribes. `schema_version` moves to `0.7`. The
   reasoning is
-  [`DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row.md)
+  [`DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Lifecycle_State_Is_Owned_By_Its_Tracker_Row.md),
+  [`DEC_A_Tracker_Row_Holds_Current_State_Only`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Tracker_Row_Holds_Current_State_Only.md)
   and
-  [`DEC_A_Tracker_Row_Holds_Current_State_Only`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Tracker_Row_Holds_Current_State_Only.md).
+  [`DEC_A_Size_Warning_Waits_For_The_Audit`](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Size_Warning_Waits_For_The_Audit.md).
 
 - **The validator says what can be acted on, and counts what it knows** —
   on six real vaults it printed 94 WARN lines of which four were actionable;
