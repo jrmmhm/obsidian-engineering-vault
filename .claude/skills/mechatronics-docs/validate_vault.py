@@ -3059,7 +3059,9 @@ def check_pointer_drift(vault, notes, spec, findings):
                 return
             head = out[pos:end].split()
             pos = end + 1
-            if len(head) != 3:
+            # '<name> missing' echoes the name, which may hold spaces; a
+            # found object's header is '<oid> <type> <size>'.
+            if len(head) != 3 or not head[2].isdigit():
                 continue
             size = int(head[2])
             blobs[key] = out[pos:pos + size].decode("utf-8", "replace").splitlines()
