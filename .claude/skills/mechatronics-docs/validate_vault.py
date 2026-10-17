@@ -1524,11 +1524,14 @@ def req_scope(path: Path, lines, abbr="REQ"):
 # File-local checks
 # --------------------------------------------------------------------------
 
-def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
+def validate_file(vault: Vault, path: Path, content=None, strict_links=False,
+                  size_measures=True):
     """File-local checks. 'content' is the raw BYTES of another revision of
     this file - git_head_content's blob, for the per-file baseline - and
     None for the file as it lies on disk. Bytes rather than text because
     the encoding of a revision is part of what the baseline has to know.
+    size_measures=False leaves out the word count of length and
+    adm-cell-long, which only the post hook asks for (DEC-MTH-065).
     """
     findings = []
     kind, abbr = vault.classify(path)
@@ -1613,7 +1616,8 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         check_frontmatter(vault, fm, abbr, path, findings)
 
     check_sections(vault, abbr, path, lines, findings)
-    check_length(path, lines, findings, size_limit(vault.schema(), "length_warn_words"))
+    check_length(path, lines, findings,
+                 size_limit(vault.schema(), "length_warn_words") if size_measures else None)
     check_links(vault, path, lines, findings, strict_links)
     check_leaks(abbr, path, lines, fm_end, findings)
     check_paths(vault, path, lines, fm_end, findings)
@@ -1631,7 +1635,7 @@ def validate_file(vault: Vault, path: Path, content=None, strict_links=False):
         check_tae_verifies(vault, fm, path, findings)
     if role == "DEC":
         check_dec_status(vault, path, lines, findings, abbr)
-    if role == "ADM":
+    if role == "ADM" and size_measures:
         check_adm_cells(path, lines, findings,
                         size_limit(vault.schema(), "adm_cell_max_chars"))
 
@@ -3221,14 +3225,19 @@ def hook_post(payload):
         touched_f.write_text(json.dumps(touched))
         head = git_head_content(vault, path)
         if head is not None:
-            base = validate_file(vault, path, content=head, strict_links=True)
+            base = validate_file(vault, path, content=head, strict_links=True,
+                                 size_measures=False)
             baseline[key] = {"codes": error_counts(base), "new": False,
                              "warns": dict(warn_keys(base))}
         else:
             baseline[key] = {"codes": {}, "new": True, "warns": {}}
         baseline_f.write_text(json.dumps(baseline))
 
-    findings = validate_file(vault, path, strict_links=False)
+    # The two size measures wait for the full audit: shown right after the
+    # write that crossed them, each cost an agent a late turn spent cutting
+    # the history they exist to keep (01_methodvault, DEC-MTH-065). Both
+    # calls leave them out alike, so the baseline compares like with like.
+    findings = validate_file(vault, path, strict_links=False, size_measures=False)
     if not findings:
         return 0
     base_codes = baseline.get(key, {}).get("codes", {})
