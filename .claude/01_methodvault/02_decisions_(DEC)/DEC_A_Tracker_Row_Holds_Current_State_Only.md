@@ -139,3 +139,5 @@ K5, chosen by the operator on 2026-10-16.
 - The two measures are a rule the vault did not have before and two new
   WARNs: MAJOR by the versioning table in `CONTRIBUTING.md`, raised as
   MINOR while the repository is at 0.x, as that file prescribes.
+- When the two measures reach the agent — at the full audit, not after
+  each write — is [[DEC_A_Size_Warning_Waits_For_The_Audit]] (DEC-MTH-065).
