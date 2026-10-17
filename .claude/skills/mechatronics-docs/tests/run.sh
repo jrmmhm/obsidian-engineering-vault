@@ -5125,6 +5125,7 @@ if [ -f "$NP" ]; then
       ".claude/skills/mechatronics-docs/hooks/stop_gate.sh" \
       ".claude/skills/mechatronics-docs/DECISIONS.md" \
       ".claude/skills/mechatronics-docs/SKILL.md" \
+      ".claude/skills/mechatronics-docs/REFERENCE.md" \
       ".claude/skills/mechatronics-docs/ARCHITECTURE.md" \
       ".github/workflows/validate-vault.yml" "IEC_61508_MAPPING.md" \
       "AGENTS.md" "CLAUDE.md" "STRUCTURE.md" "METHOD.md" "LICENSE" \
@@ -5156,7 +5157,9 @@ if [ -f "$NP" ]; then
     ok x; else fail "derived workflow lost the project vault audit"; fi
 
   # SKILL.md travels verbatim - the derivation neither strips it nor rewrites
-  # it - so every sentence in it is read in two repositories at once. Issue
+  # it - so every sentence in it is read in two repositories at once. The same
+  # holds for REFERENCE.md beside it, which carries the tool reference that
+  # used to sit in SKILL.md (DEC-MTH-063), so A2 and A3 read both files. Issue
   # #117: it promised a tier a derived project does not have ("a GitHub Actions
   # workflow that runs the test suite ...", removed with tests/ by #85) and said
   # "This repository's own workflow" about a workflow only the template has.
@@ -5181,10 +5184,10 @@ if [ -f "$NP" ]; then
   # A1 (structural): the derivation leaves no repository behind, so no tier can
   # be installed in a freshly derived project - '.git' is in JUNK_NAMES and the
   # script prints 'git init' as the reader's own next step. This is the fact
-  # SKILL.md's "neither runs by merely being present" rests on.
+  # REFERENCE.md's "neither runs by merely being present" rests on.
   TESTS=$((TESTS + 1))
   if [ ! -e "$ND/.git" ]; then ok x; else
-    fail "derivation left a git repository behind - SKILL.md assumes none"; fi
+    fail "derivation left a git repository behind - REFERENCE.md assumes none"; fi
 
   # A2 (structural): every concrete backticked path SKILL.md names exists in the
   # derived tree. What counts as a path is decided by an extension whitelist and
@@ -5204,52 +5207,54 @@ if [ -f "$NP" ]; then
   #                          clone or a pull - that absence is the point of the
   #                          sentence naming it.
   SKILL_ALLOW_PATHS="traceability_index.md traceability_graph.mmd .git/hooks/"
-  np_skill="$ND/.claude/skills/mechatronics-docs/SKILL.md"
-  np_missing=""; np_stale_allow=""
-  for p in $(grep -o '`[^`]*`' "$np_skill" | tr -d '`' \
-      | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json|\.mmd|\.html|\.csv)$' \
-      | grep -v -E '[*{}$~]|YYYY|ABBR|NN_|DOMAIN' | sort -u); do
-    if [ -e "$ND/$p" ] || [ -e "$ND/.claude/skills/mechatronics-docs/$p" ]; then
-      exists=1; else exists=0; fi
-    case " $SKILL_ALLOW_PATHS " in
-      *" $p "*) [ $exists -eq 1 ] && np_stale_allow="$np_stale_allow $p"; continue ;;
-    esac
-    [ $exists -eq 1 ] || np_missing="$np_missing $p"
-  done
-  TESTS=$((TESTS + 1))
-  if [ -z "$np_missing" ]; then ok x; else
-    fail "derived SKILL.md names path(s) the derived tree lacks:$np_missing"; fi
-  TESTS=$((TESTS + 1))
-  if [ -z "$np_stale_allow" ]; then ok x; else
-    fail "SKILL_ALLOW_PATHS entries now exist - drop them:$np_stale_allow"; fi
-
-  # A3 (denylist): the three retired phrasings, one assertion each so a
-  # regression names the sentence it reintroduced. Read the note above before
-  # extending this. The file is whitespace-normalised first: SKILL.md wraps at
-  # ~72 characters, and a claim straddling a line break is invisible to the
-  # line-oriented grep behind contains().
-  np_skill_flat=$(tr '\n' ' ' < "$np_skill" | tr -s ' ')
-  for phrase in "runs the test suite" "Two further tiers run" \
-      "This repository's own workflow"; do
+  for np_doc in SKILL.md REFERENCE.md; do
+    np_skill="$ND/.claude/skills/mechatronics-docs/$np_doc"
+    np_missing=""; np_stale_allow=""
+    for p in $(grep -o '`[^`]*`' "$np_skill" | tr -d '`' \
+        | grep -E '^[A-Za-z0-9_.][A-Za-z0-9_./()-]*(/|\.md|\.py|\.sh|\.ya?ml|\.json|\.mmd|\.html|\.csv)$' \
+        | grep -v -E '[*{}$~]|YYYY|ABBR|NN_|DOMAIN' | sort -u); do
+      if [ -e "$ND/$p" ] || [ -e "$ND/.claude/skills/mechatronics-docs/$p" ]; then
+        exists=1; else exists=0; fi
+      case " $SKILL_ALLOW_PATHS " in
+        *" $p "*) [ $exists -eq 1 ] && np_stale_allow="$np_stale_allow $p"; continue ;;
+      esac
+      [ $exists -eq 1 ] || np_missing="$np_missing $p"
+    done
     TESTS=$((TESTS + 1))
-    if contains "$np_skill_flat" "$phrase"; then
-      fail "derived SKILL.md still carries the retired phrasing: $phrase"
-    else ok x; fi
+    if [ -z "$np_missing" ]; then ok x; else
+      fail "derived $np_doc names path(s) the derived tree lacks:$np_missing"; fi
+    TESTS=$((TESTS + 1))
+    if [ -z "$np_stale_allow" ]; then ok x; else
+      fail "SKILL_ALLOW_PATHS entries now exist in $np_doc - drop them:$np_stale_allow"; fi
+
+    # A3 (denylist): the three retired phrasings, one assertion each so a
+    # regression names the sentence it reintroduced. Read the note above before
+    # extending this. The file is whitespace-normalised first: both files wrap
+    # at ~76 characters, and a claim straddling a line break is invisible to
+    # the line-oriented grep behind contains().
+    np_skill_flat=$(tr '\n' ' ' < "$np_skill" | tr -s ' ')
+    for phrase in "runs the test suite" "Two further tiers run" \
+        "This repository's own workflow"; do
+      TESTS=$((TESTS + 1))
+      if contains "$np_skill_flat" "$phrase"; then
+        fail "derived $np_doc still carries the retired phrasing: $phrase"
+      else ok x; fi
+    done
   done
 
-  # A4 (structural, template-side): SKILL.md's one surviving claim about the
+  # A4 (structural, template-side): REFERENCE.md's one surviving claim about the
   # CONTENTS of a workflow - that the template repository's own workflow arms
   # not-allocated and no-evidence-note - is pinned here. This is the
   # correspondence check the note above calls self-defeating, and it works in
   # this one direction because both the claim and the file it is about live in
   # THIS repository: no marker and no repository-dependent variant is needed.
-  # Drop that step and SKILL.md goes silently false in every derived project
-  # already shipped, which is issue #117 a second time.
+  # Drop that step and REFERENCE.md goes silently false in every derived
+  # project already shipped, which is issue #117 a second time.
   np_tmpl_wf=$(cat "$NP_ROOT/.github/workflows/validate-vault.yml" 2>/dev/null)
   TESTS=$((TESTS + 1))
   if contains "$np_tmpl_wf" "fail-on not-allocated,no-evidence-note"; then
     ok x; else
-    fail "template workflow no longer arms the --fail-on classes SKILL.md names"; fi
+    fail "template workflow no longer arms the --fail-on classes REFERENCE.md names"; fi
 
   # No prose in the derived tree may still point at the worked example or
   # the method vault - the leftover-link defect of issue #70.
