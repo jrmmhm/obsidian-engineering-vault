@@ -189,7 +189,23 @@ and membership against a named constant is invisible to it.
    wikilink targets (`iter_wikilinks`, the reader `check_links` uses).
    The name index behind it walks the vault on disk and takes the rest of
    `index_root` from `git_listed_files`
-8. the acceptance filter over the vault-wide WARNs, by the same
+8. `git_advisories` → `pointer-drift`, `ref-unresolved`, `pending-stale`,
+   each check in its own `try` so one that raises cannot drop the others.
+   `advisory_notes` hands them the active domain notes - a superseded or
+   deprecated one is not asked - and `advisory_spec` the four lists of the
+   schema's `git_advisories` block. The first two read git through
+   `git_read`, which blocks every fetch (`GIT_NO_LAZY_FETCH`,
+   `protocol.allow=never`), and say nothing where `git_complete` finds a
+   shallow repository or a call fails: one first-parent `git log` over the
+   cited files and the notes, plus one `cat-file --batch` for the notes'
+   versions since a change when `drift_kind` must decide whether a date
+   moved without the text; one `cat-file --batch-check` per repository,
+   whose ids include the possible successors `id_units` and `marked_old`
+   read, and one `check-ignore` in `absent_clones` when dead ids remain.
+   `artifact_readings` resolves a token to the one path it means, narrower
+   than `check_paths`' candidates because an existing reading produces a
+   finding here instead of suppressing one
+9. the acceptance filter over the vault-wide WARNs, by the same
    `file_acceptance` as stage 2
 
 `export_analysis` is the one that reaches outside this file: it imports the
@@ -300,6 +316,9 @@ Python, which is why a grep of the source alone does not find them.
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
 | `overview-unidentified` | `validate_vault_wide` | vault-wide | WARN |
 | `path-missing` | `check_paths` | domain | ERROR in a References or Sources section (English or German spelling, `REF_SECTION_TOKENS`), WARN elsewhere, and WARN anywhere for a gitignored path whose folder is absent |
+| `pending-stale` | `check_pending_stale` | vault-wide | WARN |
+| `pointer-drift` | `check_pointer_drift` | vault-wide, roles outside `drift_exempt_roles` | WARN |
+| `ref-unresolved` | `check_ref_unresolved` | vault-wide, roles in `ref_roles` | WARN |
 | `req-class` | `check_req_table` | domain, requirements role | ERROR |
 | `req-criterion` | `check_req_table` | domain, requirements role | ERROR |
 | `req-duplicate` | `check_req_table` | domain, requirements role | ERROR |

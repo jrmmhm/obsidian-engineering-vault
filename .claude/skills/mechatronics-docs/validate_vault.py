@@ -164,6 +164,46 @@ ARTIFACT_SEG_RE = re.compile(r"^\d{2}_")
 # Explicit open-item markers suppress the body-wide dead-path WARN only -
 # never the References/Sources ERROR (silent-bypass prevention).
 PENDING_RE = re.compile(r"\b(pending|planned|tbd|not\s+yet)\b", re.I)
+# pending-stale (DEC-MTH-060): a marker belongs to the path right before it
+# - '`20_software/linux` (planned, ...)', '`x/` clone (planned' - and to no
+# path further back than this many characters, nor across a '.' or ';'.
+PENDING_ATTACH_CHARS = 40
+# A relative path in backticks, directories included: what a marker most
+# often says is not there yet is a folder - a clone, a campaign directory -
+# which PATH_TOKEN_RE, built for files, does not read.
+PATH_SPAN_RE = re.compile(r"`((?:[\w.()-]+/)+[\w.()-]*)`")
+# Commit ids ref-unresolved reads (DEC-MTH-060): a backtick span that is
+# nothing but lowercase hex - git never prints an id in capitals, Xcode's
+# object ids are nothing else - and a hex word right after 'commit(s)',
+# the measured way a prose citation writes one. 'repo@id' never matches:
+# it is how an id of a repository this project does not hold is written.
+HEX_SPAN_RE = re.compile(r"`([0-9a-f]{7,40})`")
+COMMIT_WORD_RE = re.compile(r"\b(?i:commits?)\s+`?([0-9a-f]{7,40})(?![\w@])")
+# A dead id kept beside the id that carries the change now is history, not
+# a stale pointer (DEC-MTH-060). Only the forms agents were measured writing
+# count, each bound to the side the dead id stands on - '`old` -> `new`',
+# 'was/formerly/previously `old`', '`old` before the ... rewrite',
+# '`new` after the ... rewrite' - so '`old` (formerly `new`)', which calls
+# the dead id current, is still reported. ALIAS_HINT_RE only decides which
+# sentences have their bare hex words looked up as possible successors.
+HEX_WORD_RE = re.compile(r"(?<![\w@])([0-9a-f]{7,40})(?![\w@])")
+ALIAS_HINT_RE = re.compile(r"→|->|\b(?:was|formerly|previously|rewrit(?:e|ten))\b", re.I)
+REWRITE_TAIL = r"`?,?\s+{}\s+[^.;|]{{0,40}}?\brewrit(?:e|ten)\b"
+# A sentence ends at '.', '!' or '?' followed by whitespace - not inside a
+# path or a version, which carry no space after the dot.
+SENTENCE_RE = re.compile(r"(?:[^.!?]|[.!?](?!\s))+[.!?]*")
+LIST_ITEM_RE = re.compile(r"\s*(?:[-*+]|\d+[.)])\s")
+
+
+def commit_shaped(token):
+    """An abbreviated (7-16) or full (40) id carrying at least one letter.
+
+    All digits is a CI run or an issue number far more often than an id;
+    17-39 characters are a syzbot id or an md5, never an abbreviation git
+    writes. Precision over recall: an id of only digits goes unchecked.
+    """
+    return (any(c in "abcdef" for c in token)
+            and (7 <= len(token) <= 16 or len(token) == 40))
 
 # H2 headings that open the strict pointer zone in check_paths and end the
 # leak scan's reach in check_leaks, matched as substrings of the lowercased
@@ -278,6 +318,12 @@ FALLBACK_SCHEMA = {
                          "reason_field": "validator-accept-reason",
                          "acceptable_codes": ["length", "structure", "stub",
                                               "link-budget"]},
+    # In the essentials so an unreadable schema does not switch the three
+    # git-aware advisories off behind the single schema-unreadable WARN.
+    "git_advisories": {"clone_parents": ["20_software"],
+                       "drift_exempt_roles": ["TAE", "DEC"],
+                       "ref_roles": ["IMP", "TAE", "DEC"],
+                       "inactive_statuses": ["superseded", "deprecated"]},
     "consistency_rules": [{"id": "requirement-coverage",
                            "deferral_status_values": ["Blocked", "Deferred", "TBD"]}],
     # In the essentials for the alias map's reason (issue #66): without it
@@ -410,6 +456,26 @@ def deferral_values(schema):
                 if values:
                     return values
     return []
+
+
+ADVISORY_KEYS = ("clone_parents", "drift_exempt_roles", "ref_roles",
+                 "inactive_statuses")
+
+
+def advisory_spec(schema):
+    """The four lists the git-aware advisories read (DEC-MTH-060), or None.
+
+    Read like accept_spec: from the schema and, failing that, from
+    FALLBACK_SCHEMA. An empty list is a legitimate value - a project may
+    exempt no role - so what is required is that each key IS a list.
+    """
+    for src in (schema, FALLBACK_SCHEMA):
+        spec = _dict(src, "git_advisories")
+        if spec and all(isinstance(spec.get(k), list) for k in ADVISORY_KEYS):
+            out = {k: _strlist(spec, k) for k in ADVISORY_KEYS}
+            out["inactive_statuses"] = [s.lower() for s in out["inactive_statuses"]]
+            return out
+    return None
 
 
 def is_deferral(status, values):
@@ -2153,6 +2219,40 @@ def check_leaks(abbr, path, lines, fm_end, findings):
                                        " - Context frames the problem; concrete numbers "
                                        "belong in Options or in IMP/CMP")))
 
+def artifact_shaped(segs):
+    """Is a path token, split at '/', shaped like a project artifact?
+
+    An NN_ first segment, or an NN_ second one behind a project folder name
+    when at least three segments follow - the one shape rule check_paths
+    and the git-aware advisories share.
+    """
+    return bool(ARTIFACT_SEG_RE.match(segs[0])
+                or (len(segs) > 2 and ARTIFACT_SEG_RE.match(segs[1])))
+
+
+def artifact_readings(vault, token):
+    """The paths a project-artifact token means, for checks that REPORT on what exists.
+
+    Narrower than check_paths' candidates on purpose. There, every extra
+    reading can only suppress a path-missing finding; here a reading that
+    exists produces one. '30_hw/README.md' must not become the project's
+    own README.md, so a token starting with its NN_ folder has exactly one
+    reading, and only a token led by a project folder name gets the two
+    readings that drop or keep that name. A '..' segment reads nothing: it
+    could only lead out of the project.
+    """
+    token = token.rstrip("/")
+    if token.startswith(("http", "Projectname/", "www.")):
+        return []
+    segs = token.split("/")
+    if ".." in segs or not artifact_shaped(segs):
+        return []
+    if ARTIFACT_SEG_RE.match(segs[0]):
+        return [vault.project_root / token]
+    return [vault.project_root / "/".join(segs[1:]),
+            vault.project_root.parent / token]
+
+
 def check_paths(vault, path, lines, fm_end, findings):
     """Dead-pointer check over the whole body.
 
@@ -2221,8 +2321,7 @@ def check_paths(vault, path, lines, fm_end, findings):
             if token.startswith(("http", "Projectname/", "www.")):
                 continue
             segs = token.split("/")
-            if not (ARTIFACT_SEG_RE.match(segs[0])
-                    or (len(segs) > 2 and ARTIFACT_SEG_RE.match(segs[1]))):
+            if not artifact_shaped(segs):
                 continue
             candidates = [
                 vault.project_root / token,
@@ -2766,6 +2865,524 @@ def arc_containment(vault: Vault):
     return out
 
 
+def git_read(repo, args, stdin=None, ok=(0,)):
+    """Stdout BYTES of a read-only git query in repo, or None if it cannot answer.
+
+    Never touches the network. A partial clone fetches a missing object
+    from its promisor remote on demand - measured on a blob:none clone, an
+    unknown full id cost a round trip to its remote - so GIT_NO_LAZY_FETCH
+    switches that off, and protocol.allow=never refuses every transport on
+    a git too old to know the variable. Bytes, for git_head_content's
+    reason: a path that is not UTF-8 must not raise inside subprocess.
+    ok names the exit codes that are answers: check-ignore exits 1 when
+    nothing it was asked about is ignored.
+    """
+    env = git_env()
+    env["GIT_NO_LAZY_FETCH"] = "1"
+    try:
+        r = subprocess.run(["git", "--no-pager", "-c", "protocol.allow=never",
+                            "-C", str(repo), *args],
+                           input=stdin, capture_output=True, timeout=30, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout if r.returncode in ok else None
+
+
+def git_complete(repo):
+    """Does repo hold its whole history? A shallow clone cannot say what it lacks."""
+    out = git_read(repo, ["rev-parse", "--is-shallow-repository"])
+    return out is not None and out.strip() == b"false"
+
+
+def advisory_notes(vault, corpus, inactive):
+    """(path, role, frontmatter, lines, fm_end, fence blocks) of every active note.
+
+    Domain notes only, in corpus order. A note marked superseded or
+    deprecated - in its frontmatter, or on the body Status line a DEC
+    carries instead - is the repair the method names for a stale note, so
+    it is not asked again.
+    """
+    out = []
+    for p, text in corpus.items():
+        kind, abbr = vault.classify(p)
+        if kind != "domain":
+            continue
+        lines = text.splitlines()
+        fm, fm_end, bad = parse_frontmatter(lines)
+        if bad or fm is None:
+            fm, fm_end = {}, 0
+        status = fm.get("status")
+        if not isinstance(status, str):
+            status = None
+            for line in lines[fm_end:]:
+                if line.startswith("## "):
+                    break
+                m = re.match(r"Status:\s*(\w+)", line)
+                if m:
+                    status = m.group(1)
+                    break
+        if status and status.strip().lower() in inactive:
+            continue
+        out.append((p, vault.role_of(abbr), fm, lines, fm_end, fence_blocks(lines)))
+    return out
+
+
+def repo_file(repo, path):
+    """path relative to repo, POSIX-spelled, when it is a file of repo itself.
+
+    None for a directory, a path outside the repository, and a file below a
+    nested repository - a clone under 20_software/ whose history is its
+    own, and which this check never walks.
+    """
+    try:
+        if not path.is_file():
+            return None
+        rel = path.resolve().relative_to(repo)
+    except (OSError, ValueError):
+        return None
+    d = repo
+    for part in rel.parts[:-1]:
+        d = d / part
+        if (d / ".git").exists():
+            return None
+    return rel.as_posix()
+
+
+def check_pointer_drift(vault, notes, spec, findings):
+    """pointer-drift: a file a note names changed after the note was last verified.
+
+    One walk of the vault's own repository, restricted to the cited files
+    and the notes themselves: first-parent, so a change counts on the day
+    it reached this line of history, not the day it was written on a
+    branch. A commit that changed the note together with the file is no
+    drift - the note was written against that change. TAE and DEC record a
+    point in time and are not asked (drift_exempt_roles). Nothing is said
+    without a repository, in a shallow one, or when git cannot answer.
+
+    A date alone does not clear it (DEC-MTH-060): with last-verified on or
+    after the change, the note is still reported while its text, its
+    last-verified line aside, is what it was at that commit, or while the
+    newest change of its last-verified line since then - in a commit or in
+    the working tree - came without a change of its text: the docs-2 A/B
+    saw an agent credit the bare bump with the repair, and the note it
+    worked on had been edited for another reason after the change. A note
+    that did not exist yet at the change was written against it; one whose
+    text git cannot hand out (a partial clone) is not asked.
+    """
+    repo = vault.git_root()
+    if repo is None:
+        return
+    repo = repo.resolve()
+    if not git_complete(repo):
+        return
+    cited = []
+    for p, role, fm, lines, fm_end, blocks in notes:
+        if role in spec["drift_exempt_roles"]:
+            continue
+        lv = fm.get("last-verified")
+        if not (isinstance(lv, str) and DATE_RE.match(lv)):
+            continue
+        hosted = set()
+        for open_line, info, _, close_line in blocks:
+            if fence_host(info):
+                hosted.update(range(open_line, (close_line or len(lines)) + 1))
+        refs = {}
+        for i, line in enumerate(lines, 1):
+            if i <= fm_end or i in hosted:
+                continue
+            for m in PATH_TOKEN_RE.finditer(line):
+                for reading in artifact_readings(vault, m.group(1)):
+                    rel = repo_file(repo, reading)
+                    if rel:
+                        refs.setdefault(rel, i)
+                        break
+        note = repo_file(repo, p)
+        if refs and note:
+            cited.append((p, lv, refs, note, lines))
+    if not cited:
+        return
+    paths = sorted({r for _p, _lv, refs, *_rest in cited for r in refs}
+                   | {c[3] for c in cited})
+    # No --since: a bare bump moves last-verified past the change, and the
+    # change must still be found to be asked about.
+    out = git_read(repo, ["--literal-pathspecs", "log", "--first-parent",
+                          "--diff-merges=first-parent", "--no-renames",
+                          "--no-show-signature", "-z", "--format=%x01%H %h %cs",
+                          "--name-only", "--", *paths])
+    if out is None:
+        return
+    # Newest first: last[name] is the change that counts, oldest[name] the
+    # walk position of the earliest commit that touched name.
+    last, oldest, touched, commit = {}, {}, {}, None
+    for chunk in out.split(b"\0"):
+        chunk = chunk.strip(b"\n")
+        if not chunk:
+            continue
+        if chunk.startswith(b"\x01"):
+            head, _, chunk = chunk[1:].partition(b"\n")
+            parts = head.decode("ascii", "replace").split()
+            if len(parts) != 3:
+                return
+            commit = (*parts, set(), (commit[4] + 1) if commit else 0)
+        if commit is None or not chunk:
+            continue
+        name = os.fsdecode(chunk)
+        commit[3].add(name)
+        last.setdefault(name, commit)
+        oldest[name] = commit[4]
+        touched.setdefault(name, []).append(commit)
+    hits, ask = {}, {}
+    for p, lv, refs, note, lines in cited:
+        for rel, line in refs.items():
+            got = last.get(rel)
+            if not got or note in got[3]:
+                continue
+            if got[2] > lv:
+                hits.setdefault(p, []).append((line, rel, got[1], got[2], "date"))
+            elif oldest.get(note, -1) > got[4]:
+                ask.setdefault((got[0], note), (got, []))[1].append((p, line, rel))
+    if ask:
+        # The note at the change and at every commit since, one batch.
+        keys = set()
+        for (h, note), (got, _asked) in ask.items():
+            keys.add((h, note))
+            keys.update((c[0], note) for c in touched[note] if c[4] < got[4])
+        keys = sorted(keys)
+        out = git_read(repo, ["cat-file", "--batch"],
+                       stdin="".join(f"{h}:{n}\n" for h, n in keys).encode())
+        if out is None:
+            return
+        blobs, pos = {}, 0
+        for key in keys:
+            end = out.find(b"\n", pos)
+            if end < 0:
+                return
+            head = out[pos:end].split()
+            pos = end + 1
+            # '<name> missing' echoes the name, which may hold spaces; a
+            # found object's header is '<oid> <type> <size>'.
+            if len(head) != 3 or not head[2].isdigit():
+                continue
+            size = int(head[2])
+            blobs[key] = out[pos:pos + size].decode("utf-8", "replace").splitlines()
+            pos += size + 1
+        texts = {p: lines for p, _lv, _r, _n, lines in cited}
+        for (_h, note), (got, asked) in ask.items():
+            then = [(c[0], note) for c in touched[note] if c[4] < got[4]] + [(got[0], note)]
+            if any(k not in blobs for k in then):
+                continue
+            for p, line, rel in asked:
+                kind = drift_kind([texts[p]] + [blobs[k] for k in then])
+                if kind:
+                    hits.setdefault(p, []).append((line, rel, got[1], got[2], kind))
+    for p, lv, _refs, _note, _lines in cited:
+        if p not in hits:
+            continue
+        found = sorted(hits[p])
+        line, rel, h, day, kind = found[0]
+        more = f" (+{len(found) - 1} more)" if len(found) > 1 else ""
+        said = {"date": f"after this note's last-verified {lv}",
+                "bump": f"and the note's text has not changed since, only its "
+                        f"last-verified ({lv})",
+                "bare": f"and the newest change of this note's last-verified "
+                        f"({lv}) came without a change of its text"}[kind]
+        findings.append(Finding(
+            "WARN", "pointer-drift", str(p), line,
+            f"{rel} changed in {h} on {day}, {said}{more} - check what the "
+            "note says against that change and fix it, or record in the note "
+            "that it still holds (conventions file, pointer-drift); bump "
+            "last-verified only after that, the date alone does not clear this"))
+
+
+def unverified_text(lines):
+    """A note's lines without its last-verified line - what a bare bump leaves unchanged."""
+    return [line.rstrip() for line in lines if not line.startswith("last-verified:")]
+
+
+def drift_kind(versions):
+    """Why a note dated on or after a change is still asked about it, or None.
+
+    versions: the note now, at every commit since the change (newest
+    first), and at the change. 'bump': its text is what it was at the
+    change. 'bare': the newest change of its last-verified line came
+    without a change of its text - an edit for another reason before it
+    does not make the date a re-check.
+    """
+    if unverified_text(versions[0]) == unverified_text(versions[-1]):
+        return "bump"
+
+    def stamp(lines):
+        return [x for x in lines if x.startswith("last-verified:")][:1]
+
+    for newer, older in zip(versions, versions[1:]):
+        if stamp(newer) != stamp(older):
+            return "bare" if unverified_text(newer) == unverified_text(older) else None
+    return None
+
+
+def id_units(lines, fm_end, mask):
+    """The sentences, table cells and headings of a note, as (text, line numbers).
+
+    The unit a historical id and its successor must share. A sentence runs
+    on across a wrapped line, so a paragraph - consecutive prose lines, a
+    list item starting a new one - is joined before it is split; each
+    sentence keeps the lines it covers.
+    """
+    units, para = [], []
+
+    def flush():
+        text, starts = "", []
+        for i, line in para:
+            starts.append((len(text), i))
+            text += line.strip() + " "
+        for m in SENTENCE_RE.finditer(text):
+            begin = m.end() - len(m.group(0).lstrip())
+            covered = {i for k, (off, i) in enumerate(starts)
+                       if off < m.end() and (k + 1 == len(starts)
+                                             or starts[k + 1][0] > begin)}
+            units.append((m.group(0), covered))
+        para.clear()
+
+    for i, line in enumerate(lines, 1):
+        if i <= fm_end or mask[i] or not line.strip():
+            flush()
+            continue
+        cells = split_cells(line)
+        if cells is not None or HEADING_RE.match(line):
+            flush()
+            units.extend((c, {i}) for c in (cells if cells is not None else [line]))
+            continue
+        if LIST_ITEM_RE.match(line):
+            flush()
+        para.append((i, line))
+    flush()
+    return units
+
+
+def marked_old(dead, text, live):
+    """Does text keep dead as the history of an id in live, in a measured form?"""
+    d = rf"(?<![\w@]){dead}(?![\w@])"
+    m = re.search(d + r"`?\s*(?:→|->)\s*`?([0-9a-f]{7,40})(?![\w@])", text)
+    if m and m.group(1) in live:
+        return True
+    others = [w for w in HEX_WORD_RE.findall(text) if w != dead and w in live]
+    if not others:
+        return False
+    if re.search(r"\b(?i:was|formerly|previously)\s+(?:(?i:commit)\s+)?`?" + d, text):
+        return True
+    if re.search(d + REWRITE_TAIL.format("(?i:before)"), text):
+        return True
+    return any(re.search(rf"(?<![\w@]){w}(?![\w@])" + REWRITE_TAIL.format("(?i:after)"),
+                         text) for w in others)
+
+
+def absent_clones(vault, root, notes, spec):
+    """Clones the vault points into that are not here: '<parent>/<name>/...'.
+
+    A path inside the clone - not a bare mention of its folder, which may
+    say the opposite ('rather than in `20_software/vulns`') - and no .git
+    at that place, and the vault's repository ignores the folder: it is a
+    clone this project keeps beside its history, and an id only it holds
+    reads as dead here. The user's own excludes file is not asked, so the
+    answer is the project's on every machine.
+    """
+    wanted = {}
+    for parent in spec["clone_parents"]:
+        depth = len(parent.strip("/").split("/"))
+        for _p, _role, _fm, lines, fm_end, _blocks in notes:
+            for line in lines[fm_end:]:
+                for rx in (PATH_TOKEN_RE, PATH_SPAN_RE):
+                    for m in rx.finditer(line):
+                        segs = m.group(1).split("/")
+                        if ("/".join(segs[:depth]) != parent.strip("/")
+                                or len(segs) < depth + 2 or not segs[depth + 1]):
+                            continue
+                        d = vault.project_root / parent / segs[depth]
+                        if (d / ".git").exists():
+                            continue
+                        try:
+                            rel = d.resolve().relative_to(root).as_posix() + "/"
+                        except (OSError, ValueError):
+                            continue
+                        wanted[rel] = f"{parent.strip('/')}/{segs[depth]}"
+    if not wanted:
+        return []
+    out = git_read(root, ["-c", "core.excludesFile=/dev/null", "check-ignore", "--stdin"],
+                   stdin="".join(r + "\n" for r in sorted(wanted)).encode(), ok=(0, 1))
+    if out is None:
+        return []
+    ignored = set(out.decode("utf-8", "replace").splitlines())
+    return sorted({wanted[r] for r in wanted if r in ignored})
+
+
+def check_ref_unresolved(vault, notes, spec, findings):
+    """ref-unresolved: a commit id a note cites resolves in no local repository.
+
+    The repositories asked are the vault's own and every git clone directly
+    below a clone_parents folder, each once, with all ids still open on one
+    cat-file call. Any object counts - a tree id is a live pointer - and so
+    does an ambiguous abbreviation. A shallow repository, or one that
+    cannot answer, makes the check say nothing: 'missing' there proves
+    nothing about the id. A dead id kept as the history of a live one
+    (marked_old) is no finding. When the vault points into a clone that is
+    absent here, a dead id may be one of the clone's: the ids are counted
+    in one line instead of reported one by one with a repair.
+    """
+    cited, extra = [], set()
+    for p, role, fm, lines, fm_end, blocks in notes:
+        if role not in spec["ref_roles"]:
+            continue
+        mask = fence_mask(lines, blocks)
+        ids = {}
+        for i, line in enumerate(lines, 1):
+            if i <= fm_end or mask[i]:
+                continue
+            for rx in (HEX_SPAN_RE, COMMIT_WORD_RE):
+                for m in rx.finditer(line):
+                    if commit_shaped(m.group(1)):
+                        ids.setdefault(m.group(1), set()).add(i)
+        if not ids:
+            continue
+        units = id_units(lines, fm_end, mask)
+        for text, _covered in units:
+            words = HEX_WORD_RE.findall(text)
+            if ALIAS_HINT_RE.search(text) and any(w in ids for w in words):
+                extra.update(w for w in words if commit_shaped(w))
+        cited.append((p, ids, units))
+    root = vault.git_root()
+    if not cited or root is None:
+        return
+    repos = [root.resolve()]
+    for parent in spec["clone_parents"]:
+        base = vault.project_root / parent
+        try:
+            kids = sorted(base.iterdir()) if base.is_dir() else []
+        except OSError:
+            kids = []
+        for d in kids:
+            if d.is_dir() and (d / ".git").exists() and d.resolve() not in repos:
+                repos.append(d.resolve())
+    asked = sorted({t for _p, ids, _u in cited for t in ids} | extra)
+    open_ids = asked
+    for repo in repos:
+        if not open_ids:
+            break
+        if not git_complete(repo):
+            return
+        out = git_read(repo, ["cat-file", "--batch-check"],
+                       stdin="".join(t + "\n" for t in open_ids).encode())
+        if out is None:
+            return
+        answers = out.decode("ascii", "replace").splitlines()
+        if len(answers) != len(open_ids):
+            return
+        open_ids = [t for t, a in zip(open_ids, answers) if a.endswith(" missing")]
+    dead = set(open_ids)
+    live = set(asked) - dead
+    where = "the vault's repository"
+    if len(repos) > 1:
+        where += (f" and {len(repos) - 1} clone(s) under "
+                  + ", ".join(spec["clone_parents"]))
+    per_note = []
+    for p, ids, units in cited:
+        gone = []
+        for t, at in ids.items():
+            if t not in dead:
+                continue
+            # Every unit naming t on a line that cites it must keep t as history.
+            open_at = set()
+            for i in at:
+                naming = [text for text, covered in units
+                          if i in covered and t in HEX_WORD_RE.findall(text)]
+                if not naming or not all(marked_old(t, x, live) for x in naming):
+                    open_at.add(i)
+            if open_at:
+                gone.append((min(open_at), t))
+        if gone:
+            per_note.append((p, sorted(gone)))
+    if not per_note:
+        return
+    missing = absent_clones(vault, root.resolve(), notes, spec)
+    if missing:
+        count = len({t for _p, gone in per_note for _i, t in gone})
+        findings.append(Finding(
+            "WARN", "ref-unresolved", str(vault.root), None,
+            f"{count} commit id(s) not checked: clone(s) {', '.join(missing)} absent"))
+        return
+    for p, gone in per_note:
+        listed = ", ".join(f"`{t}`" for _i, t in gone)
+        findings.append(Finding(
+            "WARN", "ref-unresolved", str(p), gone[0][0],
+            f"commit id(s) {listed} resolve to no object in {where} - a "
+            "rewritten history or a deleted branch leaves an id dead once its "
+            "objects are pruned; replace it with the id that carries the "
+            "change now - the old one may stay beside it, marked as it is in "
+            "the conventions file - or write an id of a repository this "
+            "project does not hold as repo@id"))
+
+
+def check_pending_stale(vault, notes, spec, findings):
+    """pending-stale: a pending/planned/TBD marker on a path that exists.
+
+    The marker silences path-missing on its line for good, so once the
+    artifact exists nothing else says the line is out of date. A marker
+    belongs to the nearest path before it within PENDING_ATTACH_CHARS and
+    no sentence break - a marker in a heading, before its path, or in the
+    next sentence says nothing about that path. Needs no git.
+    """
+    for p, _role, _fm, lines, fm_end, blocks in notes:
+        mask = fence_mask(lines, blocks)
+        seen = set()
+        for i, line in enumerate(lines, 1):
+            if i <= fm_end or mask[i] or HEADING_RE.match(line):
+                continue
+            blank = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), line)
+            markers = list(PENDING_RE.finditer(blank))
+            if not markers:
+                continue
+            tokens = [(m.end(), m.group(1)) for m in PATH_TOKEN_RE.finditer(line)]
+            tokens += [(m.end(), m.group(1)) for m in PATH_SPAN_RE.finditer(line)]
+            for mk in markers:
+                before = [t for t in tokens if t[0] <= mk.start()]
+                if not before:
+                    continue
+                end, token = max(before)
+                gap = line[end:mk.start()]
+                key = token.rstrip("/")
+                if (len(gap) > PENDING_ATTACH_CHARS or "." in gap or ";" in gap
+                        or key in seen):
+                    continue
+                if any(r.exists() for r in artifact_readings(vault, token)):
+                    seen.add(key)
+                    findings.append(Finding(
+                        "WARN", "pending-stale", str(p), i,
+                        f"'{mk.group(0)}' marks {key} as not created yet, and "
+                        "it exists - remove the marker or update the line"))
+
+
+def git_advisories(vault, corpus):
+    """The git-aware advisory WARNs (DEC-MTH-060), each check on its own.
+
+    One check that fails must not take the others with it - in the stop
+    hook a raise would drop every vault-wide finding at once - so each
+    writes into its own list, and a list is kept only when its check ran
+    to the end.
+    """
+    spec = advisory_spec(vault.schema())
+    if spec is None:
+        return []
+    notes = advisory_notes(vault, corpus, spec["inactive_statuses"])
+    found = []
+    for check in (check_pointer_drift, check_ref_unresolved, check_pending_stale):
+        part = []
+        try:
+            check(vault, notes, spec, part)
+        except Exception:
+            continue
+        found.extend(part)
+    return found
+
+
 def validate_vault_wide(vault: Vault):
     # First, so it survives hook_stop's 15-line cut of the advisory block:
     # this finding is the explanation for the duplicate-basename and
@@ -2982,6 +3599,8 @@ def validate_vault_wide(vault: Vault):
             f"{label}: {', '.join(files)} - the link is ambiguous, and a "
             "path-qualified link does not resolve here either; rename one of "
             "the files"))
+
+    findings.extend(git_advisories(vault, corpus))
 
     # A file's own acceptance reaches its vault-wide WARNs too. Only files of
     # this vault's corpus are asked - a finding about the vault root or the

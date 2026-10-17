@@ -260,6 +260,10 @@ directory) — never in a session that does not invoke it, nor on subagent write
   findings (uncovered REQs, orphans, ...) are advisory — in full the first
   time and whenever they change, otherwise as one `vault-wide findings
   unchanged` line; the full audit in step 6 remains the authoritative pass.
+  Three of them say a note may have gone out of date — `pointer-drift`,
+  `ref-unresolved`, `pending-stale`; the repair is the one the message
+  names (the conventions file's quick reference states each rule), and a
+  bare `last-verified` bump is never it.
 
 Two readers, two channels. Everything advisory reaches the user as
 `Stop says: ...` — legacy findings, created files, questions for the

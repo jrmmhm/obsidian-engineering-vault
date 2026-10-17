@@ -262,6 +262,24 @@ home-relative (`~/.config/hypr/monitors.conf`), qualified by host
 defines `file://host/path` as the formal spelling of the same thing. Name
 the host in one of these ways: the path alone does not say which machine
 it is true on, and a reader on a different machine cannot recover it.
+A commit id follows the same rule: an id of this repository, or of a
+clone the validator asks (`20_software/` as shipped, `git_advisories` in
+its schema), is written bare (`` `92b06cd` ``, or "commit
+92b06cd"), and an id of a repository this project does not hold names
+it — `` `strictdoc@5a9b679` `` — because only the bare form is looked up.
+An id a history rewrite killed may stay beside the id that carries the
+change now, when one sentence or one table cell — not two cells of a
+row — says which is the old one, in one of these forms: the old id right
+after "was", "formerly" or "previously" (`` `0dcf958` (was `92b06cd`) ``);
+the old id before an arrow and the new one after it
+(`` `92b06cd` → `0dcf958` ``, or `->`); the old id followed by "before
+the … rewrite", or the new one by "after the … rewrite", with the other
+id in the same sentence. Any other wording reads as citing the old id.
+When the vault names a path inside a clone that is absent on this
+machine and ignored by git, an id of that clone cannot be told from a
+dead one, so the dead ids are counted in one line instead of reported one
+by one; naming only the clone's folder does not count, because a sentence
+can name a folder to say it is not used.
 
 The validator does not resolve any of those. It cannot tell a file that
 was deleted from a file on a machine that is simply not attached, so it
@@ -317,7 +335,7 @@ search the vault for files referencing it and update them.
 
 ### Validator-enforced rules (quick reference)
 
-Eight findings of `validate_vault.py` that the sections above do not name.
+Eleven findings of `validate_vault.py` that the sections above do not name.
 This is not the tool's whole code list — the rules above produce findings
 of their own, and every message the validator writes names its own code.
 
@@ -328,8 +346,12 @@ file the validator reads** means the root files, the `00_` files, the
 inbox and the domain files together — but nothing below a folder that is
 not a domain folder, because the validator never descends there.
 
-Three of the eight are vault-wide rather than per-file. The stop gate
-lists those as advisory; the full audit is the pass that counts.
+Six of the eleven are vault-wide rather than per-file. The stop gate
+lists those as advisory; the full audit is the pass that counts. Two of
+them read git, and say nothing where git cannot answer — no repository,
+or a shallow clone. Which roles and folders they ask is the
+`git_advisories` block of the validator's schema; the table states what
+ships.
 
 | Code | Severity | Fires on | Rule |
 | --- | --- | --- | --- |
@@ -341,6 +363,9 @@ lists those as advisory; the full audit is the pass that counts.
 | `orphan` | WARN, vault-wide | domain files | No other file in the vault links to it — reachable by search alone. |
 | `accept-invalid` | WARN | every file the validator reads | `validator-accept` names a code that cannot be accepted — an ERROR, or a WARN outside the schema's list — or sits in a `00_` file — a template, whose frontmatter every copy would inherit, or the README beside it. The finding it names is still reported. |
 | `accept-reason-missing` | WARN | every file the validator reads | `validator-accept` without a `validator-accept-reason`. Nothing is accepted until the file says why. |
+| `pointer-drift` | WARN, vault-wide | domain files except TAE and DEC, which record a point in time | A project file the note names was last changed in a commit that did not change the note too, and either the commit is dated after the note's `last-verified`, or the note's text is what it was at that commit apart from `last-verified`, or the newest change of `last-verified` since came without a change of the text. Check what the note says against the change. Fix it if it no longer holds; if it does, say so in the note — one line naming the change, `Re-checked against <id> (YYYY-MM-DD): still holds.`, updated in place on the next check. Then bump `last-verified`. A changed date alone does not clear it. |
+| `ref-unresolved` | WARN, vault-wide | IMP, TAE and DEC files | A commit id the note cites resolves in no local repository — a history rewrite leaves one dead once its objects are pruned. Replace it with the id that carries the change now — the old one may stay beside it in a form named under Paths — or qualify an id of a foreign repository as described there. |
+| `pending-stale` | WARN, vault-wide | domain files | A `pending`/`planned`/`TBD`/`not yet` marker right after a path that exists. The marker silences the dead-path check on its line for good; remove it, or update the line. |
 
 `duplicate-basename` has one remedy here, and it is not the one Obsidian
 teaches. Obsidian tells two notes of the same name apart by their path
