@@ -7870,6 +7870,58 @@ for variant in bare unignored global present; do
     printf '%s\n' "$gv_out" | grep ref-unresolved | sed 's/^/    /'; fi
 done
 rm -rf "$GR/20_software/gone" "$IMPR/IMP_Into_Clone.md"
+# The count holds only ids that would be reported: a dead id kept as
+# history is no reason for the absent-clone line.
+GX="$GA_TMP/AliasOnly"
+GXV="$GX/00_documentation/01_projectvault"
+ga_vault "$GXV"
+mkdir -p "$GX/20_software"
+printf 'one\n' > "$GX/20_software/tool.py"
+printf '20_software/gone/\n' > "$GX/.gitignore"
+ga_git 2026-01-01 init -q -b main "$GX"
+ga_commit "$GX" 2026-01-01 "baseline"
+gx_live=$(ga_git 2026-01-01 -C "$GX" rev-parse --short=8 HEAD)
+ga_note "$GXV/06_implementation_(IMP)/IMP_Only_Alias.md" IMP 2026-01-05 active \
+  "Now \`$gx_live\` (was \`deadbe8c\`), see [[IMP_Into]]."
+ga_note "$GXV/06_implementation_(IMP)/IMP_Into.md" IMP 2026-01-05 active \
+  "The driver is \`20_software/gone/src/drv.c\`, see [[IMP_Only_Alias]]."
+gx_out=$(python3 "$VALIDATOR" "$GXV" 2>&1)
+TESTS=$((TESTS + 1))
+if ! contains "$gx_out" "ref-unresolved"; then ok x; else
+  fail "a dead id kept as marked history must not raise the absent-clone line:"
+  printf '%s\n' "$gx_out" | grep ref-unresolved | sed 's/^/    /'; fi
+# A note whose name holds one space, with a version git cannot hand out
+# (removed in one commit, back in the next): that version is missing, the
+# note is not asked, and the other notes' findings stay.
+GSP="$GA_TMP/Spaced"
+GSPV="$GSP/00_documentation/01_projectvault"
+IMPS="$GSPV/06_implementation_(IMP)"
+ga_vault "$GSPV"
+mkdir -p "$GSP/20_software"
+printf 'one\n' > "$GSP/20_software/tool.py"
+ga_note "$IMPS/IMP_Spaced Note.md" IMP 2026-01-05 active \
+  "The tool is \`20_software/tool.py\`, see [[IMP_Plain]]."
+ga_note "$IMPS/IMP_Plain.md" IMP 2026-01-05 active \
+  "The tool is \`20_software/tool.py\`, see [[IMP_Spaced Note]]."
+ga_git 2026-01-01 init -q -b main "$GSP"
+ga_commit "$GSP" 2026-01-01 "baseline"
+printf 'two\n' >> "$GSP/20_software/tool.py"
+ga_commit "$GSP" 2026-02-01 "tool changed"
+mv "$IMPS/IMP_Spaced Note.md" "$GA_TMP/spaced.keep"
+ga_commit "$GSP" 2026-02-02 "note removed"
+mv "$GA_TMP/spaced.keep" "$IMPS/IMP_Spaced Note.md"
+python3 - "$IMPS/IMP_Spaced Note.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace("last-verified: 2026-01-05", "last-verified: 2026-02-03"))
+PY
+ga_commit "$GSP" 2026-02-03 "note back, dated"
+gsp_out=$(python3 "$VALIDATOR" "$GSPV" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gsp_out" "IMP_Plain\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, after this note's last-verified 2026-01-05" \
+   && ! contains "$gsp_out" "IMP_Spaced Note\.md:[0-9]* \[pointer-drift\]"; then ok x; else
+  fail "a missing version of a note with a space in its name must not drop pointer-drift:"
+  printf '%s\n' "$gsp_out" | grep -E 'pointer-drift|crash' | sed 's/^/    /'; fi
 
 # --- Unit 3: pending-stale ----------------------------------------------
 # Needs no repository, so this fixture has none.
