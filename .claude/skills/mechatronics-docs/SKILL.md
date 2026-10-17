@@ -260,11 +260,10 @@ directory) — never in a session that does not invoke it, nor on subagent write
   findings (uncovered REQs, orphans, ...) are advisory — in full the first
   time and whenever they change, otherwise as one `vault-wide findings
   unchanged` line; the full audit in step 6 remains the authoritative pass.
-  Three of them say a note may have gone out of date: `pointer-drift` (a
-  file the note names changed after its `last-verified` — re-check the
-  note, then bump `last-verified`, which clears it), `ref-unresolved` (a
-  cited commit id no local repository holds) and `pending-stale` (a
-  pending/planned marker on a path that exists).
+  Three of them say a note may have gone out of date — `pointer-drift`,
+  `ref-unresolved`, `pending-stale`; the repair is the one the message
+  names (the conventions file's quick reference states each rule), and a
+  bare `last-verified` bump is never it.
 
 Two readers, two channels. Everything advisory reaches the user as
 `Stop says: ...` — legacy findings, created files, questions for the

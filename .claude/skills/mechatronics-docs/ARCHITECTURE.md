@@ -197,7 +197,11 @@ and membership against a named constant is invisible to it.
    `git_read`, which blocks every fetch (`GIT_NO_LAZY_FETCH`,
    `protocol.allow=never`), and say nothing where `git_complete` finds a
    shallow repository or a call fails: one first-parent `git log` over the
-   cited files and the notes, one `cat-file --batch-check` per repository.
+   cited files and the notes, plus one `cat-file --batch` for the notes'
+   versions since a change when `drift_kind` must decide whether a date
+   moved without the text; one `cat-file --batch-check` per repository,
+   whose ids include the possible successors `id_units` and `marked_old`
+   read, and one `check-ignore` in `absent_clones` when dead ids remain.
    `artifact_readings` resolves a token to the one path it means, narrower
    than `check_paths`' candidates because an existing reading produces a
    finding here instead of suppressing one
