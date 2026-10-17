@@ -97,7 +97,7 @@ The domain chain, in the order it executes:
 | 3a | `check_field_value` | the schema-declared codes | the code comes from the field descriptor, not from Python |
 | 3b | `check_undeclared` | `frontmatter-undeclared` | WARN, one grouped finding per file |
 | 4 | `check_sections` | `template-sections`, `section-mismatch`, `section-near-miss` | ERROR, ERROR, WARN |
-| 5 | `check_length` | `length`, `structure` | `length` is ERROR above the hard limit, WARN above the soft one |
+| 5 | `check_length` | `length`, `structure` | `length` is ERROR above the hard line limit, WARN above the soft one, and WARN when a file at or under the soft line limit exceeds `size_limits.length_warn_words` words |
 | 6 | `check_links` | `link-unresolved`, `link-budget` | `link-unresolved` is ERROR when `strict_links`, WARN otherwise; the budget counts prose links only — no table row, no link to the file itself |
 | 7 | `check_leaks` | `impl-leak` | ERROR in ARC, WARN in a DEC Context section; no other domain is scanned, and a References/Sources section (`REF_SECTION_TOKENS`, English and German spellings) is exempt |
 | 7a | `check_fence` | `code-fence`, `fence-host`, `fence-record` | only in the banned domains; a declared over-long block is WARN, an undeclared one ERROR |
@@ -106,6 +106,7 @@ The domain chain, in the order it executes:
 | 9a | `check_req_table_silence` | `req-table-unrecognized` | WARN |
 | 10 | `check_tae_verifies` | `verifies-unknown-req` | ERROR; triggered on the **evidence role** |
 | 11 | `check_dec_status` | `dec-status`, `dec-superseded` | ERROR; triggered on the **decisions role** |
+| 11a | `check_adm_cells` | `adm-cell-long` | WARN, one per file; triggered on the **administration role** |
 | 12 | `validate_file` | `stub` | WARN |
 
 Every kind ends in the same filter: `file_acceptance` reads the file's own
@@ -113,6 +114,17 @@ Every kind ends in the same filter: `file_acceptance` reads the file's own
 ERROR, and adds `accept-invalid` and `accept-reason-missing` where the
 acceptance itself is wrong. The full audit counts what was dropped in
 `Vault.accepted` and prints one line for it above the summary.
+
+The two size measures read their limits through `size_limit` from
+`size_limits` in `vault_schema.json`, falling back per key to
+`FALLBACK_SCHEMA` when a value is not a positive integer. The word measure
+emits the same `length` code as the line measure on purpose: an acceptance
+of `length` drops both, exactly as it drops the line WARN alone, and the
+word count is not taken at all once the line count has spoken — a file
+never carries two `length` findings. `check_adm_cells` reads table body
+rows through `req_rows`, so an escaped pipe, a fenced example and an
+unclosed fence are what every other table check takes them to be.
+`adm-cell-long` is not in `validator_accept.acceptable_codes`.
 
 Step 4 is the one that asks which contract a file is under. `check_sections`
 scores the file against every template of its domain and reports the
@@ -270,6 +282,7 @@ Python, which is why a grep of the source alone does not find them.
 | --- | --- | --- | --- |
 | `accept-invalid` | `file_acceptance` | every file read | WARN |
 | `accept-reason-missing` | `file_acceptance` | every file read | WARN |
+| `adm-cell-long` | `check_adm_cells` | domain, administration role | WARN |
 | `arc-containment-unreadable` | `validate_vault_wide` | vault-wide | WARN |
 | `arc-not-in-overview` | `validate_vault_wide` | vault-wide | WARN |
 | `code-fence` | `check_fence` | domain, banned domains only | ERROR |
@@ -294,7 +307,7 @@ Python, which is why a grep of the source alone does not find them.
 | `id-vanished` | `check_identifiers` | vault-wide | WARN |
 | `impl-leak` | `check_leaks` | domain, ARC and DEC only | ERROR in ARC, WARN in DEC |
 | `inb-age` | `check_inb_age` | inbox, disk pass only | WARN |
-| `length` | `check_length` | domain | ERROR above the hard limit, WARN above the soft one |
+| `length` | `check_length` | domain | ERROR above the hard line limit, WARN above the soft one or above the word limit |
 | `link-budget` | `check_links` | every file read | WARN |
 | `link-unresolved` | `check_links` | every file read | ERROR when `strict_links`, WARN otherwise |
 | `orphan` | `validate_vault_wide` | vault-wide | WARN |
