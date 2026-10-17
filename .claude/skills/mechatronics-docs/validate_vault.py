@@ -2961,10 +2961,13 @@ def check_pointer_drift(vault, notes, spec, findings):
 
     A date alone does not clear it (DEC-MTH-060): with last-verified on or
     after the change, the note is still reported while its text, its
-    last-verified line aside, is what it was at that commit - the docs-2
-    A/B saw an agent credit the bare bump with the repair. A note that did
-    not exist yet at the change was written against it; one whose text at
-    the change git cannot hand out (a partial clone) is not asked.
+    last-verified line aside, is what it was at that commit, or while the
+    newest change of its last-verified line since then - in a commit or in
+    the working tree - came without a change of its text: the docs-2 A/B
+    saw an agent credit the bare bump with the repair, and the note it
+    worked on had been edited for another reason after the change. A note
+    that did not exist yet at the change was written against it; one whose
+    text git cannot hand out (a partial clone) is not asked.
     """
     repo = vault.git_root()
     if repo is None:
@@ -3010,7 +3013,7 @@ def check_pointer_drift(vault, notes, spec, findings):
         return
     # Newest first: last[name] is the change that counts, oldest[name] the
     # walk position of the earliest commit that touched name.
-    last, oldest, commit = {}, {}, None
+    last, oldest, touched, commit = {}, {}, {}, None
     for chunk in out.split(b"\0"):
         chunk = chunk.strip(b"\n")
         if not chunk:
@@ -3027,6 +3030,7 @@ def check_pointer_drift(vault, notes, spec, findings):
         commit[3].add(name)
         last.setdefault(name, commit)
         oldest[name] = commit[4]
+        touched.setdefault(name, []).append(commit)
     hits, ask = {}, {}
     for p, lv, refs, note, lines in cited:
         for rel, line in refs.items():
@@ -3036,15 +3040,19 @@ def check_pointer_drift(vault, notes, spec, findings):
             if got[2] > lv:
                 hits.setdefault(p, []).append((line, rel, got[1], got[2], "date"))
             elif oldest.get(note, -1) > got[4]:
-                ask.setdefault((got[0], note), []).append((p, line, rel, got[1], got[2]))
+                ask.setdefault((got[0], note), (got, []))[1].append((p, line, rel))
     if ask:
-        keys = sorted(ask)
+        # The note at the change and at every commit since, one batch.
+        keys = set()
+        for (h, note), (got, _asked) in ask.items():
+            keys.add((h, note))
+            keys.update((c[0], note) for c in touched[note] if c[4] < got[4])
+        keys = sorted(keys)
         out = git_read(repo, ["cat-file", "--batch"],
                        stdin="".join(f"{h}:{n}\n" for h, n in keys).encode())
         if out is None:
             return
-        texts = {p: lines for p, _lv, _r, _n, lines in cited}
-        pos = 0
+        blobs, pos = {}, 0
         for key in keys:
             end = out.find(b"\n", pos)
             if end < 0:
@@ -3054,20 +3062,28 @@ def check_pointer_drift(vault, notes, spec, findings):
             if len(head) != 3:
                 continue
             size = int(head[2])
-            then = out[pos:pos + size].decode("utf-8", "replace").splitlines()
+            blobs[key] = out[pos:pos + size].decode("utf-8", "replace").splitlines()
             pos += size + 1
-            for p, line, rel, h, day in ask[key]:
-                if unverified_text(then) == unverified_text(texts[p]):
-                    hits.setdefault(p, []).append((line, rel, h, day, "bump"))
+        texts = {p: lines for p, _lv, _r, _n, lines in cited}
+        for (_h, note), (got, asked) in ask.items():
+            then = [(c[0], note) for c in touched[note] if c[4] < got[4]] + [(got[0], note)]
+            if any(k not in blobs for k in then):
+                continue
+            for p, line, rel in asked:
+                kind = drift_kind([texts[p]] + [blobs[k] for k in then])
+                if kind:
+                    hits.setdefault(p, []).append((line, rel, got[1], got[2], kind))
     for p, lv, _refs, _note, _lines in cited:
         if p not in hits:
             continue
         found = sorted(hits[p])
         line, rel, h, day, kind = found[0]
         more = f" (+{len(found) - 1} more)" if len(found) > 1 else ""
-        said = (f"after this note's last-verified {lv}" if kind == "date" else
-                f"and the note's text has not changed since, only its "
-                f"last-verified ({lv})")
+        said = {"date": f"after this note's last-verified {lv}",
+                "bump": f"and the note's text has not changed since, only its "
+                        f"last-verified ({lv})",
+                "bare": f"and the newest change of this note's last-verified "
+                        f"({lv}) came without a change of its text"}[kind]
         findings.append(Finding(
             "WARN", "pointer-drift", str(p), line,
             f"{rel} changed in {h} on {day}, {said}{more} - check what the "
@@ -3079,6 +3095,27 @@ def check_pointer_drift(vault, notes, spec, findings):
 def unverified_text(lines):
     """A note's lines without its last-verified line - what a bare bump leaves unchanged."""
     return [line.rstrip() for line in lines if not line.startswith("last-verified:")]
+
+
+def drift_kind(versions):
+    """Why a note dated on or after a change is still asked about it, or None.
+
+    versions: the note now, at every commit since the change (newest
+    first), and at the change. 'bump': its text is what it was at the
+    change. 'bare': the newest change of its last-verified line came
+    without a change of its text - an edit for another reason before it
+    does not make the date a re-check.
+    """
+    if unverified_text(versions[0]) == unverified_text(versions[-1]):
+        return "bump"
+
+    def stamp(lines):
+        return [x for x in lines if x.startswith("last-verified:")][:1]
+
+    for newer, older in zip(versions, versions[1:]):
+        if stamp(newer) != stamp(older):
+            return "bare" if unverified_text(newer) == unverified_text(older) else None
+    return None
 
 
 def id_units(lines, fm_end, mask):
