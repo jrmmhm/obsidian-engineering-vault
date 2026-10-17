@@ -7727,6 +7727,87 @@ if [ "$(ga_git 2026-01-09 -C "$GR/20_software/part" config remote.origin.promiso
    && ! GIT_NO_LAZY_FETCH=1 ga_git 2026-01-09 -C "$GR/20_software/part" cat-file -e "$gp_new" 2>/dev/null; then ok x; else
   fail "ref-unresolved must never make a partial clone fetch a missing object"; fi
 
+# A dead id kept beside its live successor, marked as the old one, is
+# history (DEC-MTH-060). The accepted forms are the ones the docs-2 A/B arms
+# wrote; each is bound to the side the dead id stands on.
+ga_note "$IMPR/IMP_Alias_Before.md" IMP 2026-01-05 active \
+  "Fixed in (commit $gr_head, \`deadbe7a\` before the history"
+printf '  rewrite) for gcc.\n' >> "$IMPR/IMP_Alias_Before.md"
+ga_note "$IMPR/IMP_Alias_After.md" IMP 2026-01-05 active \
+  "Harness fix (commit deadbe8a, $gr_head after the history rewrite)."
+ga_note "$IMPR/IMP_Alias_Arrow.md" IMP 2026-01-05 active \
+  "Moved: commit deadbe9a → $gr_head after the split."
+ga_note "$IMPR/IMP_Alias_Was.md" IMP 2026-01-05 active "Now \`$gr_head\` (was \`deadbe0a\`)."
+ga_note "$IMPR/IMP_Alias_Cell.md" IMP 2026-01-05 active "| old | new |"
+printf '| --- | --- |\n| `deadbe1b` -> `%s` | x |\n' "$gr_head" >> "$IMPR/IMP_Alias_Cell.md"
+ga_note "$IMPR/IMP_Alias_None.md" IMP 2026-01-05 active "\`deadbe2b\` before the history rewrite."
+ga_note "$IMPR/IMP_Alias_Reversed.md" IMP 2026-01-05 active \
+  "Commit \`deadbe3b\` (formerly \`$gr_head\`)."
+ga_note "$IMPR/IMP_Alias_Unmarked.md" IMP 2026-01-05 active \
+  "Later (was \`deadbe4b\`, now \`$gr_head\`)."
+printf 'Also `deadbe4b` is cited.\n' >> "$IMPR/IMP_Alias_Unmarked.md"
+ga_note "$IMPR/IMP_Alias_Next_Sentence.md" IMP 2026-01-05 active \
+  "The live one is \`$gr_head\`. It was \`deadbe5b\`."
+ga_note "$IMPR/IMP_Alias_No_Marker.md" IMP 2026-01-05 active "\`deadbe6b\` and \`$gr_head\` both."
+ga_note "$IMPR/IMP_Alias_Two_Cells.md" IMP 2026-01-05 active "| old | new |"
+printf '| --- | --- |\n| `deadbe7b` | `%s` after the rewrite |\n' "$gr_head" >> "$IMPR/IMP_Alias_Two_Cells.md"
+ga_out=$(python3 "$VALIDATOR" "$GRV" 2>&1); ga_rc=$?
+for quiet in IMP_Alias_Before IMP_Alias_After IMP_Alias_Arrow IMP_Alias_Was IMP_Alias_Cell; do
+  TESTS=$((TESTS + 1))
+  if [ $ga_rc -ne 2 ] && ! contains "$ga_out" "$quiet\.md:[0-9]* \[ref-unresolved\]"; then ok x; else
+    fail "$quiet keeps a dead id marked beside its successor and must not be reported:"
+    printf '%s\n' "$ga_out" | grep -E "$quiet|crash" | sed 's/^/    /'; fi
+done
+for loud in IMP_Alias_None:deadbe2b IMP_Alias_Reversed:deadbe3b IMP_Alias_Next_Sentence:deadbe5b \
+            IMP_Alias_No_Marker:deadbe6b IMP_Alias_Two_Cells:deadbe7b; do
+  TESTS=$((TESTS + 1))
+  if contains "$ga_out" "${loud%%:*}\.md:[0-9]* \[ref-unresolved\] commit id(s) \`${loud#*:}\`"; then ok x; else
+    fail "${loud%%:*}: a dead id without a marked live successor must still be reported:"
+    printf '%s\n' "$ga_out" | grep ref-unresolved | sed 's/^/    /'; fi
+done
+TESTS=$((TESTS + 1))
+if contains "$ga_out" "IMP_Alias_Unmarked\.md:12 \[ref-unresolved\] commit id(s) \`deadbe4b\`"; then ok x; else
+  fail "a dead id marked in one place and cited bare in another must be reported at the bare one:"
+  printf '%s\n' "$ga_out" | grep IMP_Alias_Unmarked | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if contains "$ga_out" "the old one may stay beside it, marked as it is in the conventions file"; then ok x; else
+  fail "the ref-unresolved repair must say that a marked old id may stay"; fi
+# A clone the vault points into, absent here and ignored by git: an id
+# only it holds reads as dead, so the dead ids are counted in one line and
+# none is reported with a repair. A bare mention of the folder, a folder
+# git does not ignore, a clone that is present, and the user's own
+# excludes file each leave the per-id findings in place.
+printf '20_software/gone/\n' >> "$GR/.gitignore"
+ga_note "$IMPR/IMP_Into_Clone.md" IMP 2026-01-05 active "The driver is \`20_software/gone/src/drv.c\`."
+gc_out=$(python3 "$VALIDATOR" "$GRV" 2>&1)
+TESTS=$((TESTS + 1))
+if contains "$gc_out" "^WARN [^ ]*01_projectvault \[ref-unresolved\] [0-9]* commit id(s) not checked: clone(s) 20_software/gone absent$" \
+   && ! contains "$gc_out" "resolve to no object"; then ok x; else
+  fail "an absent ignored clone the vault points into must turn the dead ids into one summary line:"
+  printf '%s\n' "$gc_out" | grep ref-unresolved | sed 's/^/    /'; fi
+TESTS=$((TESTS + 1))
+if [ "$(printf '%s\n' "$gc_out" | grep -c 'not checked: clone')" = 1 ]; then ok x; else
+  fail "the absent-clone summary must be one line per run"; fi
+printf '[core]\n\texcludesFile = %s\n' "$GA_TMP/gexcludes" > "$GA_TMP/gcfg"
+printf '20_software/other/\n' > "$GA_TMP/gexcludes"
+for variant in bare unignored global present; do
+  case $variant in
+    bare) body="The clone would be \`20_software/gone\`." ;;
+    unignored) body="The driver is \`20_software/kept/src/drv.c\`." ;;
+    global) body="The driver is \`20_software/other/src/drv.c\`." ;;
+    present) body="The driver is \`20_software/gone/src/drv.c\`."
+             mkdir -p "$GR/20_software/gone"; ga_git 2026-01-10 init -q "$GR/20_software/gone" ;;
+  esac
+  ga_note "$IMPR/IMP_Into_Clone.md" IMP 2026-01-05 active "$body"
+  gv_out=$(GIT_CONFIG_GLOBAL="$GA_TMP/gcfg" python3 "$VALIDATOR" "$GRV" 2>&1)
+  TESTS=$((TESTS + 1))
+  if ! contains "$gv_out" "not checked: clone" \
+     && contains "$gv_out" "IMP_Dead\.md:11 \[ref-unresolved\] commit id(s) \`deadbee1\`"; then ok x; else
+    fail "absent-clone summary must not replace the per-id findings ($variant):"
+    printf '%s\n' "$gv_out" | grep ref-unresolved | sed 's/^/    /'; fi
+done
+rm -rf "$GR/20_software/gone" "$IMPR/IMP_Into_Clone.md"
+
 # --- Unit 3: pending-stale ----------------------------------------------
 # Needs no repository, so this fixture has none.
 GPV="$GA_TMP/Pending/00_documentation/01_projectvault"
