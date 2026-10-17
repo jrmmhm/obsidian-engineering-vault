@@ -182,4 +182,4 @@ Status of the **allocation** (not of the REQ file as a whole).
 - **Blocked**: currently not verifiable/implementable (dependency missing)
 
 **Rule:**
-- Only set **Verified** if a TAE/INS/ANA link exists and the associated evidence is documented.
+- Only set **Verified** if a TAE/INS/ANA link exists and the associated evidence is documented. The evidence covers every clause of the acceptance criterion of each allocated requirement, and that criterion is written from what the requirement demands, not from the evidence at hand: while a clause has no evidence, the allocation stays **Draft** or **Approved**, and a clause is changed or split off only as a change of the REQ file with its reason in column 5 — never dropped or softened so the allocation can be set to **Verified**.

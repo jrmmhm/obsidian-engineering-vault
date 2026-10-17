@@ -115,6 +115,21 @@ decision.
 
 ### Changed
 
+- **An acceptance criterion is never weakened to reach `Verified`** — the
+  `Verified` rule now says what the evidence has to cover: each acceptance
+  criterion is written from what its requirement demands, not from the
+  evidence at hand, a row whose evidence covers only part of it stays `Draft`
+  or `Approved`, and a clause changes only as a requirement change with its
+  own reason. In an A/B comparison more than half of the documentation
+  sessions wrote the criterion from the unit tests they held, left out the
+  pending device check and set `Verified`. The sentence stands in `CLAUDE.md` rule 7, its copy in
+  `CONTRIBUTING.md`, the Column 4 rule of the ARC README and the coverage
+  section of `SKILL.md`; a derived project copies it into its own `CLAUDE.md`
+  and ARC README. No tool output moves, and a vault whose `Verified` row rests
+  on a weakened criterion was not correct under "its evidence" before either:
+  the sentence makes the existing rule explicit, **MINOR** by the table. Why:
+  [DEC-MTH-064](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Criterion_Is_Never_Weakened_To_Reach_Verified.md).
+
 - **`SKILL.md` is shorter and keeps the reasons it steers by** — the
   traceability export, which copy of the skill enforces and the tiers
   outside a session moved to a new `REFERENCE.md` beside it, which a session
