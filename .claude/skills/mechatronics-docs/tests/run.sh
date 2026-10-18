@@ -7814,15 +7814,28 @@ ga_note "$IMPR/IMP_Alias_Next_Sentence.md" IMP 2026-01-05 active \
 ga_note "$IMPR/IMP_Alias_No_Marker.md" IMP 2026-01-05 active "\`deadbe6b\` and \`$gr_head\` both."
 ga_note "$IMPR/IMP_Alias_Two_Cells.md" IMP 2026-01-05 active "| old | new |"
 printf '| --- | --- |\n| `deadbe7b` | `%s` after the rewrite |\n' "$gr_head" >> "$IMPR/IMP_Alias_Two_Cells.md"
+# The event also written 'split' or 'rewrote': the three sentences a docs-4
+# A/B control arm wrote unprompted, ids swapped for the fixture's. The side
+# stays bound - a dead id 'after the split' is still reported.
+ga_note "$IMPR/IMP_Alias_Split_Before.md" IMP 2026-01-05 active \
+  "Not forced (commit \`$gr_head\`, \`deadbf1a\` before the repository split): clang only."
+ga_note "$IMPR/IMP_Alias_Split_Rewrote.md" IMP 2026-01-05 active \
+  "The removal (harness commit \`$gr_head\`, \`deadbf2a\` before the repository split rewrote history; for gcc) holds."
+ga_note "$IMPR/IMP_Alias_Split_After.md" IMP 2026-01-05 active \
+  "Harness fix (commit deadbf3a, \`$gr_head\` after the repository split): dropped."
+ga_note "$IMPR/IMP_Alias_Split_Reversed.md" IMP 2026-01-05 active \
+  "Harness fix (commit \`$gr_head\`, \`deadbf4a\` after the repository split): dropped."
 ga_out=$(python3 "$VALIDATOR" "$GRV" 2>&1); ga_rc=$?
-for quiet in IMP_Alias_Before IMP_Alias_After IMP_Alias_Arrow IMP_Alias_Was IMP_Alias_Cell; do
+for quiet in IMP_Alias_Before IMP_Alias_After IMP_Alias_Arrow IMP_Alias_Was IMP_Alias_Cell \
+             IMP_Alias_Split_Before IMP_Alias_Split_Rewrote IMP_Alias_Split_After; do
   TESTS=$((TESTS + 1))
   if [ $ga_rc -ne 2 ] && ! contains "$ga_out" "$quiet\.md:[0-9]* \[ref-unresolved\]"; then ok x; else
     fail "$quiet keeps a dead id marked beside its successor and must not be reported:"
     printf '%s\n' "$ga_out" | grep -E "$quiet|crash" | sed 's/^/    /'; fi
 done
 for loud in IMP_Alias_None:deadbe2b IMP_Alias_Reversed:deadbe3b IMP_Alias_Next_Sentence:deadbe5b \
-            IMP_Alias_No_Marker:deadbe6b IMP_Alias_Two_Cells:deadbe7b; do
+            IMP_Alias_No_Marker:deadbe6b IMP_Alias_Two_Cells:deadbe7b \
+            IMP_Alias_Split_Reversed:deadbf4a; do
   TESTS=$((TESTS + 1))
   if contains "$ga_out" "${loud%%:*}\.md:[0-9]* \[ref-unresolved\] commit id(s) \`${loud#*:}\`"; then ok x; else
     fail "${loud%%:*}: a dead id without a marked live successor must still be reported:"
