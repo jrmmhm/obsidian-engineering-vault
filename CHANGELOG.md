@@ -239,6 +239,15 @@ decision.
 
 ### Fixed
 
+- **An advisory says its repair itself** — the `pointer-drift` and
+  `ref-unresolved` messages pointed at the conventions file for the repair
+  and for the forms a kept historical id may take, a passage a derived
+  project's own conventions file may not carry yet (the kernel vault's had
+  none). The `ref-unresolved` message now names the marks; the
+  `pointer-drift` message, complete already, drops the pointer. Message text
+  only, the same findings: **PATCH**. The reasoning is
+  [`DEC_An_Advisory_Carries_Its_Own_Repair`](.claude/01_methodvault/02_decisions_(DEC)/DEC_An_Advisory_Carries_Its_Own_Repair.md).
+
 - **A historical id marked "before the repository split" is history** —
   `ref-unresolved` accepted a dead id kept beside its live successor only
   when the sentence named the event "rewrite". A control arm of the docs-4

@@ -7554,7 +7554,7 @@ ga_commit "$GD/20_software/clone" 2026-03-01 "clone history"
 gd_out=$(python3 "$VALIDATOR" "$GDV" 2>&1); gd_rc=$?
 TESTS=$((TESTS + 1))
 if [ $gd_rc -ne 2 ] && contains "$gd_out" \
-  "^WARN .*IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, after this note's last-verified 2026-01-05 - check what the note says against that change and fix it, or record in the note that it still holds (conventions file, pointer-drift); bump last-verified only after that, the date alone does not clear this$"; then ok x; else
+  "^WARN .*IMP_Tool\.md:11 \[pointer-drift\] 20_software/tool\.py changed in [0-9a-f]* on 2026-02-01, after this note's last-verified 2026-01-05 - check what the note says against that change and fix it, or record in the note that it still holds; bump last-verified only after that, the date alone does not clear this$"; then ok x; else
   fail "a file changed after its note's last-verified must be reported as pointer-drift:"
   printf '%s\n' "$gd_out" | grep -E 'pointer-drift|crash' | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
@@ -7846,8 +7846,16 @@ if contains "$ga_out" "IMP_Alias_Unmarked\.md:12 \[ref-unresolved\] commit id(s)
   fail "a dead id marked in one place and cited bare in another must be reported at the bare one:"
   printf '%s\n' "$ga_out" | grep IMP_Alias_Unmarked | sed 's/^/    /'; fi
 TESTS=$((TESTS + 1))
-if contains "$ga_out" "the old one may stay beside it, marked as it is in the conventions file"; then ok x; else
-  fail "the ref-unresolved repair must say that a marked old id may stay"; fi
+if contains "$ga_out" "the old one may stay beside it when the same sentence or table cell marks it old ('<old> -> <new>', 'was <old>', '<old> before the rewrite', '<new> after the rewrite'; 'split' or 'rewrote' may stand for 'rewrite')"; then ok x; else
+  fail "the ref-unresolved repair must say that a marked old id may stay, and name the marks"; fi
+# The repair travels with the validator (DEC-MTH-066): a derived vault's
+# conventions file may predate the passage, so no advisory points there.
+TESTS=$((TESTS + 1))
+gm_lines=$(printf '%s\n%s\n' "$gd_out" "$ga_out" | grep -E '\[(pointer-drift|ref-unresolved|pending-stale)\]')
+if contains "$gm_lines" '\[pointer-drift\]' && contains "$gm_lines" '\[ref-unresolved\]' \
+   && ! contains "$gm_lines" 'conventions file'; then ok x; else
+  fail "an advisory message must carry its repair, not point at the conventions file:"
+  printf '%s\n%s\n' "$gd_out" "$ga_out" | grep 'conventions file' | sed 's/^/    /'; fi
 # A clone the vault points into, absent here and ignored by git: an id
 # only it holds reads as dead, so the dead ids are counted in one line and
 # none is reported with a repair. A bare mention of the folder, a folder
