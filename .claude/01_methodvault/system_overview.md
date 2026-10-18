@@ -78,6 +78,7 @@ corrects a statement of an earlier one, the earlier file carries a
 | DEC-MTH-062 | 2026-10-16 | [[DEC_The_Thresholds_Are_The_Methods_Own_Numbers]] — the length and link-budget thresholds are the method's own numbers, and their three sources are cited for what they report |
 | DEC-MTH-063 | 2026-10-16 | [[DEC_The_Skill_Text_Keeps_The_Reasons_It_Steers_By]] — the skill text keeps the reasoning behind the rules it steers by; tool reference moves one level deep |
 | DEC-MTH-064 | 2026-10-17 | [[DEC_A_Criterion_Is_Never_Weakened_To_Reach_Verified]] — an acceptance criterion is never weakened so an allocation can reach `Verified` |
+| DEC-MTH-066 | 2026-10-18 | [[DEC_An_Advisory_Carries_Its_Own_Repair]] — an advisory message states its repair itself instead of pointing at a conventions passage a derived vault may lack |
 
 DEC-MTH-032 is the only entry of the log's own era that was not migrated: it
 is the decision that performed the migration, and it is written here rather

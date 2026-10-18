@@ -6,6 +6,7 @@ last-verified: 2026-10-18
 ---
 Date: 2026-10-16
 Status: Accepted
+Corrected by: [[DEC_An_Advisory_Carries_Its_Own_Repair]] – each advisory message now carries its repair and forms; the conventions file no longer owns them alone
 
 ## Context
 
@@ -142,9 +143,8 @@ names its host.
   changes the cited file and only the note's date counts as written
   together; a renamed note reads as written after the change; a partial
   clone, lacking the note's earlier text, leaves the date unquestioned.
-- Follow-up, not built: R5 F19 `verifies-suspect` - a REQ file changed
-  after the `last-verified` of a TAE that verifies it - is one more pair on
-  the same walk.
+- Follow-up, not built: R5 F19 `verifies-suspect` (a REQ changed after the
+  `last-verified` of a TAE verifying it), one more pair on the same walk.
 - Follow-up, not built: the git reads that predate this decision -
   `git_head_content` and `head_identifiers` - run without the network
   block and can make a partial vault repository fetch a blob on demand.
