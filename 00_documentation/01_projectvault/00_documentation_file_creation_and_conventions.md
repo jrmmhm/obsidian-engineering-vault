@@ -274,7 +274,9 @@ after "was", "formerly" or "previously" (`` `0dcf958` (was `92b06cd`) ``);
 the old id before an arrow and the new one after it
 (`` `92b06cd` → `0dcf958` ``, or `->`); the old id followed by "before
 the … rewrite", or the new one by "after the … rewrite", with the other
-id in the same sentence. Any other wording reads as citing the old id.
+id in the same sentence; "rewrote" or "split" may name the event instead
+(`` `0dcf958`, `92b06cd` before the repository split ``). Any other
+wording reads as citing the old id.
 When the vault names a path inside a clone that is absent on this
 machine and ignored by git, an id of that clone cannot be told from a
 dead one, so the dead ids are counted in one line instead of reported one

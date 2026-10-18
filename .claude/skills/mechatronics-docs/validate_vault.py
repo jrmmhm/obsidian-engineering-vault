@@ -183,12 +183,15 @@ COMMIT_WORD_RE = re.compile(r"\b(?i:commits?)\s+`?([0-9a-f]{7,40})(?![\w@])")
 # a stale pointer (DEC-MTH-060). Only the forms agents were measured writing
 # count, each bound to the side the dead id stands on - '`old` -> `new`',
 # 'was/formerly/previously `old`', '`old` before the ... rewrite',
-# '`new` after the ... rewrite' - so '`old` (formerly `new`)', which calls
-# the dead id current, is still reported. ALIAS_HINT_RE only decides which
-# sentences have their bare hex words looked up as possible successors.
+# '`new` after the ... rewrite', the event also written 'rewrote' or
+# 'split' (the repository split that rewrote the ids, docs-4 A/B) - so
+# '`old` (formerly `new`)', which calls the dead id current, is still
+# reported. ALIAS_HINT_RE only decides which sentences have their bare hex
+# words looked up as possible successors.
 HEX_WORD_RE = re.compile(r"(?<![\w@])([0-9a-f]{7,40})(?![\w@])")
-ALIAS_HINT_RE = re.compile(r"→|->|\b(?:was|formerly|previously|rewrit(?:e|ten))\b", re.I)
-REWRITE_TAIL = r"`?,?\s+{}\s+[^.;|]{{0,40}}?\brewrit(?:e|ten)\b"
+ALIAS_HINT_RE = re.compile(
+    r"→|->|\b(?:was|formerly|previously|rewrit(?:e|ten)|rewrote|split)\b", re.I)
+REWRITE_TAIL = r"`?,?\s+{}\s+[^.;|]{{0,40}}?\b(?:rewrit(?:e|ten)|rewrote|split)\b"
 # A sentence ends at '.', '!' or '?' followed by whitespace - not inside a
 # path or a version, which carry no space after the dot.
 SENTENCE_RE = re.compile(r"(?:[^.!?]|[.!?](?!\s))+[.!?]*")

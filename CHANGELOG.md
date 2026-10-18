@@ -239,6 +239,17 @@ decision.
 
 ### Fixed
 
+- **A historical id marked "before the repository split" is history** —
+  `ref-unresolved` accepted a dead id kept beside its live successor only
+  when the sentence named the event "rewrite". A control arm of the docs-4
+  A/B marked all three of its repaired ids with "split" or "rewrote", and
+  each would have been reported as a stale citation on a machine where no
+  clone the vault points into is missing. "split" and "rewrote" now name the event too, bound to the same
+  side as before. Fewer `ref-unresolved` findings, none new: **PATCH**.
+  The forms are in the conventions file's quick reference; the reasoning
+  is
+  [`DEC_Git_History_Says_Which_Notes_To_Reverify`](.claude/01_methodvault/02_decisions_(DEC)/DEC_Git_History_Says_Which_Notes_To_Reverify.md).
+
 - **The enforcement layer's research citations say what their sources
   say** — `DEC_Enforcement_Layer_For_The_Vault_Conventions`, the record
   every validator change refines, quoted the DocPrism ablation as "98%

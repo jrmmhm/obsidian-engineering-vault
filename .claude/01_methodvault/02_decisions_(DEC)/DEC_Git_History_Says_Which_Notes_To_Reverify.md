@@ -2,7 +2,7 @@
 domain: DEC
 id: DEC-MTH-060
 created: 2026-10-16
-last-verified: 2026-10-17
+last-verified: 2026-10-18
 ---
 Date: 2026-10-16
 Status: Accepted
@@ -103,10 +103,10 @@ names its host.
   the newest date change exists because the A/B target note had been
   edited for another reason after the change: compared with its text at
   the change alone, a later bare bump cleared it again.
-- A stale claim is corrected or marked, never silently dropped, and the
-  old reporting turned a correct mark into a deletion. The accepted forms
-  are the ones the sessions wrote, bound to direction: a looser marker
-  silences a stale id beside an unrelated live one.
+- A stale claim is corrected or marked, never dropped; the old reporting
+  turned a correct mark into a deletion. Accepted are the forms sessions
+  wrote ("split" and "rewrote" since docs-4), bound to direction: a
+  looser marker silences a stale id beside an unrelated live one.
 - For an absent clone, silence would hide that the check did not run, and
   a per-id finding asks to replace a correct upstream id. A clone counts
   as expected only when the vault names a path inside it: the kernel vault
