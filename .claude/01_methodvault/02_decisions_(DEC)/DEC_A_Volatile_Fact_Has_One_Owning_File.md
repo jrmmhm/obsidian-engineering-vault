@@ -113,3 +113,12 @@ month, how many files become wrong?
 - `/implement` Phase 6 reviews documentation against this rule
   (`DEC-AIW-001` in the AI method vault). Without a written standard that
   criterion would have been one opinion against another.
+- Follow-up, not built: extending this rule to lifecycle state (a status
+  such as "sent" written once, in its tracker) was rejected three times by
+  single-session A/Bs. The last, docs-4 AB-T1 (2026-10-17), found equal
+  quality, 7 restatements against 32, and 22 % more turns. A single session
+  cannot show the benefit: a restated state only harms once it changes. A
+  fair re-test runs two sessions - document, change the state, update - and
+  counts the stale claims left, under the corrected judge rubric
+  (`DEC-AIW-018` in the AI method vault). The parked branch is
+  `feat/lifecycle-state-owner-r2`.
