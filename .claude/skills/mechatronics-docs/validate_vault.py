@@ -3093,7 +3093,7 @@ def check_pointer_drift(vault, notes, spec, findings):
             "WARN", "pointer-drift", str(p), line,
             f"{rel} changed in {h} on {day}, {said}{more} - check what the "
             "note says against that change and fix it, or record in the note "
-            "that it still holds (conventions file, pointer-drift); bump "
+            "that it still holds; bump "
             "last-verified only after that, the date alone does not clear this"))
 
 
@@ -3319,9 +3319,12 @@ def check_ref_unresolved(vault, notes, spec, findings):
             f"commit id(s) {listed} resolve to no object in {where} - a "
             "rewritten history or a deleted branch leaves an id dead once its "
             "objects are pruned; replace it with the id that carries the "
-            "change now - the old one may stay beside it, marked as it is in "
-            "the conventions file - or write an id of a repository this "
-            "project does not hold as repo@id"))
+            "change now - the old one may stay beside it when the same "
+            "sentence or table cell marks it old ('<old> -> <new>', "
+            "'was <old>', '<old> before the rewrite', '<new> after the "
+            "rewrite'; 'split' or 'rewrote' may stand for 'rewrite') - or "
+            "write an id of a repository this project does not hold as "
+            "repo@id"))
 
 
 def check_pending_stale(vault, notes, spec, findings):
