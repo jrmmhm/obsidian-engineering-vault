@@ -134,6 +134,22 @@ decision.
 
 ### Changed
 
+- **A fact about the software lives in the vault, a document, a test or the
+  code, nowhere else**: `SKILL.md` gains Detail Ownership rule 6 and one
+  question under closing checklist item 5. Agent and orchestrator
+  workspaces, scratch and temp folders, worktrees, chat transcripts and
+  branches no remote holds are never a home, and nothing in the repository
+  points into one, because they are deleted when the work ends and take the
+  fact with them. A fact that exists only there moves into its owning note,
+  test or code before the session or batch ends; a path naming an artifact
+  itself (installed, deployed or kept on another machine) stays allowed. In a derived project, vault notes and
+  handoffs pointed into such a workspace. No tool output and no finding code moves,
+  and a note pointing into a workspace already failed "all referenced
+  artifact paths exist" on any other machine: corrected documentation,
+  **MINOR** by the table. A derived project gains the rule when it copies
+  the skill. Why:
+  [DEC-MTH-067](.claude/01_methodvault/02_decisions_(DEC)/DEC_A_Fact_Lives_Only_Where_The_Project_Keeps_It.md).
+
 - **An acceptance criterion is never weakened to reach `Verified`** — the
   `Verified` rule now says what the evidence has to cover: each acceptance
   criterion is written from what its requirement demands, not from the

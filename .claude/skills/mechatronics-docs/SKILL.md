@@ -135,6 +135,23 @@ The rules:
    source.** Name the owning file on the same line. A reader who finds a
    contradiction then knows which one is authoritative — without that, both
    are equally credible and both are useless.
+6. **The owner outlives the session.** A fact about the software or the
+   project's artifacts is kept in its owning vault note, a project
+   document or a `50_sources/` reference (books, manuals), a test, or the
+   code; a fact from outside the project may be cited by a stable URL or
+   a commit on a remote (`repo@id`). An agent or orchestrator workspace, a
+   scratch or temp folder, a worktree, a chat transcript, a branch no
+   remote holds, or any other record kept outside the repository is never
+   a home, and nothing in the repository points into one: those places
+   are deleted when the work ends, the fact goes with them and the link
+   stays behind, dead, as it did for the notes and handoffs of a derived
+   project that cited an orchestrator's workspace. A path naming an
+   artifact itself (installed, deployed or kept on another machine),
+   written as the conventions file asks, is not such a record. When a fact you need exists only in such a
+   place, move it into its owning note, test or code before the session
+   or batch ends, link that owner, and leave the rest behind. Never copy a
+   whole workspace record into the repository: a dump has no owner and
+   restates every fact it holds.
 
 The check before you write any concrete value: *if this changes next
 month, how many files in this vault become wrong?* More than one is a
@@ -306,6 +323,8 @@ appears not to be enforced), and the tiers outside a session.
    and every volatile fact you wrote owned by exactly one file — no path,
    version, flag, value or unit name restated in a second note?
 5. All wikilinks resolve; all referenced artifact paths exist?
+   Nothing points into a workspace, scratch folder, worktree, transcript
+   or a branch no remote holds?
 6. Invalidation sweep done — no existing note contradicts the new state?
 7. Every touched REQ has a verifying TAE (or a recorded deferred one)?
 8. system_overview / parent ARC / glossary updated where needed?
