@@ -141,8 +141,8 @@ decision.
   branches no remote holds are never a home, and nothing in the repository
   points into one, because they are deleted when the work ends and take the
   fact with them. A fact that exists only there moves into its owning note,
-  test or code before the session or batch ends; a path to an installed or
-  deployed artifact stays allowed. In a derived project, vault notes and
+  test or code before the session or batch ends; a path naming an artifact
+  itself (installed, deployed or kept on another machine) stays allowed. In a derived project, vault notes and
   handoffs pointed into such a workspace. No tool output and no finding code moves,
   and a note pointing into a workspace already failed "all referenced
   artifact paths exist" on any other machine: corrected documentation,

@@ -67,7 +67,8 @@ stable URL or a commit on a remote), names what is never a home (agent and
 orchestrator workspaces, scratch and temp folders, worktrees, chat
 transcripts, a branch no remote holds, any other record outside the
 repository), and forbids anything in the repository to point into one. A
-path that names an installed or deployed artifact is not such a record.
+path that names an artifact itself (installed, deployed or kept on another
+machine) is not such a record.
 A fact that exists only in a workspace moves into its owning note, test or
 code before the session or batch ends; a whole workspace record is never
 copied in. Closing checklist item 5 asks the question once more.

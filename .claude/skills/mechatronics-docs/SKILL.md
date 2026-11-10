@@ -146,8 +146,8 @@ The rules:
    are deleted when the work ends, the fact goes with them and the link
    stays behind, dead, as it did for the notes and handoffs of a derived
    project that cited an orchestrator's workspace. A path naming an
-   installed or deployed artifact, written as the conventions file asks,
-   is not such a record. When a fact you need exists only in such a
+   artifact itself (installed, deployed or kept on another machine),
+   written as the conventions file asks, is not such a record. When a fact you need exists only in such a
    place, move it into its owning note, test or code before the session
    or batch ends, link that owner, and leave the rest behind. Never copy a
    whole workspace record into the repository: a dump has no owner and
