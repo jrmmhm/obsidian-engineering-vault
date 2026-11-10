@@ -24,8 +24,8 @@ and 12 handoff or prompt files of the project's administration folder.
 Those workspaces are temporary by design. An orchestrator removes them when
 a batch closes, `git worktree remove` deletes a worktree, and Claude Code
 deletes its session transcripts after the period its `cleanupPeriodDays`
-setting names (code.claude.com settings reference and git-scm.com
-git-worktree, both read 2026-11-10). Each such path is a fact that leaves
+setting names (code.claude.com/docs/en/settings-reference and
+git-scm.com/docs/git-worktree, both read 2026-11-10). Each such path is a fact that leaves
 with the workspace and a link that stays behind, dead.
 
 The repository owner's decision (2026-11-10), in the owner's words: "Informationen über die
